@@ -140,12 +140,52 @@ kafclaw install      # copies to /usr/local/bin
 
 ### Deployment Modes
 
-| Mode | Description |
-|------|-------------|
-| Standalone | Local binary, no Kafka/orchestrator, localhost only |
-| Full | Local binary + Kafka group + orchestrator |
-| Headless | Binds 0.0.0.0, requires auth token, no GUI |
-| Remote | Electron UI connects to headless server |
+| Mode | Command | Bind Address | Auth Required | Description |
+|------|---------|-------------|---------------|-------------|
+| Standalone | `make run` | `127.0.0.1` | No | Local binary, no Kafka/orchestrator |
+| Full | `make run-full` | `127.0.0.1` | No | + Kafka group + orchestrator |
+| Headless | `make run-headless` | `0.0.0.0` | Yes | LAN/cloud accessible, no GUI |
+| Remote | `make electron-start-remote` | N/A | N/A | Electron UI connects to headless server |
+
+### LAN / Remote Access
+
+By default, KafClaw binds to `127.0.0.1` — only reachable from the local machine. This is an intentional security default.
+
+To make the gateway accessible from other machines on your LAN (e.g., Jetson Nano serving a home network):
+
+```bash
+export MIKROBOT_GATEWAY_AUTH_TOKEN=mysecrettoken
+make run-headless
+```
+
+Then access from another machine:
+
+```
+http://<server-ip>:18791/          # Dashboard
+http://<server-ip>:18790/chat      # API
+```
+
+**Common pitfalls:**
+- **Wrong protocol:** The gateway serves plain `http://`. Using `https://` in the browser will fail silently unless TLS is configured (`tlsCert`/`tlsKey` in gateway config).
+- **Still binding localhost:** If the startup log shows `http://127.0.0.1:18791`, the gateway is not network-accessible. Check that `MIKROBOT_GATEWAY_HOST=0.0.0.0` is set.
+- **Firewall:** Ensure ports 18790 and 18791 are open on the server's firewall.
+
+To bind to a specific IP instead of all interfaces:
+
+```bash
+MIKROBOT_GATEWAY_HOST=192.168.0.199 make run
+```
+
+Or set permanently in `~/.kafclaw/config.json`:
+
+```json
+{
+  "gateway": {
+    "host": "0.0.0.0",
+    "authToken": "mysecrettoken"
+  }
+}
+```
 
 ---
 

@@ -850,9 +850,21 @@ Adds Kafka consumer + group manager + orchestrator. Requires `MIKROBOT_GROUP_ENA
 ### 10.3 Headless Server
 
 ```bash
+export MIKROBOT_GATEWAY_AUTH_TOKEN=mysecrettoken
 make run-headless
 ```
-Binds `0.0.0.0`, requires `MIKROBOT_AUTH_TOKEN`. No GUI. Suitable for cloud deployment.
+Binds `0.0.0.0` (all network interfaces), requires `MIKROBOT_GATEWAY_AUTH_TOKEN`. No GUI. Suitable for cloud deployment and LAN access from other machines (e.g., Jetson Nano serving a home network).
+
+**LAN access from another machine:**
+
+```
+http://<server-ip>:18791/          # Dashboard (note: http, not https)
+http://<server-ip>:18790/chat      # API
+```
+
+**Important:** The default bind address is `127.0.0.1` (localhost only) — this is an intentional security default. If you see `http://127.0.0.1:18791` in the startup log, the gateway is not reachable from the network. Use `make run-headless` or set `MIKROBOT_GATEWAY_HOST=0.0.0.0` to expose it.
+
+**Protocol:** The gateway serves plain HTTP unless TLS is configured (`tlsCert`/`tlsKey`). Do not use `https://` in the browser unless you have configured TLS — the connection will fail silently.
 
 ### 10.4 Remote Client
 

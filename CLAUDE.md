@@ -59,12 +59,16 @@ KafClaw/
 │   ├── scripts/            ← install.sh, release.sh
 │   ├── go.mod, go.sum, Makefile, Dockerfile, docker-compose.yml
 │   └── ARCHITECTURE.md, MEMORY.md
+├── docs/                   ← Public documentation
+│   ├── bugs/               ← Bug reports (BUG-xxx-*.md)
+│   ├── tasklogs/           ← Completed task logs (TASK-xxx-*.md)
+│   └── v2/                 ← Guides, manuals, architecture docs
 └── private/                ← .gitignored (tracked in separate private repo)
-    ├── specs/              ← Architecture, requirements, design specs
-    ├── tasks/              ← Dev tasks, migration tasks, inspiration
-    ├── research/           ← Hardening research, drafts
-    ├── docs/               ← Guides, rebranding assets
-    └── governance/         ← AGENTS.md, archived CLAUDE.md, workspace soul files
+    └── v2/
+        ├── tasks/          ← Task plans (private)
+        ├── requirements/   ← Specs and requirements (FR-xxx-*.md)
+        ├── research/       ← Research drafts
+        └── docs/           ← Internal guides
 ```
 
 ## Three Repositories Model
@@ -135,13 +139,22 @@ Shell execution (`internal/tools/shell.go`) uses deny-pattern filtering (blocks 
 
 ## Task Workflow
 
-All implementation tasks follow a **plan → implement → log** cycle using `private/v2/`:
+All implementation tasks follow a **plan → implement → log** cycle:
 
-1. **Plan**: Create a task file in `private/v2/tasks/` using the naming convention `TASK-xxx-short-description.md` (or `BUG-xxx-` for bugs). Include: Status, Priority, Objective, Steps, Verification, Acceptance Criteria.
+1. **Plan**: Create a task file in `private/v2/tasks/` using `TASK-xxx-short-description.md`. Include: Status, Priority, Objective, Steps, Verification, Acceptance Criteria.
 2. **Implement**: Set Status to `In Progress`, do the work.
-3. **Log**: When done, set Status to `Done` in the task file, then create a corresponding entry in `private/v2/tasklog/TASK-xxx-short-description.md` with: completion date, summary of what was done, insights/lessons learned, and relevant commit references.
+3. **Log**: When done, set Status to `Done` in the task file, then create a **public** tasklog entry in `docs/tasklogs/TASK-xxx-short-description.md` with: completion date, summary of what was done, insights/lessons learned, and relevant commit references.
 
-This keeps task documentation consistent over time. The `tasks/` directory shows current/planned work; `tasklog/` is the permanent record of completed work with results and insights.
+### What goes where
+
+| Type | Location | Visibility | Naming |
+|------|----------|------------|--------|
+| **Bug reports** | `docs/bugs/` | Public (code repo) | `BUG-xxx-short-description.md` |
+| **Task logs** | `docs/tasklogs/` | Public (code repo) | `TASK-xxx-short-description.md` |
+| **Task plans** | `private/v2/tasks/` | Private | `TASK-xxx-short-description.md` |
+| **Specs & requirements** | `private/v2/requirements/` | Private | `FR-xxx-short-description.md` |
+
+Bug reports and task logs are **public** — they go in the code repo under `docs/` so anyone can see what was fixed and what was learned. Task plans and specs stay **private** because they may contain sensitive implementation details.
 
 **Private repo sync**: The `private/` directory is tracked separately in `KafClaw-PRIVATE-PARTS` (sibling repo at `/Users/kamir/GITHUB.kamir/KafClaw-PRIVATE-PARTS`). Use `sync-from-kafclaw.sh` to push changes, `sync-to-kafclaw.sh` to pull.
 

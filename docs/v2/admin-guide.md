@@ -103,8 +103,10 @@ WhatsApp-specific:
 | `Port` | `18790` | `KAFCLAW_GATEWAY_PORT` | API port |
 | `DashboardPort` | `18791` | `KAFCLAW_GATEWAY_DASHBOARD_PORT` | Dashboard port |
 | `AuthToken` | *(empty)* | `KAFCLAW_GATEWAY_AUTH_TOKEN` | Required for headless mode |
-| `TLSCert` | *(empty)* | — | Optional TLS certificate |
-| `TLSKey` | *(empty)* | — | Optional TLS key |
+| `TLSCert` | *(empty)* | — | Optional TLS certificate path |
+| `TLSKey` | *(empty)* | — | Optional TLS private key path |
+
+**LAN access:** The default `Host: 127.0.0.1` only accepts local connections. To expose the gateway on your network, set `Host` to `0.0.0.0` (all interfaces) or a specific LAN IP, and set `AuthToken` to secure it. Use `make run-headless` for the recommended configuration. The gateway serves plain HTTP — do not use `https://` in the browser unless TLS is configured.
 
 ### Tools Configuration
 
