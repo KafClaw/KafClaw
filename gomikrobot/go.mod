@@ -1,4 +1,4 @@
-module github.com/kamir/gomikrobot
+module github.com/KafClaw/KafClaw/gomikrobot
 
 go 1.24.0
 

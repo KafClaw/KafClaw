@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kamir/gomikrobot/internal/timeline"
+	"github.com/KafClaw/KafClaw/gomikrobot/internal/timeline"
 )
 
 // MemoryIndexer is an optional interface for indexing received group items

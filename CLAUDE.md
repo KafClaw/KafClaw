@@ -105,6 +105,6 @@ Shell execution (`internal/tools/shell.go`) uses deny-pattern filtering (blocks 
 
 **New CLI command:** Create file in `cmd/gomikrobot/cmd/`, define cobra command, register in `root.go` init().
 
-## Note on go.mod
+## Go Module
 
-The Go module is still `github.com/kamir/gomikrobot`. Renaming the module path is a separate follow-up task (requires updating imports in 31+ Go files).
+The Go module path is `github.com/KafClaw/KafClaw/gomikrobot`.

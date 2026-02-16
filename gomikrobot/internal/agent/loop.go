@@ -12,14 +12,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kamir/gomikrobot/internal/approval"
-	"github.com/kamir/gomikrobot/internal/bus"
-	"github.com/kamir/gomikrobot/internal/memory"
-	"github.com/kamir/gomikrobot/internal/policy"
-	"github.com/kamir/gomikrobot/internal/provider"
-	"github.com/kamir/gomikrobot/internal/session"
-	"github.com/kamir/gomikrobot/internal/timeline"
-	"github.com/kamir/gomikrobot/internal/tools"
+	"github.com/KafClaw/KafClaw/gomikrobot/internal/approval"
+	"github.com/KafClaw/KafClaw/gomikrobot/internal/bus"
+	"github.com/KafClaw/KafClaw/gomikrobot/internal/memory"
+	"github.com/KafClaw/KafClaw/gomikrobot/internal/policy"
+	"github.com/KafClaw/KafClaw/gomikrobot/internal/provider"
+	"github.com/KafClaw/KafClaw/gomikrobot/internal/session"
+	"github.com/KafClaw/KafClaw/gomikrobot/internal/timeline"
+	"github.com/KafClaw/KafClaw/gomikrobot/internal/tools"
 )
 
 // GroupTracePublisher can publish trace and audit data to a group.

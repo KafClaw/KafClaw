@@ -7,11 +7,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kamir/gomikrobot/internal/bus"
-	"github.com/kamir/gomikrobot/internal/policy"
-	"github.com/kamir/gomikrobot/internal/provider"
-	"github.com/kamir/gomikrobot/internal/timeline"
-	"github.com/kamir/gomikrobot/internal/tools"
+	"github.com/KafClaw/KafClaw/gomikrobot/internal/bus"
+	"github.com/KafClaw/KafClaw/gomikrobot/internal/policy"
+	"github.com/KafClaw/KafClaw/gomikrobot/internal/provider"
+	"github.com/KafClaw/KafClaw/gomikrobot/internal/timeline"
+	"github.com/KafClaw/KafClaw/gomikrobot/internal/tools"
 )
 
 // mockProvider returns a canned response and records calls for inspection.

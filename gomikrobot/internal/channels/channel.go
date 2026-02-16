@@ -3,7 +3,7 @@ package channels
 import (
 	"context"
 
-	"github.com/kamir/gomikrobot/internal/bus"
+	"github.com/KafClaw/KafClaw/gomikrobot/internal/bus"
 )
 
 // Channel defines the interface for chat platforms (Telegram, WhatsApp, etc).

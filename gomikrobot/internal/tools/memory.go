@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/kamir/gomikrobot/internal/memory"
+	"github.com/KafClaw/KafClaw/gomikrobot/internal/memory"
 )
 
 // RememberTool stores a piece of information in semantic memory.

@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/kamir/gomikrobot/internal/timeline"
+	"github.com/KafClaw/KafClaw/gomikrobot/internal/timeline"
 )
 
 // ApprovalRequest represents a pending approval for a tool call.

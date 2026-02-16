@@ -49,7 +49,7 @@ jobs:
           CGO_ENABLED: "0"
         run: |
           BIN_NAME="gomikrobot-${{ matrix.goos }}-${{ matrix.goarch }}"
-          go build -ldflags "-X github.com/kamir/gomikrobot/cmd/gomikrobot/cmd.version=${{ steps.version.outputs.tag }}" \
+          go build -ldflags "-X github.com/KafClaw/KafClaw/gomikrobot/cmd/gomikrobot/cmd.version=${{ steps.version.outputs.tag }}" \
             -o "dist/${BIN_NAME}" ./cmd/gomikrobot
           chmod +x "dist/${BIN_NAME}"
 

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kamir/gomikrobot/internal/provider"
+	"github.com/KafClaw/KafClaw/gomikrobot/internal/provider"
 )
 
 // ObserverConfig configures the observational memory system.

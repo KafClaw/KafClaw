@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/kamir/gomikrobot/internal/agent"
-	"github.com/kamir/gomikrobot/internal/bus"
-	"github.com/kamir/gomikrobot/internal/config"
-	"github.com/kamir/gomikrobot/internal/provider"
+	"github.com/KafClaw/KafClaw/gomikrobot/internal/agent"
+	"github.com/KafClaw/KafClaw/gomikrobot/internal/bus"
+	"github.com/KafClaw/KafClaw/gomikrobot/internal/config"
+	"github.com/KafClaw/KafClaw/gomikrobot/internal/provider"
 	"github.com/spf13/cobra"
 )
 

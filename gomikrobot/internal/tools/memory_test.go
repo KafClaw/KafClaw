@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kamir/gomikrobot/internal/memory"
-	"github.com/kamir/gomikrobot/internal/provider"
+	"github.com/KafClaw/KafClaw/gomikrobot/internal/memory"
+	"github.com/KafClaw/KafClaw/gomikrobot/internal/provider"
 	_ "modernc.org/sqlite"
 )
 

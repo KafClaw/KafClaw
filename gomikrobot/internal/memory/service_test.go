@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/kamir/gomikrobot/internal/provider"
+	"github.com/KafClaw/KafClaw/gomikrobot/internal/provider"
 )
 
 // fakeEmbedder returns a fixed vector for any input.

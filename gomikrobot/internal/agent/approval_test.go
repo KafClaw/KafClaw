@@ -7,10 +7,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kamir/gomikrobot/internal/approval"
-	"github.com/kamir/gomikrobot/internal/bus"
-	"github.com/kamir/gomikrobot/internal/policy"
-	"github.com/kamir/gomikrobot/internal/provider"
+	"github.com/KafClaw/KafClaw/gomikrobot/internal/approval"
+	"github.com/KafClaw/KafClaw/gomikrobot/internal/bus"
+	"github.com/KafClaw/KafClaw/gomikrobot/internal/policy"
+	"github.com/KafClaw/KafClaw/gomikrobot/internal/provider"
 )
 
 // TestApprovalFlowApproved exercises the full approval gate when the user approves.

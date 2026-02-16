@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/kamir/gomikrobot/internal/group"
+	"github.com/KafClaw/KafClaw/gomikrobot/internal/group"
 )
 
 // OrchestratorTopicName returns the Kafka topic for orchestrator messages.

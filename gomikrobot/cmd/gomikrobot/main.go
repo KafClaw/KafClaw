@@ -4,7 +4,7 @@ package main
 import (
 	"os"
 
-	"github.com/kamir/gomikrobot/cmd/gomikrobot/cmd"
+	"github.com/KafClaw/KafClaw/gomikrobot/cmd/gomikrobot/cmd"
 )
 
 func main() {

@@ -9,8 +9,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/kamir/gomikrobot/internal/bus"
-	"github.com/kamir/gomikrobot/internal/timeline"
+	"github.com/KafClaw/KafClaw/gomikrobot/internal/bus"
+	"github.com/KafClaw/KafClaw/gomikrobot/internal/timeline"
 )
 
 // JobCategory classifies jobs for semaphore-based concurrency limits.

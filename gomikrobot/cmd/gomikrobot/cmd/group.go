@@ -10,12 +10,12 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"github.com/kamir/gomikrobot/internal/agent"
-	"github.com/kamir/gomikrobot/internal/bus"
-	"github.com/kamir/gomikrobot/internal/config"
-	"github.com/kamir/gomikrobot/internal/group"
-	"github.com/kamir/gomikrobot/internal/timeline"
-	"github.com/kamir/gomikrobot/internal/tools"
+	"github.com/KafClaw/KafClaw/gomikrobot/internal/agent"
+	"github.com/KafClaw/KafClaw/gomikrobot/internal/bus"
+	"github.com/KafClaw/KafClaw/gomikrobot/internal/config"
+	"github.com/KafClaw/KafClaw/gomikrobot/internal/group"
+	"github.com/KafClaw/KafClaw/gomikrobot/internal/timeline"
+	"github.com/KafClaw/KafClaw/gomikrobot/internal/tools"
 	"github.com/spf13/cobra"
 )
 

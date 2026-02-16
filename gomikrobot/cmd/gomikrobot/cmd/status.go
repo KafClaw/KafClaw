@@ -5,7 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/kamir/gomikrobot/internal/config"
+	"github.com/KafClaw/KafClaw/gomikrobot/internal/config"
 	"github.com/spf13/cobra"
 )
 

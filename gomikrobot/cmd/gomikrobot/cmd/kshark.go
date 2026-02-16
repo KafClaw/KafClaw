@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kamir/gomikrobot/internal/config"
-	"github.com/kamir/gomikrobot/internal/kshark"
+	"github.com/KafClaw/KafClaw/gomikrobot/internal/config"
+	"github.com/KafClaw/KafClaw/gomikrobot/internal/kshark"
 	"github.com/spf13/cobra"
 )
 

@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kamir/gomikrobot/internal/session"
-	"github.com/kamir/gomikrobot/internal/tools"
+	"github.com/KafClaw/KafClaw/gomikrobot/internal/session"
+	"github.com/KafClaw/KafClaw/gomikrobot/internal/tools"
 )
 
 func TestContextBuilder(t *testing.T) {

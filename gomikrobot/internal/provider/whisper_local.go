@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/kamir/gomikrobot/internal/config"
+	"github.com/KafClaw/KafClaw/gomikrobot/internal/config"
 )
 
 // LocalWhisperProvider implements transcription using a local Whisper binary.

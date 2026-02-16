@@ -6,8 +6,8 @@ import (
 	"math"
 	"time"
 
-	"github.com/kamir/gomikrobot/internal/bus"
-	"github.com/kamir/gomikrobot/internal/timeline"
+	"github.com/KafClaw/KafClaw/gomikrobot/internal/bus"
+	"github.com/KafClaw/KafClaw/gomikrobot/internal/timeline"
 )
 
 // DeliveryWorker polls for completed tasks with pending delivery and retries them.

@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/kamir/gomikrobot/internal/config"
-	"github.com/kamir/gomikrobot/internal/group"
-	"github.com/kamir/gomikrobot/internal/timeline"
+	"github.com/KafClaw/KafClaw/gomikrobot/internal/config"
+	"github.com/KafClaw/KafClaw/gomikrobot/internal/group"
+	"github.com/KafClaw/KafClaw/gomikrobot/internal/timeline"
 )
 
 // Orchestrator coordinates multi-agent hierarchies and zones.

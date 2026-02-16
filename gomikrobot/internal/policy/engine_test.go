@@ -3,7 +3,7 @@ package policy
 import (
 	"testing"
 
-	"github.com/kamir/gomikrobot/internal/tools"
+	"github.com/KafClaw/KafClaw/gomikrobot/internal/tools"
 )
 
 func TestTier0AlwaysAllowed(t *testing.T) {

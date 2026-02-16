@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/kamir/gomikrobot/internal/timeline"
+	"github.com/KafClaw/KafClaw/gomikrobot/internal/timeline"
 )
 
 // RegisterSkill creates a skill channel pair and updates the topic manifest.

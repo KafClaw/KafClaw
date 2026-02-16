@@ -8,10 +8,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kamir/gomikrobot/internal/group"
-	"github.com/kamir/gomikrobot/internal/provider"
-	"github.com/kamir/gomikrobot/internal/session"
-	"github.com/kamir/gomikrobot/internal/tools"
+	"github.com/KafClaw/KafClaw/gomikrobot/internal/group"
+	"github.com/KafClaw/KafClaw/gomikrobot/internal/provider"
+	"github.com/KafClaw/KafClaw/gomikrobot/internal/session"
+	"github.com/KafClaw/KafClaw/gomikrobot/internal/tools"
 )
 
 var bootstrapFiles = []string{

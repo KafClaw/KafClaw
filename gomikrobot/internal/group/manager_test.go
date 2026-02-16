@@ -7,7 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/kamir/gomikrobot/internal/config"
+	"github.com/KafClaw/KafClaw/gomikrobot/internal/config"
 )
 
 func newTestManager(serverURL string) *Manager {

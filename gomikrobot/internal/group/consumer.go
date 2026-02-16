@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kamir/gomikrobot/internal/bus"
-	"github.com/kamir/gomikrobot/internal/timeline"
+	"github.com/KafClaw/KafClaw/gomikrobot/internal/bus"
+	"github.com/KafClaw/KafClaw/gomikrobot/internal/timeline"
 )
 
 // Consumer reads messages from Kafka topics.

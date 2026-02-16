@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kamir/gomikrobot/internal/bus"
-	"github.com/kamir/gomikrobot/internal/timeline"
+	"github.com/KafClaw/KafClaw/gomikrobot/internal/bus"
+	"github.com/KafClaw/KafClaw/gomikrobot/internal/timeline"
 )
 
 func newTestTimeline(t *testing.T) *timeline.TimelineService {

@@ -5,7 +5,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/kamir/gomikrobot/internal/timeline"
+	"github.com/KafClaw/KafClaw/gomikrobot/internal/timeline"
 	"github.com/spf13/cobra"
 )
 

@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kamir/gomikrobot/internal/bus"
-	"github.com/kamir/gomikrobot/internal/config"
+	"github.com/KafClaw/KafClaw/gomikrobot/internal/bus"
+	"github.com/KafClaw/KafClaw/gomikrobot/internal/config"
 )
 
 func TestShareMemory(t *testing.T) {

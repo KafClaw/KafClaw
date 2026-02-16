@@ -9,8 +9,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/kamir/gomikrobot/internal/config"
-	"github.com/kamir/gomikrobot/internal/timeline"
+	"github.com/KafClaw/KafClaw/gomikrobot/internal/config"
+	"github.com/KafClaw/KafClaw/gomikrobot/internal/timeline"
 )
 
 // Manager handles group lifecycle: join, leave, heartbeat, roster management.
