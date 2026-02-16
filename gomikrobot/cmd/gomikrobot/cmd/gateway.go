@@ -49,8 +49,8 @@ var gatewayCmd = &cobra.Command{
 }
 
 func runGateway(cmd *cobra.Command, args []string) {
-	printHeader("🌐 GoMikroBot Gateway")
-	fmt.Println("Starting GoMikroBot Gateway...")
+	printHeader("🌐 KafClaw Gateway")
+	fmt.Println("Starting KafClaw Gateway...")
 
 	// 1. Load Config
 	cfg, err := config.Load()
@@ -77,8 +77,8 @@ func runGateway(cmd *cobra.Command, args []string) {
 		}
 		_ = timeSvc.SetSetting(key, value)
 	}
-	seedSetting("bot_repo_path", "/Users/kamir/GITHUB.kamir/nanobot/gomikrobot")
-	seedSetting("default_work_repo_path", filepath.Join(home, "GoMikroBot-Workspace"))
+	seedSetting("bot_repo_path", "/Users/kamir/GITHUB.kamir/KafClaw/gomikrobot")
+	seedSetting("default_work_repo_path", filepath.Join(home, "KafClaw-Workspace"))
 	seedSetting("default_repo_search_path", home)
 	seedSetting("kafscale_lfs_proxy_url", "http://localhost:8080")
 
@@ -158,7 +158,7 @@ func runGateway(cmd *cobra.Command, args []string) {
 			hostname, _ := os.Hostname()
 			agentID = fmt.Sprintf("gomikrobot-%s", hostname)
 		}
-		identity := ctxBuilder.BuildIdentityEnvelope(agentID, "GoMikroBot", cfg.Model.Name)
+		identity := ctxBuilder.BuildIdentityEnvelope(agentID, "KafClaw", cfg.Model.Name)
 		// Enrich channels based on actual config.
 		if cfg.Channels.WhatsApp.Enabled {
 			identity.Channels = append(identity.Channels, "whatsapp")
@@ -261,7 +261,7 @@ func runGateway(cmd *cobra.Command, args []string) {
 			EventID:        fmt.Sprintf("MODE_STANDALONE_%d", time.Now().UnixNano()),
 			Timestamp:      time.Now(),
 			SenderID:       "system",
-			SenderName:     "GoMikroBot",
+			SenderName:     "KafClaw",
 			EventType:      "SYSTEM",
 			ContentText:    "Entered Standalone Desktop mode",
 			Classification: "MODE_CHANGE",

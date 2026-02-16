@@ -9,18 +9,11 @@ import (
 	"time"
 
 	"github.com/KafClaw/KafClaw/gomikrobot/internal/group"
+	"github.com/KafClaw/KafClaw/gomikrobot/internal/identity"
 	"github.com/KafClaw/KafClaw/gomikrobot/internal/provider"
 	"github.com/KafClaw/KafClaw/gomikrobot/internal/session"
 	"github.com/KafClaw/KafClaw/gomikrobot/internal/tools"
 )
-
-var bootstrapFiles = []string{
-	"AGENTS.md",
-	"SOUL.md",
-	"USER.md",
-	"TOOLS.md",
-	"IDENTITY.md",
-}
 
 // ContextBuilder assembles the system prompt and messages.
 type ContextBuilder struct {
@@ -94,9 +87,9 @@ func (b *ContextBuilder) getIdentity() string {
 
 	runtimeInfo := fmt.Sprintf("%s %s, Go %s", runtime.GOOS, runtime.GOARCH, runtime.Version())
 
-	return fmt.Sprintf(`# GoMikroBot 🤖
+	return fmt.Sprintf(`# KafClaw 🤖
 
-You are GoMikroBot, a helpful, efficient AI assistant.
+You are KafClaw, a helpful, efficient AI assistant.
 You have access to tools that allow you to:
 - Read, write, and edit files
 - Execute shell commands
@@ -147,7 +140,7 @@ func (b *ContextBuilder) loadBootstrapFiles() string {
 		wsPath = filepath.Join(home, wsPath[1:])
 	}
 
-	for _, filename := range bootstrapFiles {
+	for _, filename := range identity.TemplateNames {
 		path := filepath.Join(wsPath, filename)
 		content, err := os.ReadFile(path)
 		if err == nil {

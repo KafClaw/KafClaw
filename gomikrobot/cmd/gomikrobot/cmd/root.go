@@ -9,18 +9,17 @@ var (
 	// version can be overridden at build time via:
 	// go build -ldflags "-X github.com/KafClaw/KafClaw/gomikrobot/cmd/gomikrobot/cmd.version=1.2.3"
 	version = "2.6.2"
-	logo    = `
-   ____       __  __ _ _              ____        _   
-  / ___| ___ |  \/  (_) | ___ __ ___ | __ )  ___ | |_ 
- | |  _ / _ \| |\/| | | |/ / '__/ _ \|  _ \ / _ \| __|
- | |_| | (_) | |  | | |   <| | | (_) | |_) | (_) | |_ 
-  \____|\___/|_|  |_|_|_|\_\_|  \___/|____/ \___/ \__|
-`
+	logo    = "\n" +
+		"  _  __       __  ____ _\n" +
+		" | |/ / __ _ / _|/ ___| | __ ___      __\n" +
+		" | ' / / _` | |_| |   | |/ _` \\ \\ /\\ / /\n" +
+		" | . \\| (_| |  _| |___| | (_| |\\ V  V /\n" +
+		" |_|\\_\\\\__,_|_|  \\____|_|\\__,_| \\_/\\_/\n"
 )
 
 var rootCmd = &cobra.Command{
 	Use:   "gomikrobot",
-	Short: "🤖 GoMikroBot - Personal AI Assistant",
+	Short: "KafClaw - Personal AI Assistant",
 	Long:  color.CyanString(logo) + "\nA lightweight, ultra-fast AI assistant framework written in Go.",
 	Run: func(cmd *cobra.Command, args []string) {
 		cmd.Help()

@@ -230,8 +230,8 @@ type ObserverMemoryConfig struct {
 func DefaultConfig() *Config {
 	return &Config{
 		Paths: PathsConfig{
-			Workspace:      "~/GoMikroBot-Workspace",
-			WorkRepoPath:   "~/GoMikroBot-Workspace",
+			Workspace:      "~/KafClaw-Workspace",
+			WorkRepoPath:   "~/KafClaw-Workspace",
 			SystemRepoPath: "/Users/kamir/GITHUB.kamir/KafClaw/gomikrobot",
 		},
 		Model: ModelConfig{

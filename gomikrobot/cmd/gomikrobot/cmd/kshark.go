@@ -19,7 +19,7 @@ var ksharkCmd = &cobra.Command{
 a Kafka cluster: DNS, TCP, TLS, SASL auth, Kafka protocol (ApiVersions,
 Metadata), produce/consume probes, Schema Registry, and REST Proxy.
 
-Use --auto to read Kafka settings from GoMikroBot's group config instead
+Use --auto to read Kafka settings from KafClaw's group config instead
 of providing a client.properties file.`,
 	RunE: runKshark,
 }
@@ -55,7 +55,7 @@ func init() {
 	f.StringVar(&ksharkStartOffset, "start-offset", "earliest", "Probe read start offset: earliest|latest")
 	f.BoolVar(&ksharkDiag, "diag", true, "Enable traceroute/MTU diagnostics")
 	f.StringVar(&ksharkJSONOut, "json", "", "Export results to JSON file")
-	f.BoolVar(&ksharkAuto, "auto", false, "Use group config from GoMikroBot settings (no props file needed)")
+	f.BoolVar(&ksharkAuto, "auto", false, "Use group config from KafClaw settings (no props file needed)")
 	f.BoolVarP(&ksharkYes, "yes", "y", false, "Skip confirmation prompt")
 }
 
@@ -67,14 +67,14 @@ func runKshark(cmd *cobra.Command, args []string) error {
 |    <  /        \|   Y  \/ __ \|  | \/    <
 |__|_ \/_______  /|___|  (____  /__|  |__|_ \
      \/        \/      \/     \/           \/
-  bundled in GoMikroBot
+  bundled in KafClaw
 `)
 
 	var props map[string]string
 
 	switch {
 	case ksharkAuto:
-		// Build properties from GoMikroBot config
+		// Build properties from KafClaw config
 		p, err := propsFromConfig()
 		if err != nil {
 			return fmt.Errorf("--auto: %w", err)
@@ -173,7 +173,7 @@ func runKshark(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-// propsFromConfig builds a Kafka client properties map from GoMikroBot's config.
+// propsFromConfig builds a Kafka client properties map from KafClaw's config.
 func propsFromConfig() (map[string]string, error) {
 	cfg, err := config.Load()
 	if err != nil {
@@ -212,7 +212,7 @@ func propsFromConfig() (map[string]string, error) {
 		props["sasl.password"] = cfg.Group.LFSProxyAPIKey
 	}
 
-	fmt.Printf("Auto-configured from GoMikroBot group settings:\n")
+	fmt.Printf("Auto-configured from KafClaw group settings:\n")
 	fmt.Printf("  Brokers:        %s\n", brokers)
 	if cfg.Group.GroupName != "" {
 		fmt.Printf("  Group Name:     %s\n", cfg.Group.GroupName)

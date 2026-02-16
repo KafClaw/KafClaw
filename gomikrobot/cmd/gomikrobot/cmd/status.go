@@ -13,7 +13,7 @@ var versionCmd = &cobra.Command{
 	Use:   "version",
 	Short: "Print version information",
 	Run: func(cmd *cobra.Command, args []string) {
-		printHeader("🏷️ GoMikroBot Version")
+		printHeader("🏷️ KafClaw Version")
 		fmt.Printf("Version: %s\n", version)
 	},
 }
@@ -22,7 +22,7 @@ var statusCmd = &cobra.Command{
 	Use:   "status",
 	Short: "Show system status",
 	Run: func(cmd *cobra.Command, args []string) {
-		printHeader("📊 GoMikroBot Status")
+		printHeader("📊 KafClaw Status")
 		fmt.Printf("Version: %s\n", version)
 
 		// Check config

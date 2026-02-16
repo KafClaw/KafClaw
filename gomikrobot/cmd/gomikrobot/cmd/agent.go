@@ -34,7 +34,7 @@ func runAgent(cmd *cobra.Command, args []string) {
 		os.Exit(1)
 	}
 
-	printHeader("🤖 GoMikroBot Agent")
+	printHeader("🤖 KafClaw Agent")
 
 	// Load Config
 	cfg, err := config.Load()
@@ -72,7 +72,7 @@ func runAgent(cmd *cobra.Command, args []string) {
 		MaxIterations: cfg.Model.MaxToolIterations,
 	})
 
-	fmt.Printf("🤖 GoMikroBot (%s)\n", cfg.Model.Name)
+	fmt.Printf("🤖 KafClaw (%s)\n", cfg.Model.Name)
 	fmt.Println("Thinking...")
 
 	ctx := context.Background()

@@ -124,6 +124,8 @@ func Load() (*Config, error) {
 	envconfig.Process("MIKROBOT_GROUP", &cfg.Group)
 	envconfig.Process("MIKROBOT_ORCHESTRATOR", &cfg.Orchestrator)
 	envconfig.Process("MIKROBOT_SCHEDULER", &cfg.Scheduler)
+	envconfig.Process("MIKROBOT", &cfg.ER1)
+	envconfig.Process("MIKROBOT", &cfg.Observer)
 
 	// Legacy env var compatibility
 	envconfig.Process("MIKROBOT_AGENTS", &cfg.Paths)
@@ -150,9 +152,22 @@ func Load() (*Config, error) {
 	expandHome(&cfg.Paths.WorkRepoPath)
 	expandHome(&cfg.Paths.SystemRepoPath)
 
-	// Force workspace to GoMikroBot-Workspace (state lives here, independent of work repo)
+	// Resolve workspace path with backward compatibility:
+	// 1. Use ~/KafClaw-Workspace if it exists
+	// 2. Fall back to ~/GoMikroBot-Workspace if it exists (legacy)
+	// 3. Default to ~/KafClaw-Workspace for new installs
 	if home, err := os.UserHomeDir(); err == nil {
-		cfg.Paths.Workspace = filepath.Join(home, "GoMikroBot-Workspace")
+		newWS := filepath.Join(home, "KafClaw-Workspace")
+		oldWS := filepath.Join(home, "GoMikroBot-Workspace")
+
+		if _, err := os.Stat(newWS); err == nil {
+			cfg.Paths.Workspace = newWS
+		} else if _, err := os.Stat(oldWS); err == nil {
+			cfg.Paths.Workspace = oldWS
+			fmt.Fprintf(os.Stderr, "config: using legacy workspace %s (rename to %s to suppress this warning)\n", oldWS, newWS)
+		} else {
+			cfg.Paths.Workspace = newWS
+		}
 	}
 
 	return cfg, nil

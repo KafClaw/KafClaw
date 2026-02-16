@@ -1,12 +1,12 @@
-# GoMikroBot System Architecture
+# KafClaw System Architecture
 
-> Version: 2.5.3 | Updated: 2026-02-16
+> Version: 2.6.2 | Updated: 2026-02-16
 
 ---
 
 ## 1. Overview
 
-GoMikroBot is a personal AI assistant framework written in Go with an Electron desktop frontend. It connects messaging channels (WhatsApp, local network, web UI) to LLM providers through an asynchronous message bus, with a tool registry for filesystem/shell/web operations, a 6-layer semantic memory system, policy-based authorization, multi-agent collaboration via Kafka, and a cron-based job scheduler.
+KafClaw is a personal AI assistant framework written in Go with an Electron desktop frontend. It connects messaging channels (WhatsApp, local network, web UI) to LLM providers through an asynchronous message bus, with a tool registry for filesystem/shell/web operations, a 6-layer semantic memory system, policy-based authorization, multi-agent collaboration via Kafka, and a cron-based job scheduler.
 
 ```
 WhatsApp ─┐
@@ -37,6 +37,32 @@ Scheduler ┘       │              │              └── Memory (remember
 - **Behavior parity first**: Migration from Python preserves behavior before optimizing
 - **Secure defaults**: Binds 127.0.0.1, tier-restricted tool execution, deny-pattern filtering
 - **Single SQLite database**: All persistent state in `~/.gomikrobot/timeline.db`
+
+### Three Repositories Model
+
+KafClaw organizes state across three logical repositories:
+
+| Repository | Purpose | Default Location | Mutable? |
+|-----------|---------|-----------------|----------|
+| **Identity (Workspace)** | Soul files defining personality, behavior, tools, and user profile | `~/KafClaw-Workspace/` | Yes — user-customizable |
+| **Work Repo** | Agent sandbox for files, memory, tasks, docs | `~/KafClaw-Workspace/` (same as workspace by default) | Yes — agent writes here |
+| **System Repo** | Bot source code, skills, operational guidance | `gomikrobot/` (this repo) | Read-only at runtime |
+
+**Identity Repository** — Contains the soul files loaded at startup into the LLM system prompt:
+
+| File | Purpose |
+|------|---------|
+| `IDENTITY.md` | Bot self-description, architecture overview, capabilities |
+| `SOUL.md` | Personality traits, values, communication style |
+| `AGENTS.md` | Behavioral guidelines, tool usage patterns, action policy |
+| `TOOLS.md` | Tool reference with signatures and safety notes |
+| `USER.md` | User profile (name, timezone, preferences, work context) |
+
+Soul files are scaffolded by `gomikrobot onboard` from embedded templates (`internal/identity/templates/`). Users can then customize them freely. The canonical file list is defined once in `identity.TemplateNames`.
+
+**Work Repository** — Git-initialized sandbox with standard directories: `requirements/`, `tasks/`, `docs/`, `memory/`. The agent's `write_file` tool targets this repo by default.
+
+**System Repository** — The bot's own source code. Read-only at runtime. Contains skills (`skills/{name}/SKILL.md`) and operations guidance (`operations/day2day/`).
 
 ---
 
@@ -310,8 +336,8 @@ Loading precedence: Environment vars (`MIKROBOT_*`) > `~/.gomikrobot/config.json
 ```
 Config
 ├── Paths
-│   ├── Workspace        (default: ~/GoMikroBot-Workspace)
-│   ├── WorkRepoPath     (default: ~/GoMikroBot-Workspace)
+│   ├── Workspace        (default: ~/KafClaw-Workspace)
+│   ├── WorkRepoPath     (default: ~/KafClaw-Workspace)
 │   └── SystemRepoPath   (bot source repo)
 ├── Model
 │   ├── Name             (default: anthropic/claude-sonnet-4-5)
@@ -508,7 +534,7 @@ Coordinates multi-agent hierarchies:
 
 ## 6. Memory Architecture
 
-GoMikroBot uses a 6-layer memory system stored in a single SQLite database. Each layer has a source prefix, a TTL policy, and a distinct role in context assembly.
+KafClaw uses a 6-layer memory system stored in a single SQLite database. Each layer has a source prefix, a TTL policy, and a distinct role in context assembly.
 
 ### 6.1 Layer Overview
 
@@ -933,7 +959,7 @@ Conversation completes
 ```
 ContextBuilder.BuildSystemPrompt()
     │
-    ├── getIdentity()           → "You are GoMikroBot v2.5.3..."
+    ├── getIdentity()           → "You are KafClaw..."
     ├── loadBootstrapFiles()    → SOUL.md, AGENTS.md, USER.md content
     ├── WorkingMemory.Load()    → "## User Profile\n- Name: ..."
     ├── Observer.LoadObservations() → "[HIGH] User prefers Go..."

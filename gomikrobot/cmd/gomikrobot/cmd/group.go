@@ -80,13 +80,13 @@ func buildGroupManager(cfg *config.Config, timeSvc *timeline.TimelineService) *g
 		agentID = fmt.Sprintf("gomikrobot-%s", hostname)
 	}
 
-	identity := ctxBuilder.BuildIdentityEnvelope(agentID, "GoMikroBot", cfg.Model.Name)
+	identity := ctxBuilder.BuildIdentityEnvelope(agentID, "KafClaw", cfg.Model.Name)
 
 	return group.NewManager(cfg.Group, timeSvc, identity)
 }
 
 func runGroupJoin(cmd *cobra.Command, args []string) {
-	printHeader("🤝 GoMikroBot Group Join")
+	printHeader("🤝 KafClaw Group Join")
 
 	cfg, err := config.Load()
 	if err != nil {
@@ -137,7 +137,7 @@ func runGroupJoin(cmd *cobra.Command, args []string) {
 }
 
 func runGroupLeave(cmd *cobra.Command, args []string) {
-	printHeader("👋 GoMikroBot Group Leave")
+	printHeader("👋 KafClaw Group Leave")
 
 	cfg, err := config.Load()
 	if err != nil {
@@ -185,7 +185,7 @@ func runGroupLeave(cmd *cobra.Command, args []string) {
 }
 
 func runGroupStatus(cmd *cobra.Command, args []string) {
-	printHeader("📊 GoMikroBot Group Status")
+	printHeader("📊 KafClaw Group Status")
 
 	cfg, err := config.Load()
 	if err != nil {
@@ -236,7 +236,7 @@ func runGroupStatus(cmd *cobra.Command, args []string) {
 }
 
 func runGroupMembers(cmd *cobra.Command, args []string) {
-	printHeader("👥 GoMikroBot Group Members")
+	printHeader("👥 KafClaw Group Members")
 
 	timeSvc, err := loadGroupTimeline()
 	if err != nil {

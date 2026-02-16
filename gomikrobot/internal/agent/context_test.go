@@ -29,7 +29,7 @@ func TestContextBuilder(t *testing.T) {
 	systemPrompt := builder.BuildSystemPrompt()
 
 	// Verify content
-	if !strings.Contains(systemPrompt, "GoMikroBot") {
+	if !strings.Contains(systemPrompt, "KafClaw") {
 		t.Error("System prompt missing identity")
 	}
 	if !strings.Contains(systemPrompt, "Bootstrap Content") {

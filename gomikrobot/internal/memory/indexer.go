@@ -7,16 +7,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-)
 
-// soulFiles are the bootstrap files that define the agent's identity.
-var soulFiles = []string{
-	"AGENTS.md",
-	"SOUL.md",
-	"USER.md",
-	"TOOLS.md",
-	"IDENTITY.md",
-}
+	"github.com/KafClaw/KafClaw/gomikrobot/internal/identity"
+)
 
 // SoulFileIndexer reads soul files from the workspace, chunks them by ##
 // headers, and embeds+upserts each chunk into the memory system.
@@ -45,7 +38,7 @@ func (idx *SoulFileIndexer) IndexAll(ctx context.Context) error {
 	}
 
 	var indexed int
-	for _, filename := range soulFiles {
+	for _, filename := range identity.TemplateNames {
 		path := filepath.Join(wsPath, filename)
 		data, err := os.ReadFile(path)
 		if err != nil {

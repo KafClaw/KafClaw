@@ -20,7 +20,7 @@ func init() {
 }
 
 func runInstall(cmd *cobra.Command, args []string) {
-	printHeader("📦 GoMikroBot Install")
+	printHeader("📦 KafClaw Install")
 
 	exe, err := os.Executable()
 	if err != nil {

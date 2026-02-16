@@ -49,6 +49,7 @@ KafClaw/
 │   │   ├── bus/            ← Async message bus (pub-sub)
 │   │   ├── channels/       ← WhatsApp (whatsmeow), CLI, Web channels
 │   │   ├── config/         ← Config struct (env/file/default loading)
+│   │   ├── identity/       ← Embedded soul-file templates + workspace scaffolding
 │   │   ├── provider/       ← LLM provider abstraction (OpenAI/OpenRouter)
 │   │   ├── session/        ← Per-session conversation history (JSONL)
 │   │   ├── timeline/       ← SQLite event log (~/.gomikrobot/timeline.db)
@@ -65,6 +66,33 @@ KafClaw/
     ├── docs/               ← Guides, rebranding assets
     └── governance/         ← AGENTS.md, archived CLAUDE.md, workspace soul files
 ```
+
+## Three Repositories Model
+
+KafClaw organizes state across three logical repositories:
+
+- **Identity (Workspace)** — Soul files (IDENTITY.md, SOUL.md, AGENTS.md, TOOLS.md, USER.md) loaded at startup into the LLM system prompt. Scaffolded by `gomikrobot onboard`, user-customizable.
+- **Work Repo** — Agent sandbox for files, memory, tasks, docs. Git-initialized. Default: `~/KafClaw-Workspace/`.
+- **System Repo** — Bot source code (this repo). Read-only at runtime. Contains skills and operational guidance.
+
+The canonical soul file list is `identity.TemplateNames` in `internal/identity/embed.go` — single source of truth used by both `agent/context.go` and `memory/indexer.go`.
+
+## Workspace Scaffolding
+
+Running `gomikrobot onboard` creates `~/.gomikrobot/config.json` **and** scaffolds soul files into the workspace:
+
+```
+~/KafClaw-Workspace/
+├── AGENTS.md       ← Behavioral guidelines, tool usage
+├── SOUL.md         ← Personality, values, communication style
+├── USER.md         ← User profile (customize this!)
+├── TOOLS.md        ← Tool reference with safety notes
+└── IDENTITY.md     ← Bot self-description, architecture overview
+```
+
+With `--force`, existing soul files are overwritten. Without it, existing files are preserved.
+
+Templates are embedded in the binary via `go:embed` (`internal/identity/templates/`).
 
 ## Architecture
 
@@ -91,7 +119,7 @@ CLI/WhatsApp → Message Bus → Agent Loop → LLM Provider (OpenAI/OpenRouter)
 
 Loaded in order: env vars > `~/.gomikrobot/config.json` > defaults.
 
-Default model: `anthropic/claude-sonnet-4-5`. Default workspace: `~/GoMikroBot-Workspace`. Gateway ports: 18790 (API), 18791 (dashboard).
+Default model: `anthropic/claude-sonnet-4-5`. Default workspace: `~/KafClaw-Workspace`. Gateway ports: 18790 (API), 18791 (dashboard).
 
 ## Tool Security Model
 
