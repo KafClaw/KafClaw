@@ -1,4 +1,4 @@
-name: Release GoMikroBot
+name: Release KafClaw
 
 on:
   push:
@@ -111,9 +111,7 @@ jobs:
 
       - name: Package Electron app
         working-directory: gomikrobot/electron
-        run: npx electron-builder --${{ matrix.platform }}
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx electron-builder --${{ matrix.platform }} --publish never
 
       - name: Upload Electron artifacts
         uses: actions/upload-artifact@v4

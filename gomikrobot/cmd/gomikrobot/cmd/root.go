@@ -8,7 +8,7 @@ import (
 var (
 	// version can be overridden at build time via:
 	// go build -ldflags "-X github.com/KafClaw/KafClaw/gomikrobot/cmd/gomikrobot/cmd.version=1.2.3"
-	version = "2.6.0"
+	version = "2.6.1"
 	logo    = `
    ____       __  __ _ _              ____        _   
   / ___| ___ |  \/  (_) | ___ __ ___ | __ )  ___ | |_ 
