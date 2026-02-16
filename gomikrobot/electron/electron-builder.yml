@@ -1,0 +1,30 @@
+appId: com.gomikrobot.desktop
+productName: GoMikroBot
+directories:
+  output: release
+  buildResources: resources
+files:
+  - dist/**/*
+  - resources/**/*
+extraResources:
+  - from: "../gomikrobot"
+    to: "gomikrobot"
+    filter:
+      - "gomikrobot"
+mac:
+  category: public.app-category.productivity
+  icon: resources/icon.icns
+  target:
+    - dmg
+    - zip
+linux:
+  category: Utility
+  icon: resources/icon.png
+  target:
+    - AppImage
+    - deb
+win:
+  icon: resources/icon.ico
+  target:
+    - nsis
+    - portable

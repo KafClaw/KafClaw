@@ -1,0 +1,2280 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Group Management - KafClaw</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0%25' stop-color='%23f59e0b'/%3E%3Cstop offset='100%25' stop-color='%23d97706'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect x='4' y='14' width='56' height='40' rx='10' fill='url(%23g)'/%3E%3Crect x='12' y='6' width='6' height='12' rx='3' fill='%23f59e0b'/%3E%3Crect x='46' y='6' width='6' height='12' rx='3' fill='%23d97706'/%3E%3Ccircle cx='22' cy='30' r='6' fill='%230d1117'/%3E%3Ccircle cx='22' cy='30' r='3' fill='%23f59e0b'/%3E%3Ccircle cx='42' cy='30' r='6' fill='%230d1117'/%3E%3Ccircle cx='42' cy='30' r='3' fill='%23d97706'/%3E%3Crect x='20' y='40' width='24' height='4' rx='2' fill='%230d1117'/%3E%3C/svg%3E">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+        body {
+            font-family: 'JetBrains Mono', monospace;
+            background-color: #0d1117;
+            color: #c9d1d9;
+        }
+
+        .glass {
+            background: rgba(22, 27, 34, 0.8);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(48, 54, 61, 0.5);
+        }
+
+        .glass-card {
+            background: rgba(22, 27, 34, 0.6);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(48, 54, 61, 0.4);
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .glass-card:hover {
+            border-color: rgba(245, 158, 11, 0.4);
+            box-shadow: 0 0 20px rgba(245, 158, 11, 0.05);
+        }
+
+        .self-card {
+            border-color: rgba(245, 158, 11, 0.5) !important;
+            box-shadow: 0 0 24px rgba(245, 158, 11, 0.08), inset 0 0 30px rgba(245, 158, 11, 0.03);
+        }
+
+        .tab-active {
+            color: #f59e0b;
+            border-bottom: 2px solid #f59e0b;
+        }
+
+        .tab-inactive {
+            color: #6b7280;
+            border-bottom: 2px solid transparent;
+        }
+
+        .tab-inactive:hover {
+            color: #9ca3af;
+            border-bottom-color: rgba(245, 158, 11, 0.3);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        .status-active { background: #22c55e; box-shadow: 0 0 8px rgba(34, 197, 94, 0.5); }
+        .status-stale { background: #eab308; box-shadow: 0 0 8px rgba(234, 179, 8, 0.3); }
+        .status-inactive { background: #6b7280; }
+
+        .badge {
+            font-size: 10px;
+            padding: 1px 8px;
+            border-radius: 9999px;
+            font-weight: 600;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+        }
+
+        .badge-active { background: rgba(34, 197, 94, 0.15); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.3); }
+        .badge-stale { background: rgba(234, 179, 8, 0.15); color: #facc15; border: 1px solid rgba(234, 179, 8, 0.3); }
+        .badge-pending { background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); }
+        .badge-completed { background: rgba(34, 197, 94, 0.15); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.3); }
+        .badge-failed { background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); }
+        .badge-rejected { background: rgba(168, 85, 247, 0.15); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.3); }
+        .badge-outgoing { background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); }
+        .badge-incoming { background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); }
+        .badge-delegation { background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); }
+        .badge-policy { background: rgba(168, 85, 247, 0.15); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.3); }
+        .badge-approval { background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); }
+        .badge-allowed { background: rgba(34, 197, 94, 0.15); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.3); }
+        .badge-denied { background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); }
+        .badge-left { background: rgba(107, 114, 128, 0.15); color: #9ca3af; border: 1px solid rgba(107, 114, 128, 0.3); }
+        .badge-joined { background: rgba(34, 197, 94, 0.15); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.3); }
+
+        .pill {
+            font-size: 9px;
+            padding: 1px 6px;
+            border-radius: 4px;
+            background: rgba(245, 158, 11, 0.1);
+            color: #fbbf24;
+            border: 1px solid rgba(245, 158, 11, 0.2);
+        }
+
+        .span-INBOUND { color: #58a6ff; }
+        .span-LLM { color: #a855f7; }
+        .span-TOOL { color: #fb923c; }
+        .span-OUTBOUND { color: #22c55e; }
+        .span-POLICY { color: #ef4444; }
+        .span-EVENT { color: #6366f1; }
+
+        .input-field {
+            background: rgba(13, 17, 23, 0.8);
+            border: 1px solid #30363d;
+            color: #c9d1d9;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            padding: 6px 10px;
+            border-radius: 6px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .input-field:focus {
+            border-color: #f59e0b;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+            color: #0d1117;
+            font-weight: 600;
+            font-size: 11px;
+            padding: 6px 16px;
+            border-radius: 6px;
+            border: none;
+            cursor: pointer;
+            transition: opacity 0.2s, transform 0.1s;
+            letter-spacing: 0.05em;
+        }
+
+        .btn-primary:hover { opacity: 0.9; }
+        .btn-primary:active { transform: scale(0.98); }
+        .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+
+        .btn-danger {
+            background: rgba(239, 68, 68, 0.15);
+            color: #f87171;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            font-weight: 600;
+            font-size: 11px;
+            padding: 6px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .btn-danger:hover { background: rgba(239, 68, 68, 0.25); }
+
+        .btn-ghost {
+            background: transparent;
+            color: #9ca3af;
+            border: 1px solid #30363d;
+            font-size: 11px;
+            padding: 5px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-ghost:hover { color: #f59e0b; border-color: rgba(245, 158, 11, 0.4); }
+        .btn-ghost.active { color: #f59e0b; border-color: #f59e0b; background: rgba(245, 158, 11, 0.08); }
+
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #30363d; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #f59e0b; }
+
+        [v-cloak] { display: none !important; }
+
+        .fade-enter-active, .fade-leave-active { transition: opacity 0.15s; }
+        .fade-enter-from, .fade-leave-to { opacity: 0; }
+
+        @keyframes pulse-ring {
+            0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4); }
+            70% { box-shadow: 0 0 0 6px rgba(34, 197, 94, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+        }
+        .pulse-ring { animation: pulse-ring 2s infinite; }
+
+        .badge-control { background: rgba(88,166,255,0.15); color: #58a6ff; border: 1px solid rgba(88,166,255,0.3); }
+        .badge-tasks { background: rgba(251,191,36,0.15); color: #fbbf24; border: 1px solid rgba(251,191,36,0.3); }
+        .badge-observe { background: rgba(168,85,247,0.15); color: #a855f7; border: 1px solid rgba(168,85,247,0.3); }
+        .badge-memory { background: rgba(34,197,94,0.15); color: #22c55e; border: 1px solid rgba(34,197,94,0.3); }
+        .badge-skill { background: rgba(244,114,182,0.15); color: #f472b6; border: 1px solid rgba(244,114,182,0.3); }
+
+        .rank-bronze { color: #cd7f32; }
+        .rank-silver { color: #c0c0c0; }
+        .rank-gold { color: #ffd700; }
+        .rank-diamond { color: #b9f2ff; text-shadow: 0 0 10px rgba(185,242,255,0.5); }
+
+        .xp-bar { height: 6px; border-radius: 3px; background: rgba(48,54,61,0.6); }
+        .xp-fill { height: 100%; border-radius: 3px; transition: width 0.5s ease; }
+
+        .topic-pulse { animation: topic-pulse-anim 2s ease-in-out infinite; }
+        @keyframes topic-pulse-anim { 0%,100% { opacity: 0.6; } 50% { opacity: 1; } }
+
+        .health-bar { height: 4px; border-radius: 2px; background: rgba(48,54,61,0.6); overflow: hidden; }
+        .health-fill { height: 100%; border-radius: 2px; transition: width 0.5s ease; }
+
+        .pipe-body { cursor: pointer; transition: opacity 0.3s, filter 0.3s; }
+        .pipe-body:hover { filter: brightness(1.4) drop-shadow(0 0 8px currentColor); }
+        .pipe-idle { animation: idle-pulse 4s ease-in-out infinite; }
+        @keyframes idle-pulse { 0%,100% { opacity: 0.4; } 50% { opacity: 0.55; } }
+        .pipe-label { font-size: 10px; fill: #d1d5db; font-weight: 600; font-family: ui-monospace, monospace; }
+        .pipe-count { font-size: 10px; fill: #9ca3af; text-anchor: start; font-weight: 700; font-family: ui-monospace, monospace; }
+        .pipe-count-bg { fill: rgba(0,0,0,0.5); }
+        .agent-label { font-size: 10px; fill: #e5e7eb; text-anchor: middle; font-weight: 600; }
+        .factory-ground { fill: #161b22; }
+        .factory-sky { fill: #060a10; }
+        .support-stilt { stroke: #21262d; stroke-width: 2; opacity: 0.6; }
+        .level-label { font-size: 12px; fill: #8b949e; text-transform: uppercase; letter-spacing: 0.15em; font-weight: 700; }
+        .pipe-glow { pointer-events: none; }
+        .valve-ring { transition: opacity 0.3s; }
+        .pressure-dot { transition: fill 0.5s, opacity 0.5s; }
+        .pressure-active { animation: pressure-blink 1.5s ease-in-out infinite; }
+        @keyframes pressure-blink { 0%,100% { opacity: 0.7; } 50% { opacity: 1; } }
+        @keyframes pipe-flow { 0% { offset-distance: 0%; } 100% { offset-distance: 100%; } }
+        .density-popup { position: fixed; z-index: 60; pointer-events: auto; }
+
+        /* Industrial overview theme */
+        .ind-card { background: #0d1117; border: 1px solid rgba(255,107,53,0.15); border-radius: 10px; position: relative; overflow: hidden; transition: border-color 0.3s, box-shadow 0.3s; }
+        .ind-card:hover { border-color: rgba(255,107,53,0.35); box-shadow: 0 0 20px rgba(255,107,53,0.06); }
+        .ind-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, transparent, rgba(255,107,53,0.4), transparent); }
+        .ind-value { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 1.5rem; font-weight: 800; letter-spacing: 0.04em; }
+        .ind-label { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 9px; text-transform: uppercase; letter-spacing: 0.2em; color: #6b7280; }
+        .ind-glow-amber { color: #fbbf24; text-shadow: 0 0 12px rgba(251,191,36,0.3); }
+        .ind-glow-green { color: #22c55e; text-shadow: 0 0 12px rgba(34,197,94,0.3); }
+        .ind-glow-blue { color: #58a6ff; text-shadow: 0 0 12px rgba(88,166,255,0.3); }
+        .ind-glow-purple { color: #a855f7; text-shadow: 0 0 12px rgba(168,85,247,0.3); }
+        .ind-glow-orange { color: #ff6b35; text-shadow: 0 0 12px rgba(255,107,53,0.3); }
+        .ind-glow-red { color: #ef4444; text-shadow: 0 0 12px rgba(239,68,68,0.3); }
+        .ind-divider { height: 1px; background: linear-gradient(90deg, transparent, rgba(255,107,53,0.2), transparent); }
+        @keyframes ind-scan { 0% { left: -30%; } 100% { left: 130%; } }
+        .ind-scanline::after { content: ''; position: absolute; top: 0; bottom: 0; width: 30%; background: linear-gradient(90deg, transparent, rgba(255,107,53,0.03), transparent); animation: ind-scan 8s linear infinite; pointer-events: none; }
+        .density-popup .sparkline-area { opacity: 0.25; }
+        .density-popup .sparkline-line { fill: none; stroke-width: 1.5; }
+        .density-popup .env-tag { display: inline-block; padding: 1px 6px; border-radius: 4px; background: rgba(48,54,61,0.5); color: #9ca3af; border: 1px solid rgba(48,54,61,0.6); margin: 2px; }
+    </style>
+</head>
+
+<body class="h-screen flex flex-col overflow-hidden">
+    <div id="app" v-cloak class="flex flex-col h-full">
+
+        <!-- Standalone mode block -->
+        <div v-if="standaloneBlocked" class="flex items-center justify-center min-h-screen">
+            <div class="glass rounded-xl p-8 text-center max-w-md">
+                <div class="text-xl font-bold text-amber-400 mb-3">STANDALONE MODE</div>
+                <p class="text-gray-400 text-xs mb-4">Group management is not available in Standalone Desktop mode.</p>
+                <a href="/timeline" class="inline-block px-4 py-2 rounded-lg bg-amber-500/20 text-amber-400 text-xs font-bold hover:bg-amber-500/30 transition-colors">Back to Timeline</a>
+            </div>
+        </div>
+
+        <!-- Header -->
+        <header class="glass z-10 shadow-lg border-b border-gray-800/50">
+            <div class="px-6 py-3 flex items-center justify-between">
+                <div class="flex items-center gap-4">
+                    <a href="/timeline" class="flex items-center gap-2 text-gray-400 hover:text-amber-400 transition-colors text-xs">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/>
+                        </svg>
+                        Timeline
+                    </a>
+                    <div class="w-px h-5 bg-gray-700"></div>
+                    <div class="flex items-center gap-3">
+                        <div class="status-dot" :class="groupActive ? 'status-active pulse-ring' : 'status-inactive'"></div>
+                        <h1 class="text-lg font-bold text-white tracking-widest">GROUP <span class="text-amber-400">MGMT</span></h1>
+                    </div>
+                    <span v-if="status.group_name" class="text-xs text-gray-500 ml-1">{{ status.group_name }}</span>
+                </div>
+                <div class="flex items-center gap-3">
+                    <span class="text-[10px] text-gray-500 tracking-wider">{{ status.agent_id || 'no agent' }}</span>
+                    <button v-if="!groupActive" @click="showJoinModal = true" class="btn-primary">JOIN GROUP</button>
+                    <button v-else @click="leaveGroup" :disabled="leaving" class="btn-danger text-xs">
+                        {{ leaving ? 'LEAVING...' : 'LEAVE GROUP' }}
+                    </button>
+                </div>
+            </div>
+
+            <!-- Tabs -->
+            <div class="px-6 flex gap-0 border-t border-gray-800/30">
+                <button v-for="tab in tabs" :key="tab.id"
+                    @click="activeTab = tab.id"
+                    class="px-4 py-2.5 text-xs font-semibold tracking-wider transition-all"
+                    :class="activeTab === tab.id ? 'tab-active' : 'tab-inactive'">
+                    {{ tab.label }}
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="flex-1 overflow-y-auto p-6">
+
+            <!-- Overview Tab -->
+            <div v-if="activeTab === 'overview'" class="max-w-5xl mx-auto space-y-6">
+
+                <!-- ===== CONTROL ROOM BANNER ===== -->
+                <div class="rounded-xl overflow-hidden" style="border: 1px solid rgba(255,107,53,0.2);">
+                    <svg viewBox="0 0 900 140" style="width:100%; display:block;" xmlns="http://www.w3.org/2000/svg">
+                        <defs>
+                            <filter id="banner-glow" x="-50%" y="-50%" width="200%" height="200%">
+                                <feGaussianBlur in="SourceGraphic" stdDeviation="3" result="blur"/>
+                                <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+                            </filter>
+                        </defs>
+                        <!-- Dark factory backdrop -->
+                        <rect width="900" height="140" fill="#0a0e14"/>
+                        <!-- Grid -->
+                        <line v-for="i in 22" :key="'cg-'+i" :x1="i*40" y1="0" :x2="i*40" y2="140" stroke="#1a1f2b" stroke-width="0.5" opacity="0.25"/>
+                        <line v-for="i in 4" :key="'ch-'+i" x1="0" :y1="i*35" x2="900" :y2="i*35" stroke="#1a1f2b" stroke-width="0.5" opacity="0.25"/>
+
+                        <!-- Left gear assembly -->
+                        <g transform="translate(65, 70)">
+                            <circle r="28" fill="none" stroke="#ff6b35" stroke-width="1.5" opacity="0.2" stroke-dasharray="6 4">
+                                <animateTransform attributeName="transform" type="rotate" from="0" to="360" dur="15s" repeatCount="indefinite"/>
+                            </circle>
+                            <circle r="18" fill="none" stroke="#ff6b35" stroke-width="2" opacity="0.3">
+                                <animateTransform attributeName="transform" type="rotate" from="360" to="0" dur="10s" repeatCount="indefinite"/>
+                            </circle>
+                            <circle r="5" fill="#ff6b35" opacity="0.5"/>
+                            <circle r="2" fill="#fcd34d" opacity="0.8"/>
+                        </g>
+
+                        <!-- Right gear assembly -->
+                        <g transform="translate(835, 70)">
+                            <circle r="22" fill="none" stroke="#ff6b35" stroke-width="1.5" opacity="0.2" stroke-dasharray="5 3">
+                                <animateTransform attributeName="transform" type="rotate" from="360" to="0" dur="12s" repeatCount="indefinite"/>
+                            </circle>
+                            <circle r="14" fill="none" stroke="#ff6b35" stroke-width="2" opacity="0.25">
+                                <animateTransform attributeName="transform" type="rotate" from="0" to="360" dur="8s" repeatCount="indefinite"/>
+                            </circle>
+                            <circle r="4" fill="#ff6b35" opacity="0.4"/>
+                            <circle r="1.5" fill="#fcd34d" opacity="0.7"/>
+                        </g>
+
+                        <!-- Horizontal main pipe -->
+                        <rect x="110" y="64" width="680" height="12" rx="6" fill="#ff6b35" opacity="0.08"/>
+                        <rect x="110" y="64" width="680" height="12" rx="6" fill="none" stroke="#ff6b35" stroke-width="1" opacity="0.2"/>
+                        <!-- Pipe 3D shine -->
+                        <rect x="112" y="65" width="676" height="4" rx="2" fill="white" opacity="0.04"/>
+                        <!-- Flow bubble -->
+                        <circle r="4" fill="#ff6b35" opacity="0.5" filter="url(#banner-glow)">
+                            <animateMotion dur="5s" repeatCount="indefinite" path="M110,70 L790,70"/>
+                        </circle>
+                        <circle r="3" fill="#ff6b35" opacity="0.3">
+                            <animateMotion dur="7s" repeatCount="indefinite" begin="2.5s" path="M110,70 L790,70"/>
+                        </circle>
+
+                        <!-- Left valve -->
+                        <circle cx="110" cy="70" r="10" fill="#ff6b35" opacity="0.15"/>
+                        <circle cx="110" cy="70" r="7" fill="#0a0e14"/>
+                        <circle cx="110" cy="70" r="3" fill="#ff6b35" opacity="0.7">
+                            <animate attributeName="r" values="2.5;3.5;2.5" dur="3s" repeatCount="indefinite"/>
+                        </circle>
+                        <!-- Right valve -->
+                        <circle cx="790" cy="70" r="10" fill="#ff6b35" opacity="0.15"/>
+                        <circle cx="790" cy="70" r="7" fill="#0a0e14"/>
+                        <circle cx="790" cy="70" r="3" fill="#ff6b35" opacity="0.7">
+                            <animate attributeName="r" values="2.5;3.5;2.5" dur="3s" repeatCount="indefinite" begin="1s"/>
+                        </circle>
+
+                        <!-- CONTROL ROOM label -->
+                        <text x="450" y="32" text-anchor="middle" fill="#ff6b35" font-size="10" font-weight="700" letter-spacing="0.35em" opacity="0.5" style="font-family: ui-monospace, monospace;">CONTROL ROOM</text>
+
+                        <!-- Group name (hero) -->
+                        <text x="450" y="73" text-anchor="middle" dominant-baseline="middle" fill="white" font-size="20" font-weight="800" letter-spacing="0.12em" style="font-family: ui-monospace, monospace;">{{ (status.group_name || 'OFFLINE').toUpperCase() }}</text>
+
+                        <!-- Status indicator lights row -->
+                        <circle cx="360" cy="100" r="5" :fill="groupActive ? '#22c55e' : '#ef4444'" :opacity="groupActive ? 0.9 : 0.6">
+                            <animate v-if="groupActive" attributeName="opacity" values="0.6;1;0.6" dur="2s" repeatCount="indefinite"/>
+                        </circle>
+                        <text x="372" y="103" fill="#8b949e" font-size="9" letter-spacing="0.1em" style="font-family: ui-monospace, monospace;">{{ groupActive ? 'ONLINE' : 'OFFLINE' }}</text>
+
+                        <circle cx="450" cy="100" r="5" :fill="status.lfs_healthy ? '#22c55e' : '#ef4444'" opacity="0.7"/>
+                        <text x="462" y="103" fill="#8b949e" font-size="9" letter-spacing="0.1em" style="font-family: ui-monospace, monospace;">LFS</text>
+
+                        <circle cx="510" cy="100" r="5" :fill="groupActive ? '#58a6ff' : '#374151'" opacity="0.7"/>
+                        <text x="522" y="103" fill="#8b949e" font-size="9" letter-spacing="0.1em" style="font-family: ui-monospace, monospace;">KAFKA</text>
+
+                        <!-- Conveyor belt at bottom -->
+                        <rect x="0" y="126" width="900" height="14" fill="#161b22"/>
+                        <rect v-for="i in 45" :key="'belt-'+i" :x="i*20 - 6" y="129" width="12" height="8" rx="1.5" fill="#21262d" opacity="0.7"/>
+                        <line x1="0" y1="126" x2="900" y2="126" stroke="#30363d" stroke-width="1" opacity="0.5"/>
+                        <line x1="0" y1="140" x2="900" y2="140" stroke="#30363d" stroke-width="1" opacity="0.3"/>
+                    </svg>
+                </div>
+
+                <!-- ===== STATUS GAUGES ===== -->
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <!-- Group gauge -->
+                    <div class="ind-card ind-scanline p-4">
+                        <div class="flex items-center gap-2 mb-2">
+                            <svg width="14" height="14" viewBox="0 0 14 14"><circle cx="7" cy="7" r="5" fill="none" stroke="#ff6b35" stroke-width="1.5" opacity="0.5"/><circle cx="7" cy="7" r="2" fill="#ff6b35" opacity="0.7"/></svg>
+                            <span class="ind-label">Group</span>
+                        </div>
+                        <div class="ind-value text-white truncate">{{ status.group_name || '---' }}</div>
+                    </div>
+                    <!-- Status gauge -->
+                    <div class="ind-card ind-scanline p-4">
+                        <div class="flex items-center gap-2 mb-2">
+                            <svg width="14" height="14" viewBox="0 0 14 14">
+                                <circle cx="7" cy="7" r="5" :fill="groupActive ? '#22c55e' : '#ef4444'" :opacity="groupActive ? 0.3 : 0.2"/>
+                                <circle cx="7" cy="7" r="3" :fill="groupActive ? '#22c55e' : '#ef4444'" :opacity="groupActive ? 0.8 : 0.5"/>
+                            </svg>
+                            <span class="ind-label">Status</span>
+                        </div>
+                        <div class="ind-value" :class="groupActive ? 'ind-glow-green' : 'ind-glow-red'">{{ groupActive ? 'ACTIVE' : 'IDLE' }}</div>
+                    </div>
+                    <!-- Members gauge -->
+                    <div class="ind-card ind-scanline p-4">
+                        <div class="flex items-center gap-2 mb-2">
+                            <svg width="14" height="14" viewBox="0 0 14 14"><rect x="2" y="4" width="10" height="7" rx="2" fill="none" stroke="#fbbf24" stroke-width="1.5" opacity="0.5"/><circle cx="7" cy="7" r="1.5" fill="#fbbf24" opacity="0.7"/></svg>
+                            <span class="ind-label">Members</span>
+                        </div>
+                        <div class="ind-value ind-glow-amber">{{ status.member_count || 0 }}</div>
+                    </div>
+                    <!-- Agent ID gauge -->
+                    <div class="ind-card ind-scanline p-4">
+                        <div class="flex items-center gap-2 mb-2">
+                            <svg width="14" height="14" viewBox="0 0 14 14"><rect x="1" y="3" width="12" height="8" rx="1.5" fill="none" stroke="#58a6ff" stroke-width="1" opacity="0.4"/><line x1="4" y1="6" x2="10" y2="6" stroke="#58a6ff" stroke-width="1" opacity="0.5"/><line x1="4" y1="8.5" x2="8" y2="8.5" stroke="#58a6ff" stroke-width="1" opacity="0.3"/></svg>
+                            <span class="ind-label">Agent</span>
+                        </div>
+                        <div class="text-xs font-medium text-gray-300 truncate" style="font-family: ui-monospace, monospace;">{{ status.agent_id || '---' }}</div>
+                    </div>
+                </div>
+
+                <!-- ===== STATS PANEL ===== -->
+                <div v-if="stats" class="ind-card ind-scanline p-5">
+                    <div class="flex items-center gap-2 mb-4">
+                        <svg width="16" height="16" viewBox="0 0 16 16">
+                            <rect x="1" y="9" width="3" height="6" rx="0.5" fill="#fbbf24" opacity="0.6"/>
+                            <rect x="5.5" y="5" width="3" height="10" rx="0.5" fill="#22c55e" opacity="0.6"/>
+                            <rect x="10" y="2" width="3" height="13" rx="0.5" fill="#58a6ff" opacity="0.6"/>
+                        </svg>
+                        <span class="ind-label" style="font-size: 10px; letter-spacing: 0.25em;">Performance Metrics</span>
+                    </div>
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div>
+                            <div class="ind-label mb-1">Tasks (24h)</div>
+                            <div class="ind-value ind-glow-amber">{{ stats.tasks_last_24h || 0 }}</div>
+                        </div>
+                        <div>
+                            <div class="ind-label mb-1">Tasks (7d)</div>
+                            <div class="ind-value ind-glow-blue">{{ stats.tasks_last_7d || 0 }}</div>
+                        </div>
+                        <div>
+                            <div class="ind-label mb-1">Avg Response</div>
+                            <div class="ind-value ind-glow-green">{{ formatDuration(stats.avg_response_secs) }}</div>
+                        </div>
+                        <div>
+                            <div class="ind-label mb-1">Max Delegation</div>
+                            <div class="ind-value ind-glow-purple">{{ stats.max_delegation_depth || 0 }}</div>
+                        </div>
+                    </div>
+                    <!-- Mini pipe divider -->
+                    <div class="mt-4 ind-divider"></div>
+                </div>
+
+                <!-- ===== PREVIOUS GROUPS ===== -->
+                <div v-if="!groupActive && previousMembers.length > 0" class="ind-card p-5">
+                    <div class="flex items-center gap-2 mb-4">
+                        <svg width="14" height="14" viewBox="0 0 14 14"><path d="M7 1 L13 7 L7 13 L1 7 Z" fill="none" stroke="#ff6b35" stroke-width="1.5" opacity="0.4"/></svg>
+                        <span class="ind-label" style="font-size: 10px; letter-spacing: 0.25em;">Previous Groups</span>
+                    </div>
+                    <div class="space-y-2">
+                        <div v-for="pm in previousMembers" :key="pm.agent_id" class="flex items-center justify-between rounded-lg p-3" style="background: rgba(255,107,53,0.04); border: 1px solid rgba(255,107,53,0.1);">
+                            <div>
+                                <div class="text-sm text-gray-300 font-medium" style="font-family: ui-monospace, monospace;">{{ pm.agent_name || pm.agent_id }}</div>
+                                <div class="text-[10px] text-gray-600">Left {{ relativeTime(pm.left_at) }}</div>
+                            </div>
+                            <button @click="rejoinGroup(pm.agent_id)" class="btn-primary text-[10px]">REJOIN</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ===== HEALTH PIPELINE ===== -->
+                <div class="ind-card ind-scanline overflow-hidden">
+                    <!-- Pipe connecting LFS and Kafka -->
+                    <svg viewBox="0 0 900 80" style="width:100%; display:block;" xmlns="http://www.w3.org/2000/svg">
+                        <rect width="900" height="80" fill="#0a0e14"/>
+                        <!-- Horizontal pipe -->
+                        <rect x="60" y="32" width="780" height="16" rx="8" fill="#161b22"/>
+                        <rect x="60" y="32" width="780" height="16" rx="8" fill="none" stroke="#21262d" stroke-width="1"/>
+                        <!-- Pipe shine -->
+                        <rect x="62" y="33" width="776" height="5" rx="2.5" fill="white" opacity="0.03"/>
+
+                        <!-- LFS section (left) -->
+                        <circle cx="160" cy="40" r="14" fill="#22c55e" :opacity="status.lfs_healthy ? 0.12 : 0.05"/>
+                        <circle cx="160" cy="40" r="10" fill="#0a0e14"/>
+                        <circle cx="160" cy="40" r="4" :fill="status.lfs_healthy ? '#22c55e' : '#ef4444'" :opacity="status.lfs_healthy ? 0.9 : 0.5">
+                            <animate v-if="status.lfs_healthy" attributeName="r" values="3.5;4.5;3.5" dur="2.5s" repeatCount="indefinite"/>
+                        </circle>
+                        <text x="160" y="67" text-anchor="middle" fill="#8b949e" font-size="9" letter-spacing="0.15em" style="font-family: ui-monospace, monospace;">LFS PROXY</text>
+
+                        <!-- Kafka section (center-right) -->
+                        <circle cx="450" cy="40" r="14" fill="#58a6ff" :opacity="groupActive ? 0.12 : 0.05"/>
+                        <circle cx="450" cy="40" r="10" fill="#0a0e14"/>
+                        <circle cx="450" cy="40" r="4" :fill="groupActive ? '#58a6ff' : '#374151'" :opacity="groupActive ? 0.9 : 0.5">
+                            <animate v-if="groupActive" attributeName="r" values="3.5;4.5;3.5" dur="2.5s" repeatCount="indefinite" begin="0.8s"/>
+                        </circle>
+                        <text x="450" y="67" text-anchor="middle" fill="#8b949e" font-size="9" letter-spacing="0.15em" style="font-family: ui-monospace, monospace;">KAFKA</text>
+
+                        <!-- Agent section (right) -->
+                        <circle cx="740" cy="40" r="14" fill="#ff6b35" :opacity="groupActive ? 0.12 : 0.05"/>
+                        <circle cx="740" cy="40" r="10" fill="#0a0e14"/>
+                        <circle cx="740" cy="40" r="4" :fill="groupActive ? '#ff6b35' : '#374151'" :opacity="groupActive ? 0.9 : 0.5">
+                            <animate v-if="groupActive" attributeName="r" values="3.5;4.5;3.5" dur="2.5s" repeatCount="indefinite" begin="1.6s"/>
+                        </circle>
+                        <text x="740" y="67" text-anchor="middle" fill="#8b949e" font-size="9" letter-spacing="0.15em" style="font-family: ui-monospace, monospace;">AGENT</text>
+
+                        <!-- Flow bubbles (only when healthy) -->
+                        <circle v-if="status.lfs_healthy && groupActive" r="3" fill="#22c55e" opacity="0.5">
+                            <animateMotion dur="4s" repeatCount="indefinite" path="M160,40 L450,40"/>
+                        </circle>
+                        <circle v-if="groupActive" r="3" fill="#58a6ff" opacity="0.5">
+                            <animateMotion dur="4s" repeatCount="indefinite" begin="1.5s" path="M450,40 L740,40"/>
+                        </circle>
+
+                        <!-- Status text below pipe -->
+                        <text x="160" y="16" text-anchor="middle" :fill="status.lfs_healthy ? '#22c55e' : '#ef4444'" font-size="8" letter-spacing="0.1em" style="font-family: ui-monospace, monospace;">{{ status.lfs_healthy ? 'REACHABLE' : 'DOWN' }}</text>
+                        <text x="450" y="16" text-anchor="middle" :fill="groupActive ? '#58a6ff' : '#6b7280'" font-size="8" letter-spacing="0.1em" style="font-family: ui-monospace, monospace;">{{ groupActive ? 'CONNECTED' : 'DISCONNECTED' }}</text>
+                        <text x="740" y="16" text-anchor="middle" :fill="groupActive ? '#ff6b35' : '#6b7280'" font-size="8" letter-spacing="0.1em" style="font-family: ui-monospace, monospace;">{{ groupActive ? 'ACTIVE' : 'STANDBY' }}</text>
+                    </svg>
+                    <!-- URL details -->
+                    <div class="flex gap-4 px-5 py-3" style="background: rgba(13,17,23,0.5); border-top: 1px solid rgba(48,54,61,0.3);">
+                        <div class="flex-1">
+                            <span class="ind-label">LFS Endpoint</span>
+                            <div class="text-[11px] text-gray-500 truncate mt-0.5" style="font-family: ui-monospace, monospace;">{{ status.lfs_proxy_url || 'not configured' }}</div>
+                        </div>
+                        <div class="flex-1">
+                            <span class="ind-label">Kafka Brokers</span>
+                            <div class="text-[11px] text-gray-500 truncate mt-0.5" style="font-family: ui-monospace, monospace;">{{ config.kafka_brokers || 'not configured' }}</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ===== QUICK JOIN (control panel) ===== -->
+                <div v-if="!groupActive" class="ind-card p-6">
+                    <div class="flex items-center gap-3 mb-4">
+                        <svg width="20" height="20" viewBox="0 0 20 20">
+                            <circle cx="10" cy="10" r="8" fill="none" stroke="#ff6b35" stroke-width="1.5" opacity="0.3"/>
+                            <line x1="10" y1="6" x2="10" y2="14" stroke="#ff6b35" stroke-width="2" opacity="0.6"/>
+                            <line x1="6" y1="10" x2="14" y2="10" stroke="#ff6b35" stroke-width="2" opacity="0.6"/>
+                        </svg>
+                        <span class="ind-label" style="font-size: 11px; letter-spacing: 0.25em; color: #ff6b35;">Quick Join</span>
+                    </div>
+                    <div class="flex gap-3">
+                        <input v-model="quickJoinName" class="input-field flex-1" style="border-color: rgba(255,107,53,0.2); background: rgba(10,14,20,0.8);" placeholder="Group name..." @keyup.enter="quickJoin">
+                        <button @click="quickJoin" :disabled="!quickJoinName.trim() || joining" class="btn-primary" style="min-width: 100px;">
+                            {{ joining ? 'JOINING...' : 'JOIN' }}
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ===== DECENTRALIZED NOTICE (industrial warning) ===== -->
+                <div class="ind-card p-4" style="border-color: rgba(251,191,36,0.15);">
+                    <div class="flex items-start gap-3">
+                        <svg width="20" height="20" viewBox="0 0 20 20" class="shrink-0 mt-0.5">
+                            <polygon points="10,2 19,17 1,17" fill="none" stroke="#fbbf24" stroke-width="1.5" opacity="0.5"/>
+                            <line x1="10" y1="8" x2="10" y2="12" stroke="#fbbf24" stroke-width="1.5" opacity="0.6"/>
+                            <circle cx="10" cy="14.5" r="1" fill="#fbbf24" opacity="0.6"/>
+                        </svg>
+                        <div>
+                            <div class="text-xs font-semibold mb-1" style="color: #fbbf24; font-family: ui-monospace, monospace; letter-spacing: 0.1em;">DECENTRALIZED VIEW</div>
+                            <div class="text-[11px] text-gray-500 leading-relaxed">
+                                This is your agent's local view of the group. Each agent maintains its own roster
+                                based on Kafka announcements and heartbeats. Member status is eventually consistent.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Members Tab -->
+            <div v-if="activeTab === 'members'" class="max-w-5xl mx-auto">
+                <div v-if="members.length === 0" class="text-center py-20">
+                    <div class="text-gray-600 text-sm">No members in group</div>
+                    <div class="text-gray-700 text-xs mt-2">Join a group to see members</div>
+                </div>
+                <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div v-for="member in members" :key="member.agent_id"
+                        class="glass-card rounded-lg p-4"
+                        :class="{ 'self-card': member.agent_id === status.agent_id }">
+                        <!-- Header -->
+                        <div class="flex items-start justify-between mb-3">
+                            <div class="flex-1 min-w-0">
+                                <div class="flex items-center gap-2">
+                                    <span class="text-sm font-bold text-white truncate">{{ member.agent_name || member.agent_id }}</span>
+                                    <span v-if="member.role" class="text-[9px] px-1.5 py-0.5 rounded bg-purple-900/30 text-purple-400 border border-purple-800/40 uppercase tracking-wider">{{ member.role }}</span>
+                                    <span v-if="member.agent_id === status.agent_id" class="text-[9px] px-1.5 py-0.5 rounded bg-amber-900/30 text-amber-400 border border-amber-800/40">YOU</span>
+                                </div>
+                                <div class="text-[10px] text-gray-600 mt-0.5 truncate">{{ member.agent_id }}</div>
+                            </div>
+                            <span class="badge" :class="member.status === 'active' ? 'badge-active' : 'badge-stale'">
+                                {{ member.status }}
+                            </span>
+                        </div>
+
+                        <!-- Model -->
+                        <div class="text-[10px] text-gray-500 mb-2">
+                            Model: <span class="text-gray-300">{{ member.model || '---' }}</span>
+                        </div>
+
+                        <!-- Capabilities -->
+                        <div v-if="parseCaps(member.capabilities).length" class="flex flex-wrap gap-1 mb-2">
+                            <span v-for="cap in parseCaps(member.capabilities).slice(0, 6)" :key="cap" class="pill">{{ cap }}</span>
+                            <span v-if="parseCaps(member.capabilities).length > 6" class="pill">+{{ parseCaps(member.capabilities).length - 6 }}</span>
+                        </div>
+
+                        <!-- Channels -->
+                        <div v-if="parseChannels(member.channels).length" class="text-[10px] text-gray-500 mb-2">
+                            Channels: <span class="text-gray-400">{{ parseChannels(member.channels).join(', ') }}</span>
+                        </div>
+
+                        <!-- Soul Summary -->
+                        <div v-if="member.soul_summary" class="text-[10px] text-gray-500 mt-2 line-clamp-2 leading-relaxed">
+                            {{ member.soul_summary }}
+                        </div>
+
+                        <!-- Last Seen -->
+                        <div class="text-[9px] text-gray-600 mt-3 flex items-center gap-1">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                            {{ relativeTime(member.last_seen) }}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Membership History -->
+                <div v-if="membershipHistory.length > 0" class="mt-6">
+                    <div class="text-xs text-gray-400 uppercase tracking-wider font-semibold mb-3">Membership History</div>
+                    <div class="space-y-1">
+                        <div v-for="entry in membershipHistory" :key="entry.id" class="glass-card rounded-lg px-4 py-2.5 flex items-center gap-3">
+                            <span class="badge" :class="entry.action === 'joined' ? 'badge-joined' : 'badge-left'">
+                                {{ entry.action }}
+                            </span>
+                            <span class="text-xs text-gray-300">{{ entry.agent_name || entry.agent_id }}</span>
+                            <span class="text-[10px] text-gray-600 ml-auto">{{ formatTime(entry.happened_at) }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tasks Tab -->
+            <div v-if="activeTab === 'tasks'" class="max-w-5xl mx-auto space-y-4">
+                <!-- Submit Task -->
+                <div v-if="groupActive" class="glass-card rounded-lg p-4">
+                    <div class="text-xs text-gray-400 uppercase tracking-wider font-semibold mb-3">Submit Task to Group</div>
+                    <div class="space-y-2">
+                        <input v-model="taskDescription" class="input-field w-full" placeholder="Task description...">
+                        <textarea v-model="taskContent" class="input-field w-full" rows="3" placeholder="Task content (optional)..."></textarea>
+                        <div class="flex justify-end">
+                            <button @click="submitTask" :disabled="!taskDescription.trim() || submittingTask" class="btn-primary">
+                                {{ submittingTask ? 'SUBMITTING...' : 'SUBMIT TASK' }}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Filters -->
+                <div class="flex items-center gap-2">
+                    <button @click="taskFilter = ''" class="btn-ghost text-[10px]" :class="{ active: taskFilter === '' }">All</button>
+                    <button @click="taskFilter = 'outgoing'" class="btn-ghost text-[10px]" :class="{ active: taskFilter === 'outgoing' }">Outgoing</button>
+                    <button @click="taskFilter = 'incoming'" class="btn-ghost text-[10px]" :class="{ active: taskFilter === 'incoming' }">Incoming</button>
+                    <div class="w-px h-4 bg-gray-700 mx-1"></div>
+                    <button @click="taskStatusFilter = ''" class="btn-ghost text-[10px]" :class="{ active: taskStatusFilter === '' }">All Status</button>
+                    <button @click="taskStatusFilter = 'pending'" class="btn-ghost text-[10px]" :class="{ active: taskStatusFilter === 'pending' }">Pending</button>
+                    <button @click="taskStatusFilter = 'completed'" class="btn-ghost text-[10px]" :class="{ active: taskStatusFilter === 'completed' }">Completed</button>
+                    <button @click="taskStatusFilter = 'failed'" class="btn-ghost text-[10px]" :class="{ active: taskStatusFilter === 'failed' }">Failed</button>
+                </div>
+
+                <!-- Task List -->
+                <div v-if="tasks.length === 0" class="text-center py-16">
+                    <div class="text-gray-600 text-sm">No tasks found</div>
+                </div>
+                <div v-else class="space-y-2">
+                    <div v-for="task in tasks" :key="task.id" class="glass-card rounded-lg p-4">
+                        <div class="flex items-start justify-between mb-2">
+                            <div class="flex items-center gap-2">
+                                <span class="badge" :class="'badge-' + task.direction">
+                                    {{ task.direction === 'outgoing' ? '&#x2191;' : '&#x2193;' }} {{ task.direction }}
+                                </span>
+                                <span class="badge" :class="'badge-' + task.status">{{ task.status }}</span>
+                            </div>
+                            <span class="text-[9px] text-gray-600">{{ formatTime(task.created_at) }}</span>
+                        </div>
+                        <div class="text-sm text-gray-200 mb-1">{{ task.description }}</div>
+                        <div v-if="task.content" class="text-[11px] text-gray-500 mb-2 line-clamp-2">{{ task.content }}</div>
+                        <div class="flex items-center gap-3 text-[9px] text-gray-600">
+                            <span>From: <span class="text-gray-400">{{ task.requester_id }}</span></span>
+                            <span v-if="task.responder_id">To: <span class="text-gray-400">{{ task.responder_id }}</span></span>
+                        </div>
+                        <!-- Expandable Response -->
+                        <div v-if="task.response_content" class="mt-3 pt-3 border-t border-gray-800">
+                            <button @click="toggleTaskExpand(task.id)" class="text-[10px] text-amber-400 hover:text-amber-300 mb-1">
+                                {{ expandedTasks[task.id] ? 'Hide Response' : 'Show Response' }}
+                            </button>
+                            <div v-if="expandedTasks[task.id]" class="text-[11px] text-gray-400 mt-1 bg-[#0d1117] rounded p-3 max-h-40 overflow-y-auto">
+                                {{ task.response_content }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Traces Tab -->
+            <div v-if="activeTab === 'traces'" class="max-w-5xl mx-auto space-y-6">
+
+                <!-- Local End-to-End Traces -->
+                <div>
+                    <div class="text-xs text-gray-400 uppercase tracking-wider font-semibold mb-3">End-to-End Traces</div>
+                    <div v-if="localTasks.length === 0" class="text-center py-8">
+                        <div class="text-gray-600 text-sm">No local traces yet</div>
+                    </div>
+                    <div v-else class="space-y-1">
+                        <div class="grid grid-cols-12 gap-2 px-3 py-2 text-[9px] text-gray-600 uppercase tracking-wider font-semibold">
+                            <div class="col-span-1">Status</div>
+                            <div class="col-span-2">Channel</div>
+                            <div class="col-span-3">Input</div>
+                            <div class="col-span-2">Tokens</div>
+                            <div class="col-span-1">Delivery</div>
+                            <div class="col-span-2">Time</div>
+                            <div class="col-span-1"></div>
+                        </div>
+                        <div v-for="lt in localTasks" :key="lt.task_id" class="glass-card rounded-lg">
+                            <div class="grid grid-cols-12 gap-2 px-3 py-2.5 items-center text-xs cursor-pointer" @click="expandLocalTrace(lt.trace_id)">
+                                <div class="col-span-1">
+                                    <span class="badge" :class="'badge-' + lt.status">{{ lt.status }}</span>
+                                </div>
+                                <div class="col-span-2 text-gray-400 truncate text-[10px]">{{ lt.channel }}:{{ lt.chat_id }}</div>
+                                <div class="col-span-3 text-gray-300 truncate text-[10px]">{{ lt.content_in }}</div>
+                                <div class="col-span-2 text-gray-500 text-[10px]">
+                                    <span v-if="lt.total_tokens">{{ lt.prompt_tokens }}+{{ lt.completion_tokens }}={{ lt.total_tokens }}</span>
+                                    <span v-else>-</span>
+                                </div>
+                                <div class="col-span-1">
+                                    <span class="text-[9px]" :class="lt.delivery_status === 'sent' ? 'text-green-400' : lt.delivery_status === 'failed' ? 'text-red-400' : 'text-gray-500'">{{ lt.delivery_status }}</span>
+                                </div>
+                                <div class="col-span-2 text-gray-600 text-[10px]">{{ formatTime(lt.created_at) }}</div>
+                                <div class="col-span-1 text-right">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 text-gray-600 transition-transform inline" :class="{ 'rotate-180': expandedLocalTrace === lt.trace_id }" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
+                                    </svg>
+                                </div>
+                            </div>
+                            <!-- Expanded: end-to-end span breakdown -->
+                            <div v-if="expandedLocalTrace === lt.trace_id" class="px-3 pb-3 space-y-2">
+                                <div v-if="localTraceLoading" class="text-[10px] text-gray-500 py-2">Loading trace...</div>
+                                <template v-else>
+                                    <!-- Trace actions -->
+                                    <div class="flex justify-end">
+                                        <button @click.stop="copyLocalTraceJson(lt.trace_id)"
+                                            class="text-[10px] px-2 py-0.5 rounded bg-gray-700 hover:bg-gray-600 text-white transition-colors"
+                                            :class="{ 'bg-green-700 hover:bg-green-600': localTraceJsonCopied }">
+                                            {{ localTraceJsonCopied ? 'Copied!' : 'Copy JSON' }}
+                                        </button>
+                                    </div>
+                                    <!-- Span pipeline -->
+                                    <div v-if="localTraceSpans.length > 0" class="flex flex-wrap gap-1 items-center py-1">
+                                        <template v-for="(span, si) in localTraceSpans" :key="si">
+                                            <div class="flex items-center gap-1 px-2 py-1 rounded text-[10px] font-semibold cursor-pointer transition-all"
+                                                :style="{ background: spanTypeColor(span.type) + (selectedLocalSpan === si ? '40' : '20'), color: spanTypeColor(span.type), border: '2px solid ' + spanTypeColor(span.type) + (selectedLocalSpan === si ? 'cc' : '40') }"
+                                                @click="selectedLocalSpan = selectedLocalSpan === si ? null : si">
+                                                {{ span.type }}
+                                                <span class="text-[9px] opacity-60">{{ span.time }}</span>
+                                                <span v-if="span.duration" class="text-[9px] opacity-40">{{ span.duration }}</span>
+                                            </div>
+                                            <svg v-if="si < localTraceSpans.length - 1" class="h-3 w-3 text-gray-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
+                                            </svg>
+                                        </template>
+                                    </div>
+                                    <div v-else class="text-[10px] text-gray-600 italic">No spans recorded for this trace</div>
+                                    <!-- Span detail panel -->
+                                    <div v-if="selectedLocalSpan !== null && localTraceSpans[selectedLocalSpan]" class="bg-[#0d1117] rounded p-3 text-[10px] text-gray-400 space-y-2 border border-gray-800">
+                                        <template v-if="localTraceSpans[selectedLocalSpan].type === 'LLM' && localTraceSpans[selectedLocalSpan].metadata">
+                                            <div class="grid grid-cols-4 gap-x-4 gap-y-1 text-gray-500">
+                                                <span>Model: <span class="text-purple-400">{{ localTraceSpans[selectedLocalSpan].metadata.model }}</span></span>
+                                                <span>Temp: <span class="text-gray-400">{{ localTraceSpans[selectedLocalSpan].metadata.temperature }}</span></span>
+                                                <span>Max Tokens: <span class="text-gray-400">{{ localTraceSpans[selectedLocalSpan].metadata.max_tokens }}</span></span>
+                                                <span>Duration: <span class="text-gray-400">{{ localTraceSpans[selectedLocalSpan].metadata.duration_ms }}ms</span></span>
+                                                <span>Prompt Tokens: <span class="text-blue-400">{{ localTraceSpans[selectedLocalSpan].metadata.prompt_tokens }}</span></span>
+                                                <span>Completion Tokens: <span class="text-green-400">{{ localTraceSpans[selectedLocalSpan].metadata.completion_tokens }}</span></span>
+                                                <span>Total Tokens: <span class="text-yellow-400">{{ localTraceSpans[selectedLocalSpan].metadata.total_tokens }}</span></span>
+                                                <span>Finish: <span class="text-gray-400">{{ localTraceSpans[selectedLocalSpan].metadata.finish_reason }}</span></span>
+                                            </div>
+                                            <div v-if="localTraceSpans[selectedLocalSpan].metadata.system_prompt" class="space-y-1">
+                                                <div class="text-[9px] text-gray-600 uppercase font-semibold">System Prompt</div>
+                                                <pre class="whitespace-pre-wrap max-h-32 overflow-y-auto bg-[#161b22] rounded p-2 text-gray-500 text-[10px]">{{ localTraceSpans[selectedLocalSpan].metadata.system_prompt }}</pre>
+                                            </div>
+                                            <div v-if="localTraceSpans[selectedLocalSpan].metadata.last_user_message" class="space-y-1">
+                                                <div class="text-[9px] text-gray-600 uppercase font-semibold">Last User Message</div>
+                                                <pre class="whitespace-pre-wrap max-h-32 overflow-y-auto bg-[#161b22] rounded p-2 text-blue-400/80 text-[10px]">{{ localTraceSpans[selectedLocalSpan].metadata.last_user_message }}</pre>
+                                            </div>
+                                            <div v-if="localTraceSpans[selectedLocalSpan].metadata.response_text" class="space-y-1">
+                                                <div class="text-[9px] text-gray-600 uppercase font-semibold">LLM Response</div>
+                                                <pre class="whitespace-pre-wrap max-h-32 overflow-y-auto bg-[#161b22] rounded p-2 text-green-400/80 text-[10px]">{{ localTraceSpans[selectedLocalSpan].metadata.response_text }}</pre>
+                                            </div>
+                                            <div v-if="localTraceSpans[selectedLocalSpan].metadata.tool_calls && localTraceSpans[selectedLocalSpan].metadata.tool_calls.length > 0" class="space-y-1">
+                                                <div class="text-[9px] text-gray-600 uppercase font-semibold">Tool Calls Requested</div>
+                                                <div v-for="(tc, tci) in localTraceSpans[selectedLocalSpan].metadata.tool_calls" :key="tci" class="bg-[#161b22] rounded p-2 space-y-1">
+                                                    <span class="text-orange-400 font-semibold">{{ tc.name }}</span>
+                                                    <pre class="whitespace-pre-wrap max-h-24 overflow-y-auto text-gray-500 text-[10px]">{{ JSON.stringify(tc.arguments, null, 2) }}</pre>
+                                                </div>
+                                            </div>
+                                        </template>
+                                        <template v-else-if="localTraceSpans[selectedLocalSpan].type === 'TOOL' && localTraceSpans[selectedLocalSpan].metadata">
+                                            <div class="grid grid-cols-3 gap-x-4 gap-y-1 text-gray-500">
+                                                <span>Tool: <span class="text-orange-400 font-semibold">{{ localTraceSpans[selectedLocalSpan].metadata.tool_name }}</span></span>
+                                                <span>Duration: <span class="text-gray-400">{{ localTraceSpans[selectedLocalSpan].metadata.duration_ms }}ms</span></span>
+                                                <span>Call ID: <span class="text-gray-600">{{ localTraceSpans[selectedLocalSpan].metadata.tool_call_id }}</span></span>
+                                            </div>
+                                            <div v-if="localTraceSpans[selectedLocalSpan].metadata.arguments" class="space-y-1">
+                                                <div class="text-[9px] text-gray-600 uppercase font-semibold">Arguments</div>
+                                                <pre class="whitespace-pre-wrap max-h-32 overflow-y-auto bg-[#161b22] rounded p-2 text-blue-400/80 text-[10px]">{{ JSON.stringify(localTraceSpans[selectedLocalSpan].metadata.arguments, null, 2) }}</pre>
+                                            </div>
+                                            <div v-if="localTraceSpans[selectedLocalSpan].metadata.result" class="space-y-1">
+                                                <div class="text-[9px] text-gray-600 uppercase font-semibold">Result</div>
+                                                <pre class="whitespace-pre-wrap max-h-32 overflow-y-auto bg-[#161b22] rounded p-2 text-green-400/80 text-[10px]">{{ localTraceSpans[selectedLocalSpan].metadata.result }}</pre>
+                                            </div>
+                                            <div v-if="localTraceSpans[selectedLocalSpan].metadata.error" class="space-y-1">
+                                                <div class="text-[9px] text-gray-600 uppercase font-semibold">Error</div>
+                                                <pre class="whitespace-pre-wrap bg-[#161b22] rounded p-2 text-red-400 text-[10px]">{{ localTraceSpans[selectedLocalSpan].metadata.error }}</pre>
+                                            </div>
+                                        </template>
+                                        <template v-else-if="localTraceSpans[selectedLocalSpan].type === 'INBOUND' && localTraceSpans[selectedLocalSpan].metadata">
+                                            <div class="grid grid-cols-3 gap-x-4 gap-y-1 text-gray-500">
+                                                <span>Channel: <span class="text-blue-400">{{ localTraceSpans[selectedLocalSpan].metadata.channel }}</span></span>
+                                                <span>Sender: <span class="text-gray-400">{{ localTraceSpans[selectedLocalSpan].metadata.sender }}</span></span>
+                                                <span>Type: <span class="text-gray-400">{{ localTraceSpans[selectedLocalSpan].metadata.message_type }}</span></span>
+                                            </div>
+                                            <div v-if="localTraceSpans[selectedLocalSpan].metadata.content" class="space-y-1">
+                                                <div class="text-[9px] text-gray-600 uppercase font-semibold">Message Content</div>
+                                                <pre class="whitespace-pre-wrap max-h-32 overflow-y-auto bg-[#161b22] rounded p-2 text-blue-400/80 text-[10px]">{{ localTraceSpans[selectedLocalSpan].metadata.content }}</pre>
+                                            </div>
+                                        </template>
+                                        <template v-else-if="localTraceSpans[selectedLocalSpan].type === 'OUTBOUND'">
+                                            <div v-if="localTraceSpans[selectedLocalSpan].metadata" class="grid grid-cols-2 gap-x-4 gap-y-1 text-gray-500">
+                                                <span>Delivery: <span class="text-green-400">{{ localTraceSpans[selectedLocalSpan].metadata.delivery_status }}</span></span>
+                                            </div>
+                                            <div v-if="localTraceSpans[selectedLocalSpan].metadata && localTraceSpans[selectedLocalSpan].metadata.response_text" class="space-y-1">
+                                                <div class="text-[9px] text-gray-600 uppercase font-semibold">Response Text</div>
+                                                <pre class="whitespace-pre-wrap max-h-32 overflow-y-auto bg-[#161b22] rounded p-2 text-green-400/80 text-[10px]">{{ localTraceSpans[selectedLocalSpan].metadata.response_text }}</pre>
+                                            </div>
+                                        </template>
+                                        <div v-else class="text-gray-600 italic">No detailed metadata available for this span</div>
+                                    </div>
+                                    <!-- Task metadata -->
+                                    <div v-if="localTraceTask" class="bg-[#0d1117] rounded p-2 text-[10px] text-gray-500 grid grid-cols-3 gap-x-4 gap-y-1">
+                                        <span>Task: <span class="text-gray-400">{{ localTraceTask.task_id }}</span></span>
+                                        <span>Status: <span class="text-gray-400">{{ localTraceTask.status }}</span></span>
+                                        <span>Delivery: <span class="text-gray-400">{{ localTraceTask.delivery_status }}</span></span>
+                                        <span>Prompt: <span class="text-gray-400">{{ localTraceTask.prompt_tokens }}</span></span>
+                                        <span>Completion: <span class="text-gray-400">{{ localTraceTask.completion_tokens }}</span></span>
+                                        <span>Total: <span class="text-gray-400">{{ localTraceTask.total_tokens }}</span></span>
+                                    </div>
+                                    <!-- Policy decisions -->
+                                    <div v-if="localTracePolicy.length > 0" class="flex flex-wrap gap-1">
+                                        <div v-for="(pd, pi) in localTracePolicy" :key="pi"
+                                            class="text-[9px] px-2 py-0.5 rounded"
+                                            :class="pd.allowed ? 'bg-green-900/20 text-green-400 border border-green-800/30' : 'bg-red-900/20 text-red-400 border border-red-800/30'">
+                                            {{ pd.tool }} T{{ pd.tier }} {{ pd.allowed ? 'ALLOW' : 'DENY' }}
+                                        </div>
+                                    </div>
+                                    <!-- Input/Output preview -->
+                                    <div v-if="lt.content_in || lt.content_out" class="bg-[#0d1117] rounded p-2 space-y-1 max-h-48 overflow-y-auto">
+                                        <div v-if="lt.content_in" class="text-[10px]">
+                                            <span class="text-blue-400 font-semibold">IN:</span>
+                                            <span class="text-gray-400 ml-1">{{ lt.content_in }}</span>
+                                        </div>
+                                        <div v-if="lt.content_out" class="text-[10px]">
+                                            <span class="text-green-400 font-semibold">OUT:</span>
+                                            <span class="text-gray-400 ml-1 whitespace-pre-wrap">{{ lt.content_out }}</span>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Group Traces (inter-agent) -->
+                <div>
+                    <div class="flex items-center gap-3 mb-3">
+                        <div class="text-xs text-gray-400 uppercase tracking-wider font-semibold">Group Traces</div>
+                        <select v-model="traceAgentFilter" class="input-field text-xs" @change="loadTraces">
+                            <option value="">All agents</option>
+                            <option v-for="agent in traceAgents" :key="agent" :value="agent">{{ agent }}</option>
+                        </select>
+                    </div>
+
+                    <div v-if="traces.length === 0" class="text-center py-8">
+                        <div class="text-gray-600 text-sm">No group traces found</div>
+                    </div>
+                    <div v-else class="space-y-1">
+                        <div class="grid grid-cols-12 gap-2 px-3 py-2 text-[9px] text-gray-600 uppercase tracking-wider font-semibold">
+                            <div class="col-span-2">Source</div>
+                            <div class="col-span-2">Trace ID</div>
+                            <div class="col-span-1">Type</div>
+                            <div class="col-span-3">Title</div>
+                            <div class="col-span-1">Duration</div>
+                            <div class="col-span-2">Time</div>
+                            <div class="col-span-1"></div>
+                        </div>
+                        <div v-for="trace in traces" :key="trace.id" class="glass-card rounded-lg">
+                            <div class="grid grid-cols-12 gap-2 px-3 py-2.5 items-center text-xs cursor-pointer" @click="toggleTraceExpand(trace.id)">
+                                <div class="col-span-2 text-gray-300 truncate">{{ trace.source_agent_id }}</div>
+                                <div class="col-span-2 text-gray-500 truncate font-mono text-[10px]">{{ trace.trace_id }}</div>
+                                <div class="col-span-1">
+                                    <span class="text-[10px] font-semibold" :class="'span-' + (trace.span_type || 'EVENT')">{{ trace.span_type || 'EVENT' }}</span>
+                                </div>
+                                <div class="col-span-3 text-gray-300 truncate">{{ trace.title }}</div>
+                                <div class="col-span-1 text-gray-500 text-[10px]">{{ trace.duration_ms ? trace.duration_ms + 'ms' : '-' }}</div>
+                                <div class="col-span-2 text-gray-600 text-[10px]">{{ formatTime(trace.created_at) }}</div>
+                                <div class="col-span-1 text-right">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 text-gray-600 transition-transform inline" :class="{ 'rotate-180': expandedTraces[trace.id] }" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
+                                    </svg>
+                                </div>
+                            </div>
+                            <div v-if="expandedTraces[trace.id] && trace.content" class="px-3 pb-3">
+                                <div class="text-[11px] text-gray-500 bg-[#0d1117] rounded p-3 max-h-48 overflow-y-auto whitespace-pre-wrap">{{ trace.content }}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Audit Tab -->
+            <div v-if="activeTab === 'audit'" class="max-w-5xl mx-auto space-y-4">
+                <!-- Filters -->
+                <div class="flex items-center gap-2 flex-wrap">
+                    <button @click="auditSourceFilter = ''" class="btn-ghost text-[10px]" :class="{ active: auditSourceFilter === '' }">All</button>
+                    <button @click="auditSourceFilter = 'delegation'" class="btn-ghost text-[10px]" :class="{ active: auditSourceFilter === 'delegation' }">Delegation</button>
+                    <button @click="auditSourceFilter = 'policy'" class="btn-ghost text-[10px]" :class="{ active: auditSourceFilter === 'policy' }">Policy</button>
+                    <button @click="auditSourceFilter = 'approval'" class="btn-ghost text-[10px]" :class="{ active: auditSourceFilter === 'approval' }">Approval</button>
+                    <div class="w-px h-4 bg-gray-700 mx-1"></div>
+                    <input v-model="auditAgentFilter" class="input-field text-[10px]" placeholder="Agent ID..." style="width: 180px;">
+                </div>
+
+                <!-- Audit Log -->
+                <div v-if="filteredAuditEntries.length === 0" class="text-center py-16">
+                    <div class="text-gray-600 text-sm">No audit entries found</div>
+                </div>
+                <div v-else class="space-y-1">
+                    <div v-for="entry in filteredAuditEntries" :key="entry.source + '-' + entry.id" class="glass-card rounded-lg px-4 py-3">
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <span class="badge" :class="'badge-' + entry.source">{{ entry.source }}</span>
+                            <span class="badge" :class="entry.event_type === 'denied' ? 'badge-denied' : entry.event_type === 'allowed' ? 'badge-allowed' : 'badge-' + entry.event_type">{{ entry.event_type }}</span>
+                            <span v-if="entry.tier > 0" class="text-[9px] text-gray-500">Tier {{ entry.tier }}</span>
+                            <span v-if="entry.agent_id" class="text-[10px] text-gray-400">{{ entry.agent_id }}</span>
+                            <span v-if="entry.target_id" class="text-[10px] text-gray-600">&rarr; {{ entry.target_id }}</span>
+                            <span class="text-[9px] text-gray-600 ml-auto">{{ formatTime(entry.created_at) }}</span>
+                        </div>
+                        <div v-if="entry.details" class="text-[10px] text-gray-500 mt-1 truncate">{{ entry.details }}</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Topics Tab -->
+            <div v-if="activeTab === 'topics'" class="space-y-6">
+
+                <!-- Section A: Chemical Factory Pipe Visualization -->
+                <div class="max-w-7xl mx-auto">
+                    <div class="flex items-center justify-between mb-3">
+                        <div class="flex items-center gap-3">
+                            <div class="text-xs text-gray-300 uppercase tracking-wider font-bold">Topic Factory</div>
+                            <div class="flex items-center gap-1.5 text-[10px]">
+                                <span class="px-2 py-0.5 rounded-full bg-amber-900/30 text-amber-400 border border-amber-800/30">{{ factoryContentPipes.length }} content</span>
+                                <span class="text-gray-600">+</span>
+                                <span class="px-2 py-0.5 rounded-full bg-blue-900/30 text-blue-400 border border-blue-800/30">{{ factoryInfraPipes.length }} infra</span>
+                                <span class="text-gray-600">=</span>
+                                <span class="px-2 py-0.5 rounded-full bg-gray-800 text-gray-300 font-bold">{{ allFactoryTopics.length }}</span>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-3 text-[10px] text-gray-500">
+                            <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full" style="background:#58a6ff; box-shadow: 0 0 4px #58a6ff80"></span>Control</span>
+                            <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full" style="background:#fbbf24; box-shadow: 0 0 4px #fbbf2480"></span>Tasks</span>
+                            <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full" style="background:#a855f7; box-shadow: 0 0 4px #a855f780"></span>Observe</span>
+                            <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full" style="background:#22c55e; box-shadow: 0 0 4px #22c55e80"></span>Memory</span>
+                            <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full" style="background:#f472b6; box-shadow: 0 0 4px #f472b680"></span>Skill</span>
+                            <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full" style="background:#ff6b35; box-shadow: 0 0 4px #ff6b3580"></span>Agent</span>
+                        </div>
+                    </div>
+                    <div class="glass-card rounded-xl" style="background: #060a10; overflow: visible;">
+                        <svg :viewBox="'0 0 1160 ' + factorySvgHeight" :style="'width:100%; min-height:' + Math.max(630, factorySvgHeight * 0.975) + 'px;'" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">
+                            <!-- Defs: glow filters, gradients, clip paths -->
+                            <defs>
+                                <filter id="pipe-glow" x="-20%" y="-50%" width="140%" height="200%">
+                                    <feGaussianBlur in="SourceGraphic" stdDeviation="3" result="blur"/>
+                                    <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+                                </filter>
+                                <filter id="pipe-glow-strong" x="-20%" y="-80%" width="140%" height="260%">
+                                    <feGaussianBlur in="SourceGraphic" stdDeviation="6" result="blur"/>
+                                    <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+                                </filter>
+                                <filter id="bubble-blur" x="-50%" y="-50%" width="200%" height="200%">
+                                    <feGaussianBlur in="SourceGraphic" stdDeviation="1.5"/>
+                                </filter>
+                                <linearGradient id="sky-grad" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0%" stop-color="#0c1220"/>
+                                    <stop offset="100%" stop-color="#060a10"/>
+                                </linearGradient>
+                                <linearGradient id="pipe-shine" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0%" stop-color="white" stop-opacity="0.18"/>
+                                    <stop offset="40%" stop-color="white" stop-opacity="0.02"/>
+                                    <stop offset="100%" stop-color="black" stop-opacity="0.12"/>
+                                </linearGradient>
+                                <linearGradient id="liquid-shine" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0%" stop-color="white" stop-opacity="0.25"/>
+                                    <stop offset="100%" stop-color="white" stop-opacity="0"/>
+                                </linearGradient>
+                                <!-- Conveyor belt pattern for separator -->
+                                <pattern id="conveyor-pattern" x="0" y="0" width="24" height="8" patternUnits="userSpaceOnUse">
+                                    <rect width="24" height="8" fill="#161b22"/>
+                                    <rect x="2" y="2" width="8" height="4" rx="1" fill="#21262d"/>
+                                    <rect x="14" y="2" width="8" height="4" rx="1" fill="#21262d"/>
+                                </pattern>
+                            </defs>
+
+                            <!-- Sky background with gradient -->
+                            <rect x="0" y="0" :width="1160" :height="factorySvgHeight" fill="url(#sky-grad)"/>
+
+                            <!-- Subtle grid lines for depth -->
+                            <line v-for="gy in 8" :key="'grid-'+gy" x1="120" :y1="gy * 40 + 20" x2="1080" :y2="gy * 40 + 20"
+                                stroke="#1a1f2b" stroke-width="0.5" opacity="0.4"/>
+
+                            <!-- Content level label with accent line -->
+                            <line x1="20" y1="52" x2="110" y2="52" stroke="#fbbf24" stroke-width="2" opacity="0.4"/>
+                            <text x="20" y="46" class="level-label" fill="#fbbf24" opacity="0.8">Content</text>
+
+                            <!-- Content pipes -->
+                            <template v-for="(pipe, idx) in factoryContentPipes" :key="'cp-'+pipe.name">
+                                <g @click="onPipeClick(pipe, $event)" style="cursor:pointer">
+                                    <!-- Glow underlayer (active pipes get stronger glow) -->
+                                    <rect class="pipe-glow" :x="118" :y="pipe.y - 3" :width="964" :height="pipe.thickness + 6" :rx="(pipe.thickness+6)/2"
+                                        :fill="pipe.color" :opacity="pipe.stale ? 0.06 : 0.15" :filter="pipe.stale ? 'url(#pipe-glow)' : (pipe.msgCount > 10 ? 'url(#pipe-glow-strong)' : 'url(#pipe-glow)')"/>
+                                    <!-- Pipe outer casing (dark border ring) -->
+                                    <rect :x="119" :y="pipe.y - 1" :width="962" :height="pipe.thickness + 2" :rx="(pipe.thickness+2)/2"
+                                        fill="#0d1117" :opacity="pipe.stale ? 0.4 : 0.5"/>
+                                    <!-- Main pipe body — solid color for ALL pipes -->
+                                    <rect class="pipe-body" :class="pipe.stale ? 'pipe-idle' : ''" :x="120" :y="pipe.y" :width="960" :height="pipe.thickness" :rx="pipe.thickness/2"
+                                        :fill="pipe.color" :opacity="pipe.stale ? 0.4 : 0.75"/>
+                                    <!-- 3D shine gradient overlay -->
+                                    <rect :x="120" :y="pipe.y" :width="960" :height="pipe.thickness" :rx="pipe.thickness/2"
+                                        fill="url(#pipe-shine)" :opacity="pipe.stale ? 0.5 : 0.8"/>
+                                    <!-- Inner liquid fill (proportional to message count) -->
+                                    <rect :x="126" :y="pipe.y + pipe.thickness * 0.3" :width="948 * pipe.liquidLevel" :height="pipe.thickness * 0.4" :rx="pipe.thickness/5"
+                                        :fill="pipe.color" :opacity="pipe.stale ? 0.25 : 0.5"/>
+                                    <!-- Left valve connector -->
+                                    <circle class="valve-ring" :cx="120" :cy="pipe.y + pipe.thickness/2" :r="pipe.thickness/2 + 4" :fill="pipe.color" :opacity="pipe.stale ? 0.25 : 0.5"/>
+                                    <circle :cx="120" :cy="pipe.y + pipe.thickness/2" :r="pipe.thickness/2 + 2" fill="#0d1117" opacity="0.6"/>
+                                    <circle :cx="120" :cy="pipe.y + pipe.thickness/2" r="3" :fill="pipe.stale ? '#374151' : pipe.color" :opacity="pipe.stale ? 0.6 : 0.9">
+                                        <animate v-if="!pipe.stale" attributeName="r" values="2.5;3.5;2.5" dur="2s" repeatCount="indefinite"/>
+                                    </circle>
+                                    <!-- Right valve connector -->
+                                    <circle class="valve-ring" :cx="1080" :cy="pipe.y + pipe.thickness/2" :r="pipe.thickness/2 + 4" :fill="pipe.color" :opacity="pipe.stale ? 0.25 : 0.5"/>
+                                    <circle :cx="1080" :cy="pipe.y + pipe.thickness/2" :r="pipe.thickness/2 + 2" fill="#0d1117" opacity="0.6"/>
+                                    <circle :cx="1080" :cy="pipe.y + pipe.thickness/2" r="3" :fill="pipe.stale ? '#374151' : pipe.color" :opacity="pipe.stale ? 0.6 : 0.9">
+                                        <animate v-if="!pipe.stale" attributeName="r" values="2.5;3.5;2.5" dur="2s" repeatCount="indefinite" begin="0.5s"/>
+                                    </circle>
+                                    <!-- Flowing bubbles — ALL pipes get them -->
+                                    <circle v-for="p in pipe.particles" :key="p" :r="Math.max(2, pipe.thickness/4)" :fill="pipe.color"
+                                        :opacity="pipe.stale ? 0.3 : 0.8" :filter="pipe.stale ? 'url(#bubble-blur)' : 'url(#pipe-glow)'">
+                                        <animateMotion :dur="pipe.stale ? (10 + p * 3) + 's' : (2.5 + p * 0.8) + 's'" repeatCount="indefinite"
+                                            :begin="(p * 1.5) + 's'"
+                                            :path="'M120,' + (pipe.y + pipe.thickness/2) + ' L1080,' + (pipe.y + pipe.thickness/2)"/>
+                                    </circle>
+                                    <!-- Left label -->
+                                    <text class="pipe-label" :x="106" :y="pipe.y + pipe.thickness/2 + 4" text-anchor="end" :fill="pipe.color" :opacity="pipe.stale ? 0.55 : 1">{{ pipe.shortName }}</text>
+                                    <!-- Right count badge -->
+                                    <rect class="pipe-count-bg" :x="1090" :y="pipe.y + pipe.thickness/2 - 7" width="38" height="14" rx="7"/>
+                                    <text class="pipe-count" :x="1094" :y="pipe.y + pipe.thickness/2 + 3" :fill="pipe.msgCount > 0 ? pipe.color : '#4b5563'">{{ pipe.msgCount }}</text>
+                                    <!-- Pressure indicator (traffic light dot) -->
+                                    <circle class="pressure-dot" :class="!pipe.stale && pipe.msgCount > 0 ? 'pressure-active' : ''" :cx="1136" :cy="pipe.y + pipe.thickness/2" r="4"
+                                        :fill="pipe.stale ? '#374151' : (pipe.msgCount > 10 ? '#22c55e' : pipe.msgCount > 0 ? '#fbbf24' : '#6b7280')"/>
+                                </g>
+                            </template>
+
+                            <!-- Structural separator: conveyor belt / factory floor -->
+                            <rect x="120" :y="factoryStiltTop" width="960" height="8" fill="url(#conveyor-pattern)" rx="2" opacity="0.7"/>
+                            <line :x1="120" :y1="factoryStiltTop" :x2="1080" :y2="factoryStiltTop"
+                                stroke="#30363d" stroke-width="1" opacity="0.6"/>
+                            <line :x1="120" :y1="factoryStiltTop + 8" :x2="1080" :y2="factoryStiltTop + 8"
+                                stroke="#30363d" stroke-width="1" opacity="0.6"/>
+                            <!-- Support stilts with bolts -->
+                            <g v-for="sx in [250, 500, 750, 1000]" :key="'stilt-'+sx">
+                                <line :x1="sx" :y1="factoryStiltTop + 8" :x2="sx" :y2="factoryInfraLabelY - 12"
+                                    stroke="#21262d" stroke-width="3" opacity="0.5"/>
+                                <circle :cx="sx" :cy="factoryStiltTop + 4" r="3" fill="#30363d" opacity="0.8"/>
+                                <circle :cx="sx" :cy="factoryInfraLabelY - 14" r="3" fill="#30363d" opacity="0.8"/>
+                            </g>
+
+                            <!-- Infra level label with accent line -->
+                            <line x1="20" :y1="factoryInfraLabelY - 2" x2="110" :y2="factoryInfraLabelY - 2" stroke="#58a6ff" stroke-width="2" opacity="0.4"/>
+                            <text x="20" :y="factoryInfraLabelY - 8" class="level-label" fill="#58a6ff" opacity="0.8">Infra</text>
+
+                            <!-- Infra pipes -->
+                            <template v-for="(pipe, idx) in factoryInfraPipes" :key="'ip-'+pipe.name">
+                                <g @click="onPipeClick(pipe, $event)" style="cursor:pointer">
+                                    <!-- Glow underlayer -->
+                                    <rect class="pipe-glow" :x="118" :y="pipe.y - 3" :width="964" :height="pipe.thickness + 6" :rx="(pipe.thickness+6)/2"
+                                        :fill="pipe.color" :opacity="pipe.stale ? 0.06 : 0.15" :filter="pipe.stale ? 'url(#pipe-glow)' : (pipe.msgCount > 10 ? 'url(#pipe-glow-strong)' : 'url(#pipe-glow)')"/>
+                                    <!-- Pipe outer casing -->
+                                    <rect :x="119" :y="pipe.y - 1" :width="962" :height="pipe.thickness + 2" :rx="(pipe.thickness+2)/2"
+                                        fill="#0d1117" :opacity="pipe.stale ? 0.4 : 0.5"/>
+                                    <!-- Main pipe body — solid color for ALL pipes -->
+                                    <rect class="pipe-body" :class="pipe.stale ? 'pipe-idle' : ''" :x="120" :y="pipe.y" :width="960" :height="pipe.thickness" :rx="pipe.thickness/2"
+                                        :fill="pipe.color" :opacity="pipe.stale ? 0.4 : 0.75"/>
+                                    <!-- 3D shine gradient overlay -->
+                                    <rect :x="120" :y="pipe.y" :width="960" :height="pipe.thickness" :rx="pipe.thickness/2"
+                                        fill="url(#pipe-shine)" :opacity="pipe.stale ? 0.5 : 0.8"/>
+                                    <!-- Inner liquid fill -->
+                                    <rect :x="126" :y="pipe.y + pipe.thickness * 0.3" :width="948 * pipe.liquidLevel" :height="pipe.thickness * 0.4" :rx="pipe.thickness/5"
+                                        :fill="pipe.color" :opacity="pipe.stale ? 0.25 : 0.5"/>
+                                    <!-- Left valve connector -->
+                                    <circle class="valve-ring" :cx="120" :cy="pipe.y + pipe.thickness/2" :r="pipe.thickness/2 + 4" :fill="pipe.color" :opacity="pipe.stale ? 0.25 : 0.5"/>
+                                    <circle :cx="120" :cy="pipe.y + pipe.thickness/2" :r="pipe.thickness/2 + 2" fill="#0d1117" opacity="0.6"/>
+                                    <circle :cx="120" :cy="pipe.y + pipe.thickness/2" r="3" :fill="pipe.stale ? '#374151' : pipe.color" :opacity="pipe.stale ? 0.6 : 0.9">
+                                        <animate v-if="!pipe.stale" attributeName="r" values="2.5;3.5;2.5" dur="2s" repeatCount="indefinite"/>
+                                    </circle>
+                                    <!-- Right valve connector -->
+                                    <circle class="valve-ring" :cx="1080" :cy="pipe.y + pipe.thickness/2" :r="pipe.thickness/2 + 4" :fill="pipe.color" :opacity="pipe.stale ? 0.25 : 0.5"/>
+                                    <circle :cx="1080" :cy="pipe.y + pipe.thickness/2" :r="pipe.thickness/2 + 2" fill="#0d1117" opacity="0.6"/>
+                                    <circle :cx="1080" :cy="pipe.y + pipe.thickness/2" r="3" :fill="pipe.stale ? '#374151' : pipe.color" :opacity="pipe.stale ? 0.6 : 0.9">
+                                        <animate v-if="!pipe.stale" attributeName="r" values="2.5;3.5;2.5" dur="2s" repeatCount="indefinite" begin="0.5s"/>
+                                    </circle>
+                                    <!-- Flowing bubbles — ALL pipes get them -->
+                                    <circle v-for="p in pipe.particles" :key="p" :r="Math.max(2, pipe.thickness/4)" :fill="pipe.color"
+                                        :opacity="pipe.stale ? 0.3 : 0.8" :filter="pipe.stale ? 'url(#bubble-blur)' : 'url(#pipe-glow)'">
+                                        <animateMotion :dur="pipe.stale ? (10 + p * 3) + 's' : (2.5 + p * 0.8) + 's'" repeatCount="indefinite"
+                                            :begin="(p * 1.5) + 's'"
+                                            :path="'M120,' + (pipe.y + pipe.thickness/2) + ' L1080,' + (pipe.y + pipe.thickness/2)"/>
+                                    </circle>
+                                    <!-- Left label -->
+                                    <text class="pipe-label" :x="106" :y="pipe.y + pipe.thickness/2 + 4" text-anchor="end" :fill="pipe.color" :opacity="pipe.stale ? 0.55 : 1">{{ pipe.shortName }}</text>
+                                    <!-- Right count badge -->
+                                    <rect class="pipe-count-bg" :x="1090" :y="pipe.y + pipe.thickness/2 - 7" width="38" height="14" rx="7"/>
+                                    <text class="pipe-count" :x="1094" :y="pipe.y + pipe.thickness/2 + 3" :fill="pipe.msgCount > 0 ? pipe.color : '#4b5563'">{{ pipe.msgCount }}</text>
+                                    <!-- Pressure indicator -->
+                                    <circle class="pressure-dot" :class="!pipe.stale && pipe.msgCount > 0 ? 'pressure-active' : ''" :cx="1136" :cy="pipe.y + pipe.thickness/2" r="4"
+                                        :fill="pipe.stale ? '#374151' : (pipe.msgCount > 10 ? '#22c55e' : pipe.msgCount > 0 ? '#fbbf24' : '#6b7280')"/>
+                                </g>
+                            </template>
+
+                            <!-- Ground line — factory floor -->
+                            <rect x="100" :y="factoryGroundY" width="1000" height="6" fill="url(#conveyor-pattern)" rx="2" opacity="0.5"/>
+                            <line x1="100" :y1="factoryGroundY" x2="1100" :y2="factoryGroundY" stroke="#30363d" stroke-width="1" opacity="0.6"/>
+                            <line x1="100" :y1="factoryGroundY + 6" x2="1100" :y2="factoryGroundY + 6" stroke="#30363d" stroke-width="1" opacity="0.6"/>
+
+                            <!-- Agent stations -->
+                            <template v-for="(ag, idx) in factoryAgents" :key="'ag-'+ag.id">
+                                <g>
+                                    <!-- Vertical connector pipe (solid, not dashed) -->
+                                    <line :x1="agentX(idx)" y1="50" :x2="agentX(idx)" :y2="factoryGroundY + 10"
+                                        stroke="#ff6b35" stroke-width="2" opacity="0.25"/>
+                                    <line :x1="agentX(idx)" y1="50" :x2="agentX(idx)" :y2="factoryGroundY + 10"
+                                        stroke="#ff6b35" stroke-width="1" opacity="0.4"/>
+                                    <!-- Junction dots on connected pipes (with valve ring) -->
+                                    <template v-for="jp in agentJunctions(ag)" :key="'jn-'+ag.id+'-'+jp.name">
+                                        <circle :cx="agentX(idx)" :cy="jp.y + jp.thickness/2" r="6" :fill="jp.color" opacity="0.2"/>
+                                        <circle :cx="agentX(idx)" :cy="jp.y + jp.thickness/2" r="4" fill="#0d1117" opacity="0.6"/>
+                                        <circle :cx="agentX(idx)" :cy="jp.y + jp.thickness/2" r="2.5" :fill="jp.color" opacity="0.9" filter="url(#pipe-glow)"/>
+                                    </template>
+                                    <!-- Pump station (industrial look) -->
+                                    <rect :x="agentX(idx) - 26" :y="factoryGroundY + 10" width="52" height="34" rx="4"
+                                        fill="#ff6b35" opacity="0.15"/>
+                                    <rect :x="agentX(idx) - 24" :y="factoryGroundY + 11" width="48" height="32" rx="4"
+                                        fill="#0d1117" stroke="#ff6b35" stroke-width="1.5" opacity="0.8"/>
+                                    <!-- Spinning gear indicator -->
+                                    <circle :cx="agentX(idx)" :cy="factoryGroundY + 27" r="8" fill="none" stroke="#ff6b35" stroke-width="1.5" opacity="0.6">
+                                        <animateTransform attributeName="transform" type="rotate"
+                                            :values="'0 ' + agentX(idx) + ' ' + (factoryGroundY + 27) + ' 360 ' + agentX(idx) + ' ' + (factoryGroundY + 27)"
+                                            dur="8s" repeatCount="indefinite"/>
+                                    </circle>
+                                    <circle :cx="agentX(idx)" :cy="factoryGroundY + 27" r="4" fill="#ff6b35" opacity="0.8"/>
+                                    <circle :cx="agentX(idx)" :cy="factoryGroundY + 27" r="1.5" fill="#fcd34d"/>
+                                    <!-- Gear teeth (4 small rects around the gear) -->
+                                    <rect v-for="tooth in [0, 90, 180, 270]" :key="'tooth-'+ag.id+'-'+tooth"
+                                        :x="agentX(idx) - 1.5" :y="factoryGroundY + 27 - 10" width="3" height="4" rx="1"
+                                        fill="#ff6b35" opacity="0.5"
+                                        :transform="'rotate(' + tooth + ' ' + agentX(idx) + ' ' + (factoryGroundY + 27) + ')'">
+                                        <animateTransform attributeName="transform" type="rotate" additive="sum"
+                                            :values="'0 ' + agentX(idx) + ' ' + (factoryGroundY + 27) + ' 360 ' + agentX(idx) + ' ' + (factoryGroundY + 27)"
+                                            dur="8s" repeatCount="indefinite"/>
+                                    </rect>
+                                    <!-- Agent label -->
+                                    <text class="agent-label" :x="agentX(idx)" :y="factoryGroundY + 60" fill="#ff6b35">{{ ag.shortName }}</text>
+                                </g>
+                            </template>
+                        </svg>
+                    </div>
+                </div>
+
+                <!-- Density Popup -->
+                <div v-if="factorySelectedPipe" class="density-popup glass rounded-xl border border-gray-700 shadow-2xl p-4"
+                    :style="{ left: factoryPipePosition.x + 'px', top: factoryPipePosition.y + 'px', width: '340px' }"
+                    @click.stop>
+                    <div class="flex items-center justify-between mb-3">
+                        <div class="text-xs font-semibold text-white">{{ factorySelectedPipe }}</div>
+                        <button @click="factorySelectedPipe = null" class="text-gray-500 hover:text-white text-sm">&times;</button>
+                    </div>
+                    <div v-if="densityLoading" class="text-[10px] text-gray-500 py-4 text-center">Loading...</div>
+                    <template v-else>
+                        <!-- Sparkline -->
+                        <div v-if="densityData.length > 0" class="mb-3">
+                            <svg viewBox="0 0 300 60" style="width:100%;height:60px;">
+                                <path :d="densitySparklineArea()" :fill="densityColor" class="sparkline-area"/>
+                                <path :d="densitySparklinePath()" :stroke="densityColor" class="sparkline-line"/>
+                            </svg>
+                            <div class="flex justify-between text-[9px] text-gray-600 mt-1">
+                                <span>{{ densityData[0]?.bucket_start?.slice(5,16) || '' }}</span>
+                                <span>now</span>
+                            </div>
+                        </div>
+                        <div v-else class="text-[10px] text-gray-600 mb-3 italic">No density data</div>
+                        <!-- Envelope type tags -->
+                        <div v-if="Object.keys(envelopeTypes).length > 0" class="mb-2">
+                            <div class="text-[9px] text-gray-500 uppercase tracking-wider mb-1">Envelope Types</div>
+                            <div class="flex flex-wrap">
+                                <span v-for="(cnt, etype) in envelopeTypes" :key="etype" class="env-tag"
+                                    :style="{ fontSize: tagFontSize(cnt) + 'px' }">
+                                    {{ etype }} <span class="text-gray-600">{{ cnt }}</span>
+                                </span>
+                            </div>
+                        </div>
+                        <!-- Quick stats -->
+                        <div class="flex gap-3 text-[10px] text-gray-500 mt-2 pt-2 border-t border-gray-800">
+                            <span>Total: {{ densityData.reduce((s, b) => s + b.count, 0) }}</span>
+                            <span>24h: {{ densityData.slice(-24).reduce((s, b) => s + b.count, 0) }}</span>
+                        </div>
+                    </template>
+                </div>
+
+                <!-- Section B: Topic Registry -->
+                <div class="max-w-7xl mx-auto">
+                    <div class="flex items-center justify-between mb-3">
+                        <div class="text-xs text-gray-400 uppercase tracking-wider font-semibold">Topic Registry</div>
+                        <div class="flex gap-1">
+                            <button v-for="cat in ['all','control','tasks','observe','memory','skill']" :key="cat"
+                                @click="topicCategoryFilter = cat"
+                                class="btn-ghost text-[10px] px-2 py-1"
+                                :style="topicCategoryFilter === cat ? { color: getCategoryColor(cat), borderColor: getCategoryColor(cat), background: getCategoryColor(cat) + '14' } : {}">
+                                {{ cat.toUpperCase() }}
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <div v-for="topic in filteredTopics" :key="topic.name"
+                            class="glass-card rounded-lg p-4"
+                            :class="topic.health && topic.health.is_stale ? 'topic-pulse' : ''">
+
+                            <div class="flex items-center gap-2 mb-2">
+                                <span class="badge" :class="'badge-' + topic.category">{{ topic.category }}</span>
+                                <span class="text-xs font-semibold text-white truncate flex-1">{{ topic.name.split('.').slice(-1)[0] }}</span>
+                            </div>
+                            <div class="text-[10px] text-gray-500 mb-3">{{ topic.description }}</div>
+
+                            <div v-if="topic.stats" class="space-y-2">
+                                <div class="flex items-center gap-3 text-[10px]">
+                                    <span class="text-gray-400">{{ topic.stats.message_count || 0 }} msgs</span>
+                                    <span class="text-gray-500">24h: {{ topic.stats.last_24h || 0 }}</span>
+                                    <span class="text-gray-500">7d: {{ topic.stats.last_7d || 0 }}</span>
+                                </div>
+                                <div class="flex items-center gap-3 text-[10px]">
+                                    <span class="text-gray-400">Agents: {{ topic.stats.unique_agents || 0 }}</span>
+                                    <span v-if="topic.stats.last_message_at" class="text-gray-500">Last: {{ relativeTime(topic.stats.last_message_at) }}</span>
+                                </div>
+                            </div>
+                            <div v-else class="text-[10px] text-gray-600 italic">No messages yet</div>
+
+                            <!-- Health bar -->
+                            <div v-if="topic.health" class="mt-2">
+                                <div class="flex items-center justify-between text-[9px] text-gray-500 mb-1">
+                                    <span>Health</span>
+                                    <span>{{ topic.health.score }}%</span>
+                                </div>
+                                <div class="health-bar">
+                                    <div class="health-fill" :style="{ width: topic.health.score + '%', background: topic.health.score > 70 ? '#22c55e' : topic.health.score > 40 ? '#eab308' : '#ef4444' }"></div>
+                                </div>
+                            </div>
+
+                            <!-- Consumers -->
+                            <div v-if="topic.consumers && topic.consumers.length" class="mt-2 flex flex-wrap gap-1">
+                                <span v-for="c in topic.consumers" :key="c" class="pill">{{ c }}</span>
+                            </div>
+
+                            <!-- Actions -->
+                            <div class="flex gap-2 mt-3">
+                                <button v-if="topic.stats && topic.stats.message_count > 0"
+                                    @click="browseTopic(topic.name)" class="btn-ghost text-[10px] px-2 py-1">BROWSE</button>
+                                <button v-if="!topic.stats || topic.stats.message_count === 0"
+                                    @click="ensureTopic(topic.name)" class="btn-primary text-[10px] px-2 py-1">CREATE</button>
+                            </div>
+
+                            <!-- Browse panel -->
+                            <div v-if="selectedTopic === topic.name && topicMessages.length > 0" class="mt-3 space-y-1 max-h-48 overflow-y-auto border-t border-gray-800 pt-2">
+                                <div v-for="msg in topicMessages" :key="msg.id" class="text-[10px] flex items-center gap-2 py-1">
+                                    <span class="text-gray-600">{{ relativeTime(msg.created_at) }}</span>
+                                    <span class="text-amber-400">{{ msg.sender_id.split('-').slice(-1)[0] }}</span>
+                                    <span class="text-gray-400">{{ msg.envelope_type }}</span>
+                                    <span class="text-gray-600">{{ msg.payload_size }}b</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Leaderboard Tab -->
+            <div v-if="activeTab === 'leaderboard'" class="max-w-5xl mx-auto space-y-6">
+                <div v-if="xpLeaderboard.length > 0">
+                    <div class="text-xs text-gray-400 uppercase tracking-wider font-semibold mb-3">XP Leaderboard</div>
+                    <div class="flex gap-4 overflow-x-auto pb-2">
+                        <div v-for="(agent, idx) in xpLeaderboard" :key="agent.agent_id"
+                            class="glass-card rounded-lg p-4 min-w-[220px] flex-shrink-0">
+                            <div class="flex items-center gap-2 mb-2">
+                                <div class="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold"
+                                    :style="{ background: getRankBg(agent.rank), color: getRankColor(agent.rank) }">
+                                    {{ idx + 1 }}
+                                </div>
+                                <div>
+                                    <div class="text-xs font-semibold text-white truncate" style="max-width:140px">{{ agent.agent_name || agent.agent_id }}</div>
+                                    <div class="text-[10px]" :class="'rank-' + agent.rank.toLowerCase()">{{ agent.rank }}</div>
+                                </div>
+                            </div>
+                            <div class="xp-bar mb-1">
+                                <div class="xp-fill" :style="{ width: getXPPercent(agent) + '%', background: getRankColor(agent.rank) }"></div>
+                            </div>
+                            <div class="flex items-center justify-between text-[10px] text-gray-500 mb-2">
+                                <span>Level {{ agent.level }}</span>
+                                <span>{{ agent.total_xp }} XP</span>
+                            </div>
+                            <div class="grid grid-cols-2 gap-1 text-[9px] text-gray-500">
+                                <span>Tasks: {{ agent.tasks_completed }}</span>
+                                <span>Traces: {{ agent.traces_shared }}</span>
+                                <span>Memory: {{ agent.memories_shared }}</span>
+                                <span>Skills: {{ agent.skills_registered }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div v-else class="text-center text-gray-500 text-sm py-12">No XP data yet. Activity in the group generates XP.</div>
+            </div>
+
+            <!-- Config Tab -->
+            <div v-if="activeTab === 'config'" class="max-w-2xl mx-auto space-y-4">
+                <div class="glass-card rounded-lg p-6 space-y-4">
+                    <div class="text-xs text-gray-400 uppercase tracking-wider font-semibold mb-2">Group Configuration</div>
+
+                    <div class="space-y-3">
+                        <div>
+                            <label class="text-[10px] text-gray-500 uppercase tracking-wider block mb-1">LFS Proxy URL</label>
+                            <input v-model="configForm.lfs_proxy_url" class="input-field w-full" placeholder="http://localhost:8080">
+                        </div>
+                        <div>
+                            <label class="text-[10px] text-gray-500 uppercase tracking-wider block mb-1">API Key</label>
+                            <input v-model="configForm.api_key" type="password" class="input-field w-full" placeholder="API key (masked)">
+                        </div>
+                        <div>
+                            <label class="text-[10px] text-gray-500 uppercase tracking-wider block mb-1">Kafka Brokers</label>
+                            <input v-model="configForm.kafka_brokers" class="input-field w-full" placeholder="localhost:9092">
+                        </div>
+                        <div>
+                            <label class="text-[10px] text-gray-500 uppercase tracking-wider block mb-1">Consumer Group</label>
+                            <input v-model="configForm.consumer_group" class="input-field w-full" placeholder="consumer group">
+                        </div>
+                        <div>
+                            <label class="text-[10px] text-gray-500 uppercase tracking-wider block mb-1">Agent ID</label>
+                            <input v-model="configForm.agent_id" class="input-field w-full" placeholder="agent ID">
+                        </div>
+                        <div>
+                            <label class="text-[10px] text-gray-500 uppercase tracking-wider block mb-1">Poll Interval (ms)</label>
+                            <input v-model="configForm.poll_interval_ms" type="number" class="input-field w-full" placeholder="2000">
+                        </div>
+                    </div>
+
+                    <div class="flex items-center justify-between pt-2">
+                        <div v-if="configSaved" class="text-[11px]" :class="configRequiresRejoin ? 'text-amber-400' : 'text-green-400'">
+                            {{ configRequiresRejoin ? 'Saved. Rejoin required for changes to take effect.' : 'Saved.' }}
+                        </div>
+                        <div v-else></div>
+                        <button @click="saveConfig" :disabled="savingConfig" class="btn-primary">
+                            {{ savingConfig ? 'SAVING...' : 'SAVE CONFIG' }}
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+
+        <!-- Join Modal -->
+        <div v-if="showJoinModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60" @click.self="showJoinModal = false">
+            <div class="glass rounded-xl border border-gray-700 shadow-2xl p-6" style="width: 420px; max-width: 92vw;">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="text-sm font-bold text-amber-400 tracking-widest">JOIN GROUP</div>
+                    <button @click="showJoinModal = false" class="text-gray-500 hover:text-white text-lg">&times;</button>
+                </div>
+                <div class="space-y-3">
+                    <div>
+                        <label class="text-[10px] text-gray-500 uppercase tracking-wider block mb-1">Group Name *</label>
+                        <input v-model="joinForm.group_name" class="input-field w-full" placeholder="my-agent-team" @keyup.enter="joinGroup" @focus="fillDefault('joinForm', 'group_name', 'my-agent-team')">
+                    </div>
+                    <div>
+                        <label class="text-[10px] text-gray-500 uppercase tracking-wider block mb-1">LFS Proxy URL</label>
+                        <input v-model="joinForm.lfs_proxy_url" class="input-field w-full" placeholder="http://localhost:8080" @focus="fillDefault('joinForm', 'lfs_proxy_url', 'http://localhost:8080')">
+                    </div>
+                    <div>
+                        <label class="text-[10px] text-gray-500 uppercase tracking-wider block mb-1">Kafka Brokers</label>
+                        <input v-model="joinForm.kafka_brokers" class="input-field w-full" placeholder="localhost:9092" @focus="fillDefault('joinForm', 'kafka_brokers', 'localhost:9092')">
+                    </div>
+                    <div>
+                        <label class="text-[10px] text-gray-500 uppercase tracking-wider block mb-1">Agent ID (optional)</label>
+                        <input v-model="joinForm.agent_id" class="input-field w-full" placeholder="auto-generated if empty">
+                    </div>
+                </div>
+                <div v-if="joinError" class="text-xs text-red-400 mt-3">{{ joinError }}</div>
+                <div class="flex justify-end gap-2 mt-5">
+                    <button @click="showJoinModal = false" class="btn-ghost">Cancel</button>
+                    <button @click="joinGroup" :disabled="!joinForm.group_name.trim() || joining" class="btn-primary">
+                        {{ joining ? 'JOINING...' : 'JOIN' }}
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Toast -->
+        <div v-if="toast" class="fixed bottom-6 right-6 z-50 glass rounded-lg px-4 py-3 shadow-xl border"
+            :class="toast.type === 'error' ? 'border-red-800 text-red-400' : 'border-green-800 text-green-400'">
+            <div class="text-xs font-medium">{{ toast.message }}</div>
+        </div>
+
+    </div>
+
+    <script>
+    const { createApp, ref, reactive, computed, onMounted, onUnmounted, watch } = Vue
+
+    createApp({
+        setup() {
+            const tabs = [
+                { id: 'overview', label: 'Overview' },
+                { id: 'members', label: 'Members' },
+                { id: 'topics', label: 'Topics' },
+                { id: 'leaderboard', label: 'Leaderboard' },
+                { id: 'tasks', label: 'Tasks' },
+                { id: 'traces', label: 'Traces' },
+                { id: 'audit', label: 'Audit' },
+                { id: 'config', label: 'Config' },
+            ]
+            const activeTab = ref('overview')
+
+            // State
+            const status = ref({ active: false, group_name: '', member_count: 0, agent_id: '', lfs_proxy_url: '', lfs_healthy: false })
+            const members = ref([])
+            const tasks = ref([])
+            const traces = ref([])
+            const config = ref({})
+            const groupActive = computed(() => status.value.active === true)
+
+            // UI state
+            const showJoinModal = ref(false)
+            const joining = ref(false)
+            const leaving = ref(false)
+            const joinError = ref('')
+            const quickJoinName = ref('')
+            const toast = ref(null)
+            const standaloneBlocked = ref(false)
+            const expandedTasks = reactive({})
+            const expandedTraces = reactive({})
+
+            // Stats & audit state
+            const stats = ref(null)
+            const previousMembers = ref([])
+            const membershipHistory = ref([])
+            const auditEntries = ref([])
+            const auditSourceFilter = ref('')
+            const auditAgentFilter = ref('')
+            const filteredAuditEntries = computed(() => {
+                let entries = auditEntries.value
+                if (auditSourceFilter.value) {
+                    entries = entries.filter(e => e.source === auditSourceFilter.value)
+                }
+                if (auditAgentFilter.value) {
+                    const q = auditAgentFilter.value.toLowerCase()
+                    entries = entries.filter(e => (e.agent_id || '').toLowerCase().includes(q))
+                }
+                return entries
+            })
+
+            // Topics state
+            const topicsData = ref([])
+            const skillTopicsData = ref([])
+            const topicFlow = ref([])
+            const topicHealth = ref([])
+            const xpLeaderboard = ref([])
+            const topicCategoryFilter = ref('all')
+            const selectedTopic = ref(null)
+            const topicMessages = ref([])
+            // Factory pipe visualization state
+            const factorySelectedPipe = ref(null)
+            const factoryPipePosition = reactive({ x: 200, y: 200 })
+            const densityData = ref([])
+            const envelopeTypes = ref({})
+            const densityLoading = ref(false)
+            const densityColor = ref('#58a6ff')
+
+            const filteredTopics = computed(() => {
+                const all = [...topicsData.value, ...skillTopicsData.value]
+                if (topicCategoryFilter.value === 'all') return all
+                return all.filter(t => t.category === topicCategoryFilter.value)
+            })
+
+            // Task form
+            const taskDescription = ref('')
+            const taskContent = ref('')
+            const submittingTask = ref(false)
+            const taskFilter = ref('')
+            const taskStatusFilter = ref('')
+
+            // Trace filter
+            const traceAgentFilter = ref('')
+            const traceAgents = computed(() => {
+                const agents = new Set(traces.value.map(t => t.source_agent_id))
+                return [...agents].sort()
+            })
+
+            // Local end-to-end traces (from agent tasks)
+            const localTasks = ref([])
+            const expandedLocalTrace = ref(null)
+            const localTraceSpans = ref([])
+            const localTraceTask = ref(null)
+            const localTracePolicy = ref([])
+            const localTraceLoading = ref(false)
+            const selectedLocalSpan = ref(null)
+            const localTraceJsonCopied = ref(false)
+
+            const copyLocalTraceJson = async (traceId) => {
+                const spans = localTraceSpans.value.map(s => ({
+                    type: s.type,
+                    time: s.time,
+                    duration: s.duration || '',
+                    title: s.title || s.type,
+                    metadata: s.metadata || {}
+                }))
+                const hasToolSpans = spans.some(s => s.type === 'TOOL')
+                const hasReadFile = spans.some(s => s.type === 'TOOL' && s.metadata && s.metadata.tool_name === 'read_file')
+                const task = localTraceTask.value
+                const exportObj = {
+                    trace_id: traceId || '',
+                    exported_at: new Date().toISOString(),
+                    spans,
+                    task: task ? {
+                        task_id: task.task_id,
+                        status: task.status,
+                        prompt_tokens: task.prompt_tokens,
+                        completion_tokens: task.completion_tokens,
+                        total_tokens: task.total_tokens,
+                        channel: task.channel || ''
+                    } : null,
+                    policy_decisions: localTracePolicy.value || [],
+                    analysis: {
+                        used_tools: hasToolSpans,
+                        data_source: hasReadFile ? 'file_read' : (hasToolSpans ? 'tool_assisted' : 'llm_context_only'),
+                        span_count: spans.length,
+                        llm_iterations: spans.filter(s => s.type === 'LLM').length
+                    }
+                }
+                try {
+                    await navigator.clipboard.writeText(JSON.stringify(exportObj, null, 2))
+                    localTraceJsonCopied.value = true
+                    setTimeout(() => { localTraceJsonCopied.value = false }, 2000)
+                } catch (e) {
+                    console.error('Failed to copy trace JSON', e)
+                }
+            }
+
+            // Config form
+            const configForm = reactive({ lfs_proxy_url: '', api_key: '', kafka_brokers: '', consumer_group: '', agent_id: '', poll_interval_ms: '' })
+            const savingConfig = ref(false)
+            const configSaved = ref(false)
+            const configRequiresRejoin = ref(false)
+
+            // Join form
+            const joinForm = reactive({ group_name: '', lfs_proxy_url: '', kafka_brokers: '', agent_id: '' })
+
+            // Polling
+            let pollTimer = null
+
+            function showToast(message, type = 'success') {
+                toast.value = { message, type }
+                setTimeout(() => { toast.value = null }, 3000)
+            }
+
+            async function loadStatus() {
+                try {
+                    const res = await fetch('/api/v1/group/status')
+                    status.value = await res.json()
+                } catch (e) { /* ignore */ }
+            }
+
+            async function loadMembers() {
+                try {
+                    const res = await fetch('/api/v1/group/members')
+                    const data = await res.json()
+                    members.value = Array.isArray(data) ? data : []
+                } catch (e) {
+                    console.warn('loadMembers error:', e)
+                }
+            }
+
+            async function loadTasks() {
+                try {
+                    let url = '/api/v1/group/tasks?limit=100'
+                    if (taskFilter.value) url += '&direction=' + taskFilter.value
+                    if (taskStatusFilter.value) url += '&status=' + taskStatusFilter.value
+                    const res = await fetch(url)
+                    tasks.value = await res.json()
+                } catch (e) { /* ignore */ }
+            }
+
+            async function loadTraces() {
+                try {
+                    let url = '/api/v1/group/traces?limit=100'
+                    if (traceAgentFilter.value) url += '&agent_id=' + encodeURIComponent(traceAgentFilter.value)
+                    const res = await fetch(url)
+                    traces.value = await res.json()
+                } catch (e) { /* ignore */ }
+            }
+
+            async function loadLocalTasks() {
+                try {
+                    const res = await fetch('/api/v1/tasks?limit=50')
+                    localTasks.value = await res.json()
+                } catch (e) { /* ignore */ }
+            }
+
+            async function expandLocalTrace(traceId) {
+                if (expandedLocalTrace.value === traceId) {
+                    expandedLocalTrace.value = null
+                    return
+                }
+                expandedLocalTrace.value = traceId
+                localTraceSpans.value = []
+                localTraceTask.value = null
+                localTracePolicy.value = []
+                localTraceLoading.value = true
+                selectedLocalSpan.value = null
+                try {
+                    const res = await fetch('/api/v1/trace/' + encodeURIComponent(traceId))
+                    const data = await res.json()
+                    localTraceSpans.value = (data.spans || []).sort((a, b) => a.time.localeCompare(b.time))
+                    localTraceTask.value = data.task || null
+                    localTracePolicy.value = data.policy_decisions || []
+                } catch (e) { /* ignore */ }
+                localTraceLoading.value = false
+            }
+
+            function spanTypeColor(type) {
+                const map = { INBOUND: '#58a6ff', LLM: '#a855f7', TOOL: '#fb923c', OUTBOUND: '#22c55e', POLICY: '#ef4444' }
+                return map[type] || '#6366f1'
+            }
+
+            async function loadConfig() {
+                try {
+                    const res = await fetch('/api/v1/group/config')
+                    const data = await res.json()
+                    config.value = data
+                    configForm.lfs_proxy_url = data.lfs_proxy_url || ''
+                    configForm.api_key = ''
+                    configForm.kafka_brokers = data.kafka_brokers || ''
+                    configForm.consumer_group = data.consumer_group || ''
+                    configForm.agent_id = data.agent_id || ''
+                    configForm.poll_interval_ms = data.poll_interval_ms || ''
+                } catch (e) { /* ignore */ }
+            }
+
+            async function loadAll() {
+                await loadStatus()
+                await loadMembers()
+                await loadStats()
+                await loadPreviousMembers()
+            }
+
+            async function joinGroup() {
+                if (!joinForm.group_name.trim()) return
+                joining.value = true
+                joinError.value = ''
+                try {
+                    const res = await fetch('/api/v1/group/join', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(joinForm),
+                    })
+                    if (!res.ok) {
+                        joinError.value = await res.text()
+                        return
+                    }
+                    status.value = await res.json()
+                    showJoinModal.value = false
+                    joinForm.group_name = ''
+                    joinForm.lfs_proxy_url = ''
+                    joinForm.kafka_brokers = ''
+                    joinForm.agent_id = ''
+                    showToast('Joined group: ' + status.value.group_name)
+                    await loadAll()
+                    await loadConfig()
+                } catch (e) {
+                    joinError.value = e.message
+                } finally {
+                    joining.value = false
+                }
+            }
+
+            async function quickJoin() {
+                joinForm.group_name = quickJoinName.value
+                await joinGroup()
+                quickJoinName.value = ''
+            }
+
+            async function leaveGroup() {
+                leaving.value = true
+                try {
+                    const res = await fetch('/api/v1/group/leave', { method: 'POST' })
+                    if (!res.ok) {
+                        showToast(await res.text(), 'error')
+                        return
+                    }
+                    showToast('Left group')
+                    await loadAll()
+                } catch (e) {
+                    showToast(e.message, 'error')
+                } finally {
+                    leaving.value = false
+                }
+            }
+
+            async function submitTask() {
+                if (!taskDescription.value.trim()) return
+                submittingTask.value = true
+                try {
+                    const res = await fetch('/api/v1/group/tasks/submit', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ description: taskDescription.value, content: taskContent.value }),
+                    })
+                    if (!res.ok) {
+                        showToast(await res.text(), 'error')
+                        return
+                    }
+                    const data = await res.json()
+                    showToast('Task submitted: ' + data.task_id)
+                    taskDescription.value = ''
+                    taskContent.value = ''
+                    await loadTasks()
+                } catch (e) {
+                    showToast(e.message, 'error')
+                } finally {
+                    submittingTask.value = false
+                }
+            }
+
+            async function saveConfig() {
+                savingConfig.value = true
+                configSaved.value = false
+                try {
+                    const body = {}
+                    if (configForm.lfs_proxy_url) body.lfs_proxy_url = configForm.lfs_proxy_url
+                    if (configForm.api_key) body.api_key = configForm.api_key
+                    if (configForm.kafka_brokers) body.kafka_brokers = configForm.kafka_brokers
+                    if (configForm.consumer_group) body.consumer_group = configForm.consumer_group
+                    if (configForm.agent_id) body.agent_id = configForm.agent_id
+                    if (configForm.poll_interval_ms) body.poll_interval_ms = String(configForm.poll_interval_ms)
+
+                    const res = await fetch('/api/v1/group/config', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(body),
+                    })
+                    if (!res.ok) {
+                        showToast(await res.text(), 'error')
+                        return
+                    }
+                    const data = await res.json()
+                    configSaved.value = true
+                    configRequiresRejoin.value = data.requires_rejoin === true
+                } catch (e) {
+                    showToast(e.message, 'error')
+                } finally {
+                    savingConfig.value = false
+                }
+            }
+
+            async function loadStats() {
+                try {
+                    const res = await fetch('/api/v1/group/stats')
+                    stats.value = await res.json()
+                } catch (e) { /* ignore */ }
+            }
+
+            async function loadPreviousMembers() {
+                try {
+                    const res = await fetch('/api/v1/group/members/previous')
+                    previousMembers.value = await res.json()
+                } catch (e) { /* ignore */ }
+            }
+
+            async function loadMembershipHistory() {
+                try {
+                    const res = await fetch('/api/v1/group/membership/history?limit=50')
+                    membershipHistory.value = await res.json()
+                } catch (e) { /* ignore */ }
+            }
+
+            async function rejoinGroup(agentID) {
+                try {
+                    const res = await fetch('/api/v1/group/rejoin', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ agent_id: agentID }),
+                    })
+                    if (!res.ok) {
+                        showToast(await res.text(), 'error')
+                        return
+                    }
+                    showToast('Rejoined: ' + agentID)
+                    await loadAll()
+                    await loadPreviousMembers()
+                } catch (e) {
+                    showToast(e.message, 'error')
+                }
+            }
+
+            async function loadAudit() {
+                try {
+                    const res = await fetch('/api/v1/group/audit?limit=200')
+                    auditEntries.value = await res.json()
+                } catch (e) { /* ignore */ }
+            }
+
+            // --- Topics functions ---
+            async function loadTopics() {
+                try {
+                    const res = await fetch('/api/v1/group/topics')
+                    const data = await res.json()
+                    topicsData.value = data.topics || []
+                    skillTopicsData.value = data.skill_topics || []
+                    xpLeaderboard.value = data.xp_leaderboard || []
+                } catch (e) { /* ignore */ }
+            }
+
+            async function loadTopicFlow() {
+                try {
+                    const res = await fetch('/api/v1/group/topics/flow')
+                    const data = await res.json()
+                    topicFlow.value = data.edges || []
+                } catch (e) { /* ignore */ }
+            }
+
+            async function loadTopicHealth() {
+                try {
+                    const res = await fetch('/api/v1/group/topics/health')
+                    const data = await res.json()
+                    topicHealth.value = data.health || []
+                } catch (e) { /* ignore */ }
+            }
+
+            async function ensureTopic(topicName) {
+                try {
+                    const res = await fetch('/api/v1/group/topics/ensure', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ topic_name: topicName })
+                    })
+                    const data = await res.json()
+                    if (data.ok) {
+                        showToast('Topic created: ' + topicName)
+                        await loadTopics()
+                        await loadTopicHealth()
+                        // Auto-open browse panel for the newly created topic
+                        await browseTopic(topicName)
+                    } else {
+                        showToast(data.error || 'Failed', 'error')
+                    }
+                } catch (e) { showToast('Failed to create topic', 'error') }
+            }
+
+            async function browseTopic(topicName) {
+                if (selectedTopic.value === topicName) {
+                    selectedTopic.value = null
+                    topicMessages.value = []
+                    return
+                }
+                selectedTopic.value = topicName
+                try {
+                    const res = await fetch('/api/v1/group/topics?browse=' + encodeURIComponent(topicName) + '&limit=50')
+                    const data = await res.json()
+                    topicMessages.value = data.messages || []
+                } catch (e) { topicMessages.value = [] }
+            }
+
+            function getRankColor(rank) {
+                const map = { Bronze: '#cd7f32', Silver: '#c0c0c0', Gold: '#ffd700', Diamond: '#b9f2ff' }
+                return map[rank] || '#6b7280'
+            }
+
+            function getRankBg(rank) {
+                const map = { Bronze: 'rgba(205,127,50,0.2)', Silver: 'rgba(192,192,192,0.2)', Gold: 'rgba(255,215,0,0.2)', Diamond: 'rgba(185,242,255,0.2)' }
+                return map[rank] || 'rgba(107,114,128,0.2)'
+            }
+
+            function getXPPercent(agent) {
+                const level = agent.level || 0
+                const nextLevelXP = (level + 1) * (level + 1) * 10
+                const currLevelXP = level * level * 10
+                const progress = (agent.total_xp - currLevelXP) / (nextLevelXP - currLevelXP) * 100
+                return Math.min(100, Math.max(0, progress))
+            }
+
+            function getCategoryColor(cat) {
+                const map = { all: '#f59e0b', control: '#58a6ff', tasks: '#fbbf24', observe: '#a855f7', memory: '#22c55e', skill: '#f472b6' }
+                return map[cat] || '#6b7280'
+            }
+
+            // --- Factory pipe layout computations ---
+            function buildPipe(topic, yPos) {
+                const mph = topic.health ? topic.health.messages_per_hour : 0
+                const msgCount = topic.stats ? topic.stats.message_count : 0
+                // Thicker pipes — min 10px, scale with activity
+                const thickness = Math.max(10, Math.min(28, 10 + Math.log2(msgCount + 1) * 3 + Math.log2(mph + 1) * 3))
+                const stale = topic.health ? topic.health.is_stale : (msgCount === 0)
+                // ALL pipes get bubbles — stale = 1 slow idle bubble, active = 1-4 fast ones
+                const particles = stale
+                    ? [0]
+                    : Array.from({ length: Math.min(4, Math.max(1, Math.ceil(mph) + 1)) }, (_, i) => i)
+                // Liquid fill level: min 15% even for empty pipes (visual interest), max 95%
+                const liquidLevel = msgCount === 0 ? 0.15 : Math.min(0.95, 0.15 + Math.log2(msgCount + 1) * 0.1)
+                return {
+                    name: topic.name,
+                    shortName: (topic.name || '').split('.').slice(-1)[0],
+                    category: topic.category,
+                    color: getCategoryColor(topic.category),
+                    y: yPos,
+                    thickness,
+                    stale,
+                    msgCount,
+                    particles,
+                    liquidLevel,
+                    consumers: topic.consumers || [],
+                }
+            }
+
+            // Dynamic category grouping: Content (tasks, memory, skill) + Infra (control, observe) + any others
+            const contentCategories = ['tasks', 'memory', 'skill']
+            const infraCategories = ['control', 'observe']
+
+            // Known core topic templates — keyed by short suffix so they match regardless of group name prefix
+            const coreTopicTemplates = [
+                { suffix: 'requests',           category: 'tasks',   description: 'General task requests' },
+                { suffix: 'responses',          category: 'tasks',   description: 'General task responses' },
+                { suffix: 'tasks.status',       category: 'tasks',   description: 'Task status updates' },
+                { suffix: 'memory.shared',      category: 'memory',  description: 'Shared memory items' },
+                { suffix: 'memory.context',     category: 'memory',  description: 'Ephemeral context sharing' },
+                { suffix: 'announce',           category: 'control', description: 'Join/leave/heartbeat' },
+                { suffix: 'control.roster',     category: 'control', description: 'Topic registry manifest' },
+                { suffix: 'control.onboarding', category: 'control', description: 'Agent onboarding protocol' },
+                { suffix: 'traces',             category: 'observe', description: 'Trace spans' },
+                { suffix: 'observe.audit',      category: 'observe', description: 'Administrative audit events' },
+                { suffix: 'orchestrator',       category: 'control', description: 'Orchestrator coordination' },
+            ]
+
+            // All topics: API data + guaranteed core topics (filled in if missing from API)
+            const allFactoryTopics = computed(() => {
+                const apiTopics = [...topicsData.value, ...skillTopicsData.value]
+                const byName = new Map()
+                apiTopics.forEach(t => byName.set(t.name, t))
+
+                // Determine group prefix from any existing topic name, or from group status
+                let prefix = ''
+                if (apiTopics.length > 0) {
+                    // e.g. "group.mygroup.requests" → "group.mygroup"
+                    const parts = apiTopics[0].name.split('.')
+                    if (parts.length >= 3) prefix = parts.slice(0, 2).join('.')
+                } else if (status.value && status.value.group_name) {
+                    prefix = 'group.' + status.value.group_name
+                }
+
+                // Ensure every core topic exists
+                if (prefix) {
+                    coreTopicTemplates.forEach(tmpl => {
+                        const fullName = prefix + '.' + tmpl.suffix
+                        if (!byName.has(fullName)) {
+                            byName.set(fullName, {
+                                name: fullName,
+                                category: tmpl.category,
+                                description: tmpl.description,
+                                consumers: [],
+                                stats: null,
+                                health: null,
+                            })
+                        }
+                    })
+                }
+
+                return Array.from(byName.values())
+            })
+
+            const factoryContentPipes = computed(() => {
+                const content = allFactoryTopics.value.filter(t => contentCategories.includes(t.category))
+                const pipes = []
+                let y = 68
+                content.forEach(t => {
+                    const p = buildPipe(t, y)
+                    pipes.push(p)
+                    y += p.thickness + 14
+                })
+                return pipes
+            })
+
+            const factoryStiltTop = computed(() => {
+                const pipes = factoryContentPipes.value
+                if (pipes.length === 0) return 140
+                const last = pipes[pipes.length - 1]
+                return last.y + last.thickness + 24
+            })
+
+            const factoryInfraLabelY = computed(() => factoryStiltTop.value + 40)
+
+            const factoryInfraPipes = computed(() => {
+                // Everything not in content goes to infra
+                const infra = allFactoryTopics.value.filter(t => !contentCategories.includes(t.category))
+                const pipes = []
+                let y = factoryInfraLabelY.value + 18
+                infra.forEach(t => {
+                    const p = buildPipe(t, y)
+                    pipes.push(p)
+                    y += p.thickness + 14
+                })
+                return pipes
+            })
+
+            const factoryGroundY = computed(() => {
+                const pipes = factoryInfraPipes.value
+                if (pipes.length === 0) return factoryInfraLabelY.value + 60
+                const last = pipes[pipes.length - 1]
+                return last.y + last.thickness + 30
+            })
+
+            const factorySvgHeight = computed(() => factoryGroundY.value + 80)
+
+            const factoryAgents = computed(() => {
+                const seenIds = new Set()
+                const seenNames = new Set()
+                const agents = []
+                const addAgent = (id, name) => {
+                    const shortName = (name || id).split('-').slice(-1)[0]
+                    if (seenIds.has(id) || seenNames.has(shortName)) return
+                    agents.push({ id, shortName })
+                    seenIds.add(id)
+                    seenNames.add(shortName)
+                }
+                // From XP leaderboard
+                xpLeaderboard.value.forEach(a => addAgent(a.agent_id, a.agent_name))
+                // From members
+                members.value.forEach(m => addAgent(m.agent_id, m.agent_name))
+                return agents
+            })
+
+            function agentX(idx) {
+                const count = factoryAgents.value.length || 1
+                const spacing = 900 / (count + 1)
+                return 150 + spacing * (idx + 1)
+            }
+
+            function agentJunctions(agent) {
+                const allPipes = [...factoryContentPipes.value, ...factoryInfraPipes.value]
+                // Match via flow data
+                const agentTopics = new Set()
+                topicFlow.value.forEach(f => {
+                    if (f.source_agent_id === agent.id || f.target_agent_id === agent.id) {
+                        agentTopics.add(f.topic_name)
+                    }
+                })
+                // Fallback: match via consumer lists
+                allPipes.forEach(p => {
+                    if (p.consumers && p.consumers.includes(agent.id)) {
+                        agentTopics.add(p.name)
+                    }
+                })
+                return allPipes.filter(p => agentTopics.has(p.name))
+            }
+
+            async function onPipeClick(pipe, event) {
+                factorySelectedPipe.value = pipe.name
+                densityColor.value = pipe.color
+                // Position popup near click
+                const rect = event.target.closest('svg').getBoundingClientRect()
+                factoryPipePosition.x = Math.min(event.clientX, window.innerWidth - 360)
+                factoryPipePosition.y = Math.min(event.clientY + 10, window.innerHeight - 300)
+                // Fetch density data
+                densityLoading.value = true
+                try {
+                    const res = await fetch('/api/v1/group/topics/density?topic=' + encodeURIComponent(pipe.name) + '&hours=48')
+                    const data = await res.json()
+                    densityData.value = data.buckets || []
+                    envelopeTypes.value = data.envelope_types || {}
+                } catch (e) {
+                    densityData.value = []
+                    envelopeTypes.value = {}
+                } finally {
+                    densityLoading.value = false
+                }
+            }
+
+            function densitySparklinePath() {
+                const buckets = densityData.value
+                if (!buckets.length) return ''
+                const max = Math.max(1, ...buckets.map(b => b.count))
+                const w = 300, h = 55
+                return buckets.map((b, i) => {
+                    const x = (i / (buckets.length - 1)) * w
+                    const y = h - (b.count / max) * (h - 5)
+                    return (i === 0 ? 'M' : 'L') + x.toFixed(1) + ',' + y.toFixed(1)
+                }).join(' ')
+            }
+
+            function densitySparklineArea() {
+                const buckets = densityData.value
+                if (!buckets.length) return ''
+                const max = Math.max(1, ...buckets.map(b => b.count))
+                const w = 300, h = 55
+                let path = 'M0,' + h
+                buckets.forEach((b, i) => {
+                    const x = (i / (buckets.length - 1)) * w
+                    const y = h - (b.count / max) * (h - 5)
+                    path += ' L' + x.toFixed(1) + ',' + y.toFixed(1)
+                })
+                path += ' L' + w + ',' + h + ' Z'
+                return path
+            }
+
+            function tagFontSize(count) {
+                const allCounts = Object.values(envelopeTypes.value)
+                const max = Math.max(1, ...allCounts)
+                return Math.max(9, Math.min(16, 9 + (count / max) * 7))
+            }
+
+            function formatDuration(secs) {
+                if (!secs || secs === 0) return '---'
+                if (secs < 60) return Math.round(secs) + 's'
+                if (secs < 3600) return Math.round(secs / 60) + 'm'
+                return Math.round(secs / 3600) + 'h'
+            }
+
+            function fillDefault(formName, field, defaultVal) {
+                const form = formName === 'joinForm' ? joinForm : configForm
+                if (!form[field]) form[field] = defaultVal
+            }
+
+            function toggleTaskExpand(id) {
+                expandedTasks[id] = !expandedTasks[id]
+            }
+
+            function toggleTraceExpand(id) {
+                expandedTraces[id] = !expandedTraces[id]
+            }
+
+            function parseCaps(capsStr) {
+                try { const v = JSON.parse(capsStr || '[]'); return Array.isArray(v) ? v : [] } catch { return [] }
+            }
+
+            function parseChannels(chStr) {
+                try { const v = JSON.parse(chStr || '[]'); return Array.isArray(v) ? v : [] } catch { return [] }
+            }
+
+            function relativeTime(dateStr) {
+                if (!dateStr) return 'never'
+                const date = new Date(dateStr)
+                const now = new Date()
+                const diff = Math.floor((now - date) / 1000)
+                if (diff < 10) return 'just now'
+                if (diff < 60) return diff + 's ago'
+                if (diff < 3600) return Math.floor(diff / 60) + 'm ago'
+                if (diff < 86400) return Math.floor(diff / 3600) + 'h ago'
+                return Math.floor(diff / 86400) + 'd ago'
+            }
+
+            function formatTime(dateStr) {
+                if (!dateStr) return ''
+                const d = new Date(dateStr)
+                return d.toLocaleString('en-GB', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' })
+            }
+
+            // Watch tab changes to load data
+            watch(activeTab, async (tab) => {
+                if (tab === 'tasks') loadTasks()
+                if (tab === 'traces') { loadTraces(); loadLocalTasks() }
+                if (tab === 'config') loadConfig()
+                if (tab === 'members') { loadMembers(); loadMembershipHistory() }
+                if (tab === 'audit') loadAudit()
+                if (tab === 'topics') {
+                    await loadTopics()
+                    await loadTopicFlow()
+                    await loadTopicHealth()
+                }
+                if (tab === 'leaderboard') {
+                    await loadTopics()
+                }
+            })
+
+            watch([taskFilter, taskStatusFilter], () => loadTasks())
+
+            onMounted(async () => {
+                try {
+                    const sr = await fetch('/api/v1/status')
+                    const sd = await sr.json()
+                    if (sd.mode === 'standalone') {
+                        standaloneBlocked.value = true
+                        return
+                    }
+                } catch(e) {}
+                await loadAll()
+                await loadConfig()
+                // Poll every 10s
+                pollTimer = setInterval(async () => {
+                    await loadStatus()
+                    await loadMembers()
+                    if (activeTab.value === 'tasks') await loadTasks()
+                    if (activeTab.value === 'traces') { await loadTraces(); await loadLocalTasks() }
+                }, 10000)
+            })
+
+            onUnmounted(() => {
+                if (pollTimer) clearInterval(pollTimer)
+            })
+
+            return {
+                tabs, activeTab, standaloneBlocked,
+                status, members, tasks, traces, config, groupActive,
+                stats, previousMembers, membershipHistory,
+                auditEntries, auditSourceFilter, auditAgentFilter, filteredAuditEntries,
+                showJoinModal, joining, leaving, joinError, quickJoinName, toast,
+                expandedTasks, expandedTraces,
+                taskDescription, taskContent, submittingTask, taskFilter, taskStatusFilter,
+                traceAgentFilter, traceAgents,
+                localTasks, expandedLocalTrace, localTraceSpans, localTraceTask,
+                localTracePolicy, localTraceLoading, expandLocalTrace, spanTypeColor, selectedLocalSpan, localTraceJsonCopied, copyLocalTraceJson,
+                configForm, savingConfig, configSaved, configRequiresRejoin,
+                joinForm,
+                // Topics
+                topicsData, skillTopicsData, topicFlow, topicHealth,
+                xpLeaderboard, topicCategoryFilter, selectedTopic, topicMessages,
+                filteredTopics,
+                // Factory pipe viz
+                allFactoryTopics, factoryContentPipes, factoryInfraPipes, factoryStiltTop,
+                factoryInfraLabelY, factoryGroundY, factorySvgHeight,
+                factoryAgents, factorySelectedPipe, factoryPipePosition,
+                densityData, envelopeTypes, densityLoading, densityColor,
+                agentX, agentJunctions, onPipeClick,
+                densitySparklinePath, densitySparklineArea, tagFontSize,
+                joinGroup, quickJoin, leaveGroup, submitTask, saveConfig,
+                rejoinGroup, loadAudit, loadTopics,
+                ensureTopic, browseTopic,
+                getCategoryColor, getRankColor, getRankBg, getXPPercent,
+                fillDefault, toggleTaskExpand, toggleTraceExpand,
+                parseCaps, parseChannels, relativeTime, formatTime, formatDuration,
+                loadTraces,
+            }
+        }
+    }).mount('#app')
+    </script>
+</body>
+</html>

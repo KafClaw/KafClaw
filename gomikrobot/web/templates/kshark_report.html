@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>kshark Health Check Report</title>
+    <style>
+        :root {
+            --color-bg: #f8f9fa;
+            --color-surface: #ffffff;
+            --color-text: #212529;
+            --color-text-muted: #6c757d;
+            --color-primary: #007bff;
+            --color-border: #dee2e6;
+            --color-ok: #155724;
+            --color-ok-bg: #d4edda;
+            --color-warn: #856404;
+            --color-warn-bg: #fff3cd;
+            --color-fail: #721c24;
+            --color-fail-bg: #f8d7da;
+            --color-skip: #6c757d;
+            --font-family-sans-serif: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            --box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.05);
+        }
+        body {
+            font-family: var(--font-family-sans-serif);
+            line-height: 1.6;
+            color: var(--color-text);
+            background-color: var(--color-bg);
+            margin: 0;
+            padding: 1rem;
+        }
+        .container {
+            max-width: 1140px;
+            margin: 2rem auto;
+            background-color: var(--color-surface);
+            border-radius: 0.5rem;
+            box-shadow: var(--box-shadow);
+            border: 1px solid var(--color-border);
+        }
+        header {
+            background-color: var(--color-primary);
+            color: #fff;
+            padding: 2rem;
+            border-top-left-radius: 0.5rem;
+            border-top-right-radius: 0.5rem;
+        }
+        header h1 { margin: 0; font-size: 2em; }
+        header p { margin: 0.25rem 0 0; opacity: 0.9; }
+        header img {
+            max-width: 150px;
+            margin: 0 auto 1rem;
+            display: block;
+            border-radius: 0.5rem;
+            box-shadow: 0 0.25rem 0.75rem rgba(0, 0, 0, 0.1);
+        }
+        section { padding: 2rem; border-bottom: 1px solid var(--color-border); }
+        section:last-child { border-bottom: none; }
+        h2 {
+            font-size: 1.5em;
+            color: var(--color-text);
+            margin-top: 0;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid var(--color-border);
+        }
+        h3 { font-size: 1.2em; color: var(--color-text); margin-top: 1.5rem; }
+        .card {
+            background: var(--color-bg);
+            border: 1px solid var(--color-border);
+            border-radius: 0.25rem;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+        }
+        .card p { margin: 0; }
+        .card-list { list-style-type: none; padding: 0; }
+        .card-list li {
+            background: var(--color-surface);
+            padding: 0.75rem 1.25rem;
+            border: 1px solid var(--color-border);
+            border-radius: 0.25rem;
+            margin-bottom: 0.5rem;
+        }
+        table { width: 100%; border-collapse: collapse; margin-top: 1.5rem; }
+        th, td { text-align: left; padding: 0.75rem; border-bottom: 1px solid var(--color-border); vertical-align: top; }
+        th { background-color: var(--color-bg); font-weight: 600; }
+        .status-ok { background-color: var(--color-ok-bg); }
+        .status-ok .icon { color: var(--color-ok); }
+        .status-warn { background-color: var(--color-warn-bg); }
+        .status-warn .icon { color: var(--color-warn); }
+        .status-fail { background-color: var(--color-fail-bg); font-weight: 500; }
+        .status-fail .icon { color: var(--color-fail); }
+        .status-skip { color: var(--color-text-muted); }
+        .status-skip .icon { color: var(--color-skip); }
+        .icon { font-size: 1.2em; display: inline-block; width: 25px; text-align: center; }
+        .hint { font-size: 0.9em; color: var(--color-text-muted); margin-top: 0.25rem; padding-left: 25px; }
+        .summary-list { list-style-type: none; padding: 0; display: flex; flex-wrap: wrap; gap: 1rem; }
+        .summary-list li { background-color: var(--color-bg); padding: 1rem; border-radius: 0.25rem; border: 1px solid var(--color-border); flex-grow: 1; }
+        .summary-list strong { display: block; margin-bottom: 0.5rem; }
+        .disclaimer { font-style: italic; color: var(--color-text-muted); border-left: 3px solid var(--color-border); padding-left: 1rem; margin-top: 2rem; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <img src="https://github.com/scalytics/kshark-core/blob/main/docs/images/title.png?raw=true" alt="kshark Logo">
+            <h1>kshark Health Check Report</h1>
+            <p>Generated on {{.Report.FinishedAt.Format "January 2, 2006 at 3:04 PM MST"}}</p>
+        </header>
+
+        <section id="ai-analysis">
+            <h2>AI-Powered Analysis</h2>
+            <div class="card">
+                <h3>Root Cause Analysis</h3>
+                <p>{{.Analysis.RootCauseAnalysis}}</p>
+            </div>
+            <div class="card">
+                <h3>Problem Layer</h3>
+                <p>{{.Analysis.ProblemLayer}}</p>
+            </div>
+            <div class="card">
+                <h3>Explanation</h3>
+                <p>{{.Analysis.Explanation}}</p>
+            </div>
+            <h3>Suggested Fixes</h3>
+            <ul class="card-list">
+                {{range .Analysis.SuggestedFixes}}
+                <li>{{.}}</li>
+                {{end}}
+            </ul>
+            <p class="disclaimer">{{.Analysis.Disclaimer}}</p>
+        </section>
+
+        <section id="summary">
+            <h2>Scan Summary</h2>
+            <ul class="summary-list">
+                {{range $layer, $stats := .Report.Summary}}
+                <li>
+                    <strong>{{$layer}}</strong>
+                    <span class="status-ok">OK: {{$stats.OK}}</span>,
+                    <span class="status-warn">WARN: {{$stats.WARN}}</span>,
+                    <span class="status-fail">FAIL: {{$stats.FAIL}}</span>,
+                    <span class="status-skip">SKIP: {{$stats.SKIP}}</span>
+                </li>
+                {{end}}
+            </ul>
+        </section>
+
+        <section id="details">
+            <h2>Detailed Checks</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width:40px;"></th>
+                        <th>Component</th>
+                        <th>Target</th>
+                        <th>Layer</th>
+                        <th>Detail</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{range .Report.Rows}}
+                    <tr class="status-{{.Status | ToLower}}">
+                        <td><span class="icon">{{.Status | Icon}}</span></td>
+                        <td>{{.Component}}</td>
+                        <td>{{.Target}}</td>
+                        <td>{{.Layer}}</td>
+                        <td>
+                            {{.Detail}}
+                            {{if and .Hint (ne .Status "OK")}}
+                            <div class="hint">↳ Hint: {{.Hint}}</div>
+                            {{end}}
+                        </td>
+                    </tr>
+                    {{end}}
+                </tbody>
+            </table>
+        </section>
+    </div>
+</body>
+</html>

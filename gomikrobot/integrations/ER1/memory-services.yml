@@ -1,0 +1,877 @@
+openapi: 3.0.3
+info:
+  title: services api
+  version: 1.1.0
+servers:
+  - url: http://127.0.0.1:8080
+    description: Dev
+
+tags:
+  - name: memory
+    description: Memory Management
+  - name: user
+    description: User Management
+  - name: qna
+    description: QnA API
+
+paths:
+  ###########################################
+  ###########################################
+  ## User
+  ###########################################
+  ###########################################
+
+  /user/access:
+    post:
+      tags:
+        - user
+      summary: user login/create or access check - access request
+      operationId: UserAccessRequest
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                uid:
+                  type: string
+                given_name:
+                  type: string
+                family_name:
+                  type: string
+                email:
+                  type: string
+                email_valid:
+                  type: boolean
+      responses:
+        200:
+          description: return memories as per filter settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserAccessResponse"
+        403:
+          $ref: "#/components/responses/403"
+
+  ###########################################
+  ###########################################
+  ## Memory
+  ###########################################
+  ###########################################
+
+  /memory/{ctx_id}:
+    get:
+      tags:
+        - memory
+      parameters:
+        - name: ctx_id
+          in: path
+          description: context id
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          description: limit of memory items
+          schema:
+            type: integer
+            default: 10
+        - name: startDate
+          in: query
+          description: start date for memory items (rfc3339 + iso8601 compatible with timezone)
+          schema:
+            type: string
+            format: date-time
+            example: 2025-03-05T09:41:07Z
+        - name: endDate
+          in: query
+          description: end date for memory items (rfc3339 + iso8601 compatible with timezone)
+          schema:
+            type: string
+            format: date-time
+            example: 2025-03-06T09:41:07Z
+      summary: retrive a list of memory items from given context
+      operationId: GetMemoryList
+      responses:
+        200:
+          description: return memories as per filter settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MemoryList"
+        401:
+          $ref: "#/components/responses/401"
+        403:
+          $ref: "#/components/responses/403"
+        404:
+          $ref: "#/components/responses/404"
+        500:
+          $ref: "#/components/responses/500"
+
+    post:
+      tags:
+        - memory
+      parameters:
+        - name: ctx_id
+          in: path
+          description: context id
+          required: true
+          schema:
+            type: string
+      summary: upload a new memory item to the given context
+      operationId: UploadMemory
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                type:
+                  type: string
+                  description: type of memory, f.e. "record"
+                  default: "record"
+                audio:
+                  type: string
+                  format: binary
+                image:
+                  type: string
+                  format: binary
+                location_lat:
+                  type: number
+                  format: float
+                  default: 0.0
+                location_lon:
+                  type: number
+                  format: float
+                  default: 0.0
+      responses:
+        200:
+          description: created memory item
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Memory"
+        400:
+          $ref: "#/components/responses/400"
+        401:
+          $ref: "#/components/responses/401"
+        403:
+          $ref: "#/components/responses/403"
+        404:
+          $ref: "#/components/responses/404"
+        500:
+          $ref: "#/components/responses/500"
+
+  /memory/{ctx_id}/{memory_id}/image:
+    get:
+      tags:
+        - memory
+      parameters:
+        - name: ctx_id
+          in: path
+          description: context id
+          required: true
+          schema:
+            type: string
+        - name: memory_id
+          in: path
+          description: memory id
+          required: true
+          schema:
+            type: string
+      summary: retrive image resource for a given memory id
+      operationId: GetImageForMemory
+      responses:
+        200:
+          description: image for memory item
+          content:
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+            image/png:
+              schema:
+                type: string
+                format: binary
+        401:
+          $ref: "#/components/responses/401NoContent"
+        403:
+          $ref: "#/components/responses/403NoContent"
+        404:
+          $ref: "#/components/responses/404NoContent"
+        500:
+          $ref: "#/components/responses/500"
+
+  /memory/{ctx_id}/{memory_id}/audio:
+    get:
+      tags:
+        - memory
+      parameters:
+        - name: ctx_id
+          in: path
+          description: context id
+          required: true
+          schema:
+            type: string
+        - name: memory_id
+          in: path
+          description: memory id
+          required: true
+          schema:
+            type: string
+      summary: retrive audio resource for a given memory id
+      operationId: GetAudioForMemory
+      responses:
+        200:
+          description: audio for memory item
+          content:
+            audio/mpeg;codecs=mp3:
+              schema:
+                type: string
+                format: binary
+            audio/ogg;codecs=opus:
+              schema:
+                type: string
+                format: binary
+            audio/webm;codecs=opus:
+              schema:
+                type: string
+                format: binary
+        401:
+          $ref: "#/components/responses/401NoContent"
+        403:
+          $ref: "#/components/responses/403NoContent"
+        404:
+          $ref: "#/components/responses/404NoContent"
+        500:
+          $ref: "#/components/responses/500"
+
+  /memory/{ctx_id}/add_tags:
+    post:
+      tags:
+        - memory
+      parameters:
+        - name: ctx_id
+          in: path
+          description: context id
+          required: true
+          schema:
+            type: string
+      summary: add a tags to memory items
+      operationId: AddTagsToMemories
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ids:
+                  description: list of memory ids
+                  type: array
+                  items:
+                    type: string
+                tags:
+                  description: list of tags to add to each memory item
+                  type: array
+                  items:
+                    type: string
+      responses:
+        200:
+          $ref: "#/components/responses/200"
+        400:
+          $ref: "#/components/responses/400"
+        401:
+          $ref: "#/components/responses/401"
+        403:
+          $ref: "#/components/responses/403"
+        404:
+          $ref: "#/components/responses/404"
+        500:
+          $ref: "#/components/responses/500"
+
+  /memory/{ctx_id}/{memory_id}:
+    get:
+      tags:
+        - memory
+      parameters:
+        - name: ctx_id
+          in: path
+          description: context id
+          required: true
+          schema:
+            type: string
+        - name: memory_id
+          in: path
+          description: memory id
+          required: true
+          schema:
+            type: string
+      summary: retrive the given memory item
+      operationId: GetMemoryById
+      responses:
+        200:
+          description: existing memory item
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Memory"
+        401:
+          $ref: "#/components/responses/401"
+        404:
+          $ref: "#/components/responses/404"
+        500:
+          $ref: "#/components/responses/500"
+    patch:
+      tags:
+        - memory
+      parameters:
+        - name: ctx_id
+          in: path
+          description: context id
+          required: true
+          schema:
+            type: string
+        - name: memory_id
+          in: path
+          description: memory id
+          required: true
+          schema:
+            type: string
+      summary: update the given memory item (only supports transcript modification for now)
+      operationId: UpdateMemory
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                transcript:
+                  type: string
+                  description: modified/updated transcript
+
+      responses:
+        200:
+          description: created memory item
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Memory"
+        400:
+          $ref: "#/components/responses/400"
+        401:
+          $ref: "#/components/responses/401"
+        403:
+          $ref: "#/components/responses/403"
+        404:
+          $ref: "#/components/responses/404"
+        500:
+          $ref: "#/components/responses/500"
+
+    delete:
+      tags:
+        - memory
+      parameters:
+        - name: ctx_id
+          in: path
+          description: context id
+          required: true
+          schema:
+            type: string
+        - name: memory_id
+          in: path
+          description: memory id
+          required: true
+          schema:
+            type: string
+      summary: delete a given memory item
+      operationId: DeleteMemory
+      responses:
+        200:
+          $ref: "#/components/responses/200"
+        401:
+          $ref: "#/components/responses/401"
+        403:
+          $ref: "#/components/responses/403"
+        404:
+          $ref: "#/components/responses/404"
+        500:
+          $ref: "#/components/responses/500"
+
+  ###########################################
+  ###########################################
+  ## QnA
+  ###########################################
+  ###########################################
+
+  /qna/topics:
+    get:
+      tags:
+        - qna
+      summary: get topics for user
+      operationId: GetQnATopicsForUser
+      parameters:
+        - name: uid
+          in: query
+          description: user id
+          schema:
+            type: string
+            default: "1234567890"
+      responses:
+        200:
+          description: success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QnATopics"
+        401:
+          $ref: "#/components/responses/401"
+
+  /qna/topics/{topicID}:
+    get:
+      tags:
+        - qna
+      summary: get qna interactions for a topic
+      operationId: GetQnAInteractionsForTopicForUser
+      parameters:
+        - name: topicID
+          in: path
+          description: topic id
+          required: true
+          schema:
+            type: string
+        - name: uid
+          in: query
+          description: user id
+          schema:
+            type: string
+            default: "1234567890"
+      responses:
+        200:
+          description: success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QnAInteractions"
+        401:
+          $ref: "#/components/responses/401"
+        404:
+          $ref: "#/components/responses/404"
+
+  /qna/interactions:
+    get:
+      tags:
+        - qna
+      summary: get qna interactions for a user
+      operationId: GetQnAInteractionsForUser
+      parameters:
+        - name: uid
+          in: query
+          description: user id
+          schema:
+            type: string
+            default: "1234567890"
+      responses:
+        200:
+          description: success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QnAInteractions"
+        401:
+          $ref: "#/components/responses/401"
+    post:
+      tags:
+        - qna
+      summary: create a new qna interaction
+      operationId: PostQnAInteractionForUser
+      parameters:
+        - name: uid
+          in: query
+          description: user id
+          schema:
+            type: string
+            default: "1234567890"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddQnAInteraction"
+        required: true
+      responses:
+        200:
+          $ref: "#/components/responses/200"
+        401:
+          $ref: "#/components/responses/401"
+
+  /qna/interactions/{qnaInteractionID}:
+    post:
+      tags:
+        - qna
+      summary: create a new message (question) for a qna interaction
+      operationId: PostQnAInteractionQuestionForUser
+      parameters:
+        - name: qnaInteractionID
+          in: path
+          description: qna interaction id
+          required: true
+          schema:
+            type: string
+        - name: uid
+          in: query
+          description: user id
+          schema:
+            type: string
+            default: "1234567890"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddQnAInteractionQuestion"
+        required: true
+      responses:
+        200:
+          $ref: "#/components/responses/200"
+        401:
+          $ref: "#/components/responses/401"
+
+security:
+  - ApiKeyAuth: []
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-KEY
+
+  responses:
+    200:
+      description: operation successful
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/APISuccessResponse"
+    400:
+      description: input (or verifier nonce/state/..) validation error, f.e. a missing field or wrong type
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/APIErrorResponse"
+    401:
+      description: unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/APIErrorResponse"
+    403:
+      description: forbidden
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/APIErrorResponse"
+    404:
+      description: item not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/APIErrorResponse"
+    500:
+      description: internal error, f.e. database not reachable
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/APIErrorResponse"
+    401NoContent:
+      description: unauthorized (NoContent Response)
+    403NoContent:
+      description: forbidden (NoContent Response)
+    404NoContent:
+      description: item not found (NoContent Response)
+
+  schemas:
+    APISuccessResponse:
+      description: default api success response
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          default: "ok"
+
+    APIErrorResponse:
+      description: default api error response
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+          default: "error"
+
+    ###########################################
+    ###########################################
+    ## User
+    ###########################################
+    ###########################################
+
+    UserAccessResponse:
+      description: response for an user access request
+      type: object
+      required:
+        - ctx_id
+        - tier
+        #TODO: enable when roles are implemented
+        # - roles
+      properties:
+        ctx_id:
+          description: context id
+          type: string
+        tier:
+          description: user tier
+          type: string
+        roles:
+          $ref: "#/components/schemas/UserRoles"
+
+    UserRoles:
+      description: user role presets (categories and tags) to be used for memory items, first item is the default
+      type: array
+      items:
+        type: object
+        required:
+          - name
+          - categories
+          - tags
+        properties:
+          name:
+            type: string
+          label_color:
+            type: string
+          label_icon_key:
+            type: string
+          categories:
+            $ref: "#/components/schemas/UserRoleCategoryPreset"
+          tags:
+            $ref: "#/components/schemas/UserRoleTagPreset"
+
+    UserRoleCategoryPreset:
+      description: a category preset
+      type: array
+      items:
+        type: string
+
+    UserRoleTagPreset:
+      description: a tag preset
+      type: array
+      items:
+        type: string
+
+    ###########################################
+    ###########################################
+    ## Memory
+    ###########################################
+    ###########################################
+
+    MemoryList:
+      description: a memory item list
+      type: object
+      required:
+        - memories
+      properties:
+        memories:
+          type: array
+          items:
+            $ref: "#/components/schemas/Memory"
+
+    Memory:
+      description: a memory item
+      type: object
+      required:
+        - id
+        - type
+        - audio
+        - image
+        - created_at
+      properties:
+        id:
+          type: string
+          default: "1234567890"
+        type:
+          type: string
+          description: type of memory, f.e. "record"
+          default: "record"
+        audio:
+          type: boolean
+          default: true
+        image:
+          type: boolean
+          default: true
+        description:
+          description: optional description
+          type: string
+          default: ""
+        transcript:
+          description: optional transcript
+          type: string
+          default: ""
+        transcript_status:
+          description: transcription status
+          type: string
+          default: "processed"
+        review_status:
+          description: review status
+          type: string
+          default: "n"
+        location_lat:
+          description: optional location information (latitude)
+          type: number
+          format: float
+          default: 0.0
+        location_lon:
+          description: optional location information (longitude)
+          type: number
+          format: float
+          default: 0.0
+        created_at:
+          description: creation timestamp (rfc3339 + iso8601 compatible with timezone)
+          type: string
+          format: date-time
+          example: 2025-03-05T09:41:07Z
+        tags:
+          $ref: "#/components/schemas/MemoryTagList"
+
+    MemoryTagList:
+      type: array
+      items:
+        type: string
+
+    ###########################################
+    ###########################################
+    ## QnA
+    ###########################################
+    ###########################################
+
+    QnATopic:
+      type: object
+      required:
+        - topicName
+        - id
+      properties:
+        topicName:
+          type: string
+          example: "Topic #1"
+        id:
+          description: unique id for this qna topic
+          type: string
+          example: "12345"
+
+    QnATopics:
+      type: array
+      items:
+        $ref: "#/components/schemas/QnATopic"
+
+    QnAInteraction:
+      type: object
+      required:
+        - id
+        - topicID
+        - messages
+        - summary
+      properties:
+        id:
+          description: unique id for this qna interaction
+          type: string
+          example: "23456"
+        topicID:
+          description: id of the topic this interaction belongs to
+          type: string
+          example: "12345"
+        messages:
+          type: array
+          items:
+            type: object
+            required:
+              - messageType
+              - content
+              - timestamp
+            properties:
+              messageType:
+                type: string
+                enum:
+                  - answer
+                  - question
+                example: "answer"
+                description: qna interaction message type
+              content:
+                type: string
+                example: "test content"
+                description: question or answer content
+              timestamp:
+                type: string
+                format: date-time
+                description: timestamp for the server side creation of this message
+              location:
+                type: object
+                description: optional location for questions
+                required:
+                  - lat
+                  - lon
+                properties:
+                  lat:
+                    type: number
+                    example: 51.3243
+                  lon:
+                    type: number
+                    example: 13.2323
+        summary:
+          type: string
+
+    QnAInteractions:
+      type: array
+      items:
+        $ref: "#/components/schemas/QnAInteraction"
+
+    AddQnAInteraction:
+      type: object
+      required:
+        - content
+      properties:
+        content:
+          type: string
+          example: "test content"
+          description: question or answer content
+        location:
+          type: object
+          description: optional location for questions
+          required:
+            - lat
+            - lon
+          properties:
+            lat:
+              type: number
+              example: 51.3243
+            lon:
+              type: number
+              example: 13.2323
+
+    AddQnAInteractionQuestion:
+      type: object
+      required:
+        - content
+      properties:
+        content:
+          type: string
+          example: "test content"
+          description: question or answer content
+        location:
+          type: object
+          description: optional location for questions
+          required:
+            - lat
+            - lon
+          properties:
+            lat:
+              type: number
+              example: 51.3243
+            lon:
+              type: number
+              example: 13.2323

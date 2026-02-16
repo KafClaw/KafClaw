@@ -1,0 +1,16 @@
+services:
+  gomikrobot:
+    image: gomikrobot:local
+    pull_policy: never
+    container_name: gomikrobot
+    ports:
+      - "18790:18790"
+      - "18791:18791"
+    environment:
+      MIKROBOT_AGENTS_SYSTEM_REPO_PATH: /opt/system-repo
+      MIKROBOT_AGENTS_WORK_REPO_PATH: /opt/work-repo
+      MIKROBOT_AGENTS_WORKSPACE: /root/.gomikrobot/workspace
+    volumes:
+      - ${SYSTEM_REPO_PATH:?set SYSTEM_REPO_PATH}:/opt/system-repo
+      - ${WORK_REPO_PATH:?set WORK_REPO_PATH}:/opt/work-repo
+      - ${HOME}/.gomikrobot:/root/.gomikrobot
