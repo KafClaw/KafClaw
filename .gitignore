@@ -31,3 +31,8 @@ go.work.sum
 # .idea/
 # .vscode/
 private/
+gomikrobot/gomikrobot
+gomikrobot/dist/
+gomikrobot/electron/node_modules/
+gomikrobot/electron/dist/
+.DS_Store

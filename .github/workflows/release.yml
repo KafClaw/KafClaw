@@ -1,0 +1,157 @@
+name: Release GoMikroBot
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  # -------------------------------------------------------------------
+  # Job 1: Cross-compile Go CLI binaries (all platforms from one runner)
+  # -------------------------------------------------------------------
+  build-go:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - goos: darwin
+            goarch: arm64
+          - goos: darwin
+            goarch: amd64
+          - goos: linux
+            goarch: amd64
+          - goos: linux
+            goarch: arm64
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.24.13"
+          cache-dependency-path: gomikrobot/go.sum
+
+      - name: Extract version from tag
+        id: version
+        run: echo "tag=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+
+      - name: Build
+        working-directory: gomikrobot
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: "0"
+        run: |
+          BIN_NAME="gomikrobot-${{ matrix.goos }}-${{ matrix.goarch }}"
+          go build -ldflags "-X github.com/kamir/gomikrobot/cmd/gomikrobot/cmd.version=${{ steps.version.outputs.tag }}" \
+            -o "dist/${BIN_NAME}" ./cmd/gomikrobot
+          chmod +x "dist/${BIN_NAME}"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: gomikrobot-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: gomikrobot/dist/*
+
+  # -------------------------------------------------------------------
+  # Job 2: Package Electron desktop app (needs native runners)
+  # -------------------------------------------------------------------
+  build-electron:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            platform: mac
+            go_goos: darwin
+            go_goarch: arm64
+          - os: ubuntu-latest
+            platform: linux
+            go_goos: linux
+            go_goarch: amd64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.24.13"
+          cache-dependency-path: gomikrobot/go.sum
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Build Go binary for target platform
+        working-directory: gomikrobot
+        env:
+          GOOS: ${{ matrix.go_goos }}
+          GOARCH: ${{ matrix.go_goarch }}
+          CGO_ENABLED: "0"
+        run: |
+          go build -o gomikrobot ./cmd/gomikrobot
+          chmod +x gomikrobot
+
+      - name: Install Electron dependencies
+        working-directory: gomikrobot/electron
+        run: npm ci
+
+      - name: Build Electron app
+        working-directory: gomikrobot/electron
+        run: npm run build
+
+      - name: Package Electron app
+        working-directory: gomikrobot/electron
+        run: npx electron-builder --${{ matrix.platform }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload Electron artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: electron-${{ matrix.platform }}
+          path: |
+            gomikrobot/electron/release/*.dmg
+            gomikrobot/electron/release/*.AppImage
+
+  # -------------------------------------------------------------------
+  # Job 3: Publish GitHub Release with all artifacts
+  # -------------------------------------------------------------------
+  release:
+    needs: [build-go, build-electron]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Prepare release files
+        run: |
+          mkdir -p release_files
+          # Flatten Go binaries
+          find artifacts -name "gomikrobot-*" -type f -exec cp {} release_files/ \;
+          # Flatten Electron packages
+          find artifacts -name "*.dmg" -type f -exec cp {} release_files/ \;
+          find artifacts -name "*.AppImage" -type f -exec cp {} release_files/ \;
+          echo "Release files:"
+          ls -lh release_files/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: false
+          generate_release_notes: true
+          files: release_files/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
