@@ -42,14 +42,23 @@ esac
 
 NEXT="${MAJOR}.${MINOR}.${PATCH}"
 
-perl -0777 -i -pe "s/version = \\\"$CURRENT\\\"/version = \\\"$NEXT\\\"/g" "$ROOT_GO"
+# Portable in-place sed (macOS BSD sed requires '' arg, GNU sed does not)
+sedi() {
+  if sed --version >/dev/null 2>&1; then
+    sed -i "$@"        # GNU
+  else
+    sed -i '' "$@"     # BSD (macOS)
+  fi
+}
+
+sedi "s/version = \"$CURRENT\"/version = \"$NEXT\"/g" "$ROOT_GO"
 
 echo "Version bumped: $CURRENT -> $NEXT"
 
 # Sync Electron app version
 ELECTRON_PKG="${ROOT_DIR}/electron/package.json"
 if [[ -f "$ELECTRON_PKG" ]]; then
-  perl -i -pe "s/\"version\": \"[0-9]+\.[0-9]+\.[0-9]+\"/\"version\": \"$NEXT\"/" "$ELECTRON_PKG"
+  sedi -E "s/\"version\": \"[0-9]+\.[0-9]+\.[0-9]+\"/\"version\": \"$NEXT\"/" "$ELECTRON_PKG"
   echo "Electron version synced to $NEXT"
 fi
 

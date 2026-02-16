@@ -3,7 +3,12 @@ SHELL := /bin/bash
 # Tries .bashrc first (Linux default), then .zshrc (macOS default), then .profile (POSIX fallback).
 SOURCE_ENV := if [ -f "$$HOME/.bashrc" ]; then . "$$HOME/.bashrc"; elif [ -f "$$HOME/.zshrc" ]; then . "$$HOME/.zshrc"; elif [ -f "$$HOME/.profile" ]; then . "$$HOME/.profile"; fi &&
 
-.PHONY: help build run rerun test test-classification install \
+# Minimum versions required
+GO_MIN_VERSION := 1.24
+NODE_MIN_VERSION := 18
+NPM_MIN_VERSION := 9
+
+.PHONY: help check bootstrap build run rerun test test-classification install \
 	release release-major release-minor release-patch dist-go \
 	docker-build docker-up docker-down docker-logs \
 	run-standalone run-full run-headless \
@@ -12,6 +17,80 @@ SOURCE_ENV := if [ -f "$$HOME/.bashrc" ]; then . "$$HOME/.bashrc"; elif [ -f "$$
 
 help: ## Show this help
 	@awk 'BEGIN {FS = ":.*##"; printf "\nTargets:\n"} /^[a-zA-Z0-9_-]+:.*##/ {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2} END {printf "\n"}' $(MAKEFILE_LIST)
+
+# ---------------------------------------------------------------------------
+# Bootstrap & prerequisite check
+# ---------------------------------------------------------------------------
+
+bootstrap: ## Install build prerequisites for this platform
+	@case "$$(uname -s)" in \
+		Darwin) bash scripts/bootstrap-macos.sh ;; \
+		Linux)  bash scripts/bootstrap-ubuntu.sh ;; \
+		*)      echo "No bootstrap script for $$(uname -s). See PREREQUISITES.md"; exit 1 ;; \
+	esac
+
+check: ## Validate build prerequisites (Go, git, Node.js/npm)
+	@echo "Checking prerequisites..."
+	@command -v go >/dev/null 2>&1 || { \
+		echo ""; \
+		echo "  ERROR: Go is not installed."; \
+		echo "  Required: Go >= $(GO_MIN_VERSION)"; \
+		echo "  Install:  https://go.dev/dl/"; \
+		echo "  See:      PREREQUISITES.md"; \
+		echo ""; \
+		exit 1; \
+	}
+	@GO_VER=$$(go version | sed -E 's/.*go([0-9]+\.[0-9]+).*/\1/'); \
+	GO_MAJ=$$(echo "$$GO_VER" | cut -d. -f1); \
+	GO_MIN=$$(echo "$$GO_VER" | cut -d. -f2); \
+	REQ_MAJ=$$(echo "$(GO_MIN_VERSION)" | cut -d. -f1); \
+	REQ_MIN=$$(echo "$(GO_MIN_VERSION)" | cut -d. -f2); \
+	if [ "$$GO_MAJ" -lt "$$REQ_MAJ" ] || { [ "$$GO_MAJ" -eq "$$REQ_MAJ" ] && [ "$$GO_MIN" -lt "$$REQ_MIN" ]; }; then \
+		echo ""; \
+		echo "  ERROR: Go $$GO_VER is too old."; \
+		echo "  Required: Go >= $(GO_MIN_VERSION)"; \
+		echo "  Installed: Go $$GO_VER ($$(which go))"; \
+		echo "  Install:  https://go.dev/dl/"; \
+		echo "  See:      PREREQUISITES.md"; \
+		echo ""; \
+		exit 1; \
+	fi
+	@echo "  Go $$(go version | sed -E 's/.*go([0-9]+\.[0-9]+\.[0-9]+).*/\1/') — OK"
+	@command -v git >/dev/null 2>&1 && \
+		echo "  git $$(git --version | sed 's/git version //') — OK" || \
+		echo "  WARNING: git not found (needed for work repo init)"
+	@if command -v node >/dev/null 2>&1; then \
+		NODE_VER=$$(node --version | sed 's/v//'); \
+		NODE_MAJ=$$(echo "$$NODE_VER" | cut -d. -f1); \
+		if [ "$$NODE_MAJ" -lt "$(NODE_MIN_VERSION)" ]; then \
+			echo "  WARNING: Node.js $$NODE_VER is too old (need >= $(NODE_MIN_VERSION) for Electron)"; \
+		else \
+			echo "  Node.js $$NODE_VER — OK"; \
+		fi; \
+	else \
+		echo "  WARNING: Node.js not found (needed for Electron desktop app)"; \
+	fi
+	@if command -v npm >/dev/null 2>&1; then \
+		NPM_VER=$$(npm --version); \
+		NPM_MAJ=$$(echo "$$NPM_VER" | cut -d. -f1); \
+		if [ "$$NPM_MAJ" -lt "$(NPM_MIN_VERSION)" ]; then \
+			echo "  WARNING: npm $$NPM_VER is too old (need >= $(NPM_MIN_VERSION))"; \
+		else \
+			echo "  npm $$NPM_VER — OK"; \
+		fi; \
+	else \
+		echo "  WARNING: npm not found (bundled with Node.js)"; \
+	fi
+	@command -v lsof >/dev/null 2>&1 && \
+		echo "  lsof — OK" || \
+		echo "  WARNING: lsof not found (needed for make kill-gateway)"
+	@command -v docker >/dev/null 2>&1 && \
+		echo "  docker $$(docker --version | sed -E 's/Docker version ([0-9]+\.[0-9]+).*/\1/') — OK" || \
+		echo "  docker — not installed (optional, for make docker-*)"
+	@command -v gh >/dev/null 2>&1 && \
+		echo "  gh $$(gh --version | head -1 | sed -E 's/.*version ([0-9]+\.[0-9]+).*/\1/') — OK" || \
+		echo "  gh — not installed (optional, GitHub CLI)"
+	@echo "  All prerequisites checked."
 
 # ---------------------------------------------------------------------------
 # Go binary
@@ -26,7 +105,7 @@ test-classification: ## Run internal/external message classification E2E test (v
 test-orchestrator: ## Run orchestrator tests (verbose)
 	go test -v ./internal/orchestrator/
 
-build: ## Build the gomikrobot binary
+build: check ## Build the gomikrobot binary
 	go build ./cmd/gomikrobot
 
 install: build ## Install gomikrobot to /usr/local/bin
