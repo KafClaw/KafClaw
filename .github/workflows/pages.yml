@@ -26,6 +26,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Pages
+        if: github.repository == 'KafClaw/KafClaw'
         uses: actions/configure-pages@v5
         with:
           enablement: true
@@ -42,6 +43,7 @@ jobs:
           path: ./_site
 
   deploy:
+    if: github.repository == 'KafClaw/KafClaw'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
