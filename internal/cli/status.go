@@ -4,7 +4,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
+	"strings"
 
+	"github.com/KafClaw/KafClaw/internal/channels"
 	"github.com/KafClaw/KafClaw/internal/config"
 	"github.com/spf13/cobra"
 )
@@ -61,7 +64,156 @@ var statusCmd = &cobra.Command{
 			fmt.Println("WhatsApp Link: ✗ No session (QR needed)")
 			fmt.Println("WhatsApp QR:   " + qrPath)
 		}
+		if cfg != nil && cfg.Channels.Slack.Enabled {
+			fmt.Println("Slack:    ✓ Enabled")
+		} else if cfg != nil {
+			fmt.Println("Slack:    ✗ Disabled")
+		}
+		if cfg != nil && cfg.Channels.MSTeams.Enabled {
+			fmt.Println("MSTeams:  ✓ Enabled")
+		} else if cfg != nil {
+			fmt.Println("MSTeams:  ✗ Disabled")
+		}
+		if cfg != nil {
+			printSlackStatusDetails(cfg)
+			printMSTeamsStatusDetails(cfg)
+		}
+		if cfg != nil {
+			warnings := channels.CollectUnsafeGroupPolicyWarnings(cfg)
+			if len(warnings) == 0 {
+				fmt.Println("Policy:   ✓ No unsafe group policy warnings")
+			} else {
+				fmt.Printf("Policy:   ⚠ %d warning(s)\n", len(warnings))
+				for _, w := range warnings {
+					fmt.Printf("  - %s\n", w)
+				}
+			}
+		}
+		if timeSvc, err := openTimelineService(); err == nil {
+			svc := channels.NewPairingService(timeSvc)
+			if pending, err := svc.ListPending(); err == nil {
+				if len(pending) == 0 {
+					fmt.Println("Pairing:  ✓ No pending requests")
+				} else {
+					counts := map[string]int{}
+					for _, p := range pending {
+						counts[p.Channel]++
+					}
+					chs := make([]string, 0, len(counts))
+					for k := range counts {
+						chs = append(chs, k)
+					}
+					sort.Strings(chs)
+					summary := ""
+					for i, ch := range chs {
+						if i > 0 {
+							summary += ", "
+						}
+						summary += fmt.Sprintf("%s=%d", ch, counts[ch])
+					}
+					fmt.Printf("Pairing:  ⚠ %d pending (%s)\n", len(pending), summary)
+				}
+			} else {
+				fmt.Println("Pairing:  ? Unable to read pending requests")
+			}
+			_ = timeSvc.Close()
+		} else {
+			fmt.Println("Pairing:  ? Timeline unavailable")
+		}
 
 		fmt.Println("Status:  Ready")
 	},
+}
+
+func printSlackStatusDetails(cfg *config.Config) {
+	diags := channels.CollectChannelAccountDiagnostics(cfg)
+	printSlackAccount("default", cfg.Channels.Slack.Enabled, cfg.Channels.Slack.BotToken, cfg.Channels.Slack.AppToken, cfg.Channels.Slack.InboundToken, cfg.Channels.Slack.OutboundURL, cfg.Channels.Slack.AllowFrom, cfg.Channels.Slack.DmPolicy, cfg.Channels.Slack.GroupPolicy, cfg.Channels.Slack.RequireMention, cfg.Channels.Slack.SessionScope, issuesForAccount("slack", "default", diags))
+	for _, acct := range cfg.Channels.Slack.Accounts {
+		id := nonEmpty(strings.ToLower(strings.TrimSpace(acct.ID)), "default")
+		printSlackAccount(id, acct.Enabled, acct.BotToken, acct.AppToken, acct.InboundToken, acct.OutboundURL, acct.AllowFrom, acct.DmPolicy, acct.GroupPolicy, acct.RequireMention, nonEmpty(acct.SessionScope, cfg.Channels.Slack.SessionScope), issuesForAccount("slack", id, diags))
+	}
+}
+
+func printMSTeamsStatusDetails(cfg *config.Config) {
+	diags := channels.CollectChannelAccountDiagnostics(cfg)
+	printTeamsAccount("default", cfg.Channels.MSTeams.Enabled, cfg.Channels.MSTeams.AppID, cfg.Channels.MSTeams.AppPassword, cfg.Channels.MSTeams.TenantID, cfg.Channels.MSTeams.InboundToken, cfg.Channels.MSTeams.OutboundURL, cfg.Channels.MSTeams.AllowFrom, cfg.Channels.MSTeams.GroupAllowFrom, cfg.Channels.MSTeams.DmPolicy, cfg.Channels.MSTeams.GroupPolicy, cfg.Channels.MSTeams.RequireMention, cfg.Channels.MSTeams.SessionScope, issuesForAccount("msteams", "default", diags))
+	for _, acct := range cfg.Channels.MSTeams.Accounts {
+		id := nonEmpty(strings.ToLower(strings.TrimSpace(acct.ID)), "default")
+		printTeamsAccount(id, acct.Enabled, acct.AppID, acct.AppPassword, acct.TenantID, acct.InboundToken, acct.OutboundURL, acct.AllowFrom, acct.GroupAllowFrom, acct.DmPolicy, acct.GroupPolicy, acct.RequireMention, nonEmpty(acct.SessionScope, cfg.Channels.MSTeams.SessionScope), issuesForAccount("msteams", id, diags))
+	}
+}
+
+func printSlackAccount(accountID string, enabled bool, botToken, appToken, inboundToken, outboundURL string, allow []string, dm config.DmPolicy, group config.GroupPolicy, requireMention bool, scopeMode string, issues []string) {
+	state := "disabled"
+	if enabled {
+		state = "enabled"
+	}
+	fmt.Printf("Slack Account [%s]: %s\n", accountID, state)
+	fmt.Printf("  - scope: mode=%s session=%s\n", nonEmpty(scopeMode, "room"), sessionScopeHint("slack", scopeMode))
+	fmt.Printf("  - policies: dm=%s group=%s require_mention=%t\n", nonEmpty(string(dm), "pairing"), nonEmpty(string(group), "allowlist"), requireMention)
+	fmt.Printf("  - allowlist: dm=%d group=%d\n", len(allow), len(allow))
+	fmt.Printf("  - bridge: inbound_token=%t outbound_url=%t\n", strings.TrimSpace(inboundToken) != "", strings.TrimSpace(outboundURL) != "")
+	fmt.Printf("  - credentials: bot_token=%t app_token=%t\n", strings.TrimSpace(botToken) != "", strings.TrimSpace(appToken) != "")
+	if len(issues) == 0 {
+		fmt.Printf("  - diagnostics: configured\n")
+	} else {
+		fmt.Printf("  - diagnostics: %d issue(s)\n", len(issues))
+		for _, issue := range issues {
+			fmt.Printf("    * %s\n", issue)
+		}
+	}
+}
+
+func printTeamsAccount(accountID string, enabled bool, appID, appPassword, tenantID, inboundToken, outboundURL string, allow, groupAllow []string, dm config.DmPolicy, group config.GroupPolicy, requireMention bool, scopeMode string, issues []string) {
+	state := "disabled"
+	if enabled {
+		state = "enabled"
+	}
+	fmt.Printf("MSTeams Account [%s]: %s\n", accountID, state)
+	fmt.Printf("  - scope: mode=%s session=%s\n", nonEmpty(scopeMode, "room"), sessionScopeHint("msteams", scopeMode))
+	fmt.Printf("  - policies: dm=%s group=%s require_mention=%t\n", nonEmpty(string(dm), "pairing"), nonEmpty(string(group), "allowlist"), requireMention)
+	fmt.Printf("  - allowlist: dm=%d group=%d\n", len(allow), len(groupAllow))
+	fmt.Printf("  - bridge: inbound_token=%t outbound_url=%t\n", strings.TrimSpace(inboundToken) != "", strings.TrimSpace(outboundURL) != "")
+	fmt.Printf("  - credentials: app_id=%t app_password=%t tenant_id=%s\n", strings.TrimSpace(appID) != "", strings.TrimSpace(appPassword) != "", nonEmpty(strings.TrimSpace(tenantID), "unset"))
+	if len(issues) == 0 {
+		fmt.Printf("  - diagnostics: configured\n")
+	} else {
+		fmt.Printf("  - diagnostics: %d issue(s)\n", len(issues))
+		for _, issue := range issues {
+			fmt.Printf("    * %s\n", issue)
+		}
+	}
+}
+
+func nonEmpty(v, fallback string) string {
+	if strings.TrimSpace(v) == "" {
+		return fallback
+	}
+	return strings.TrimSpace(v)
+}
+
+func issuesForAccount(channel, account string, diags []channels.AccountDiagnostic) []string {
+	ch := strings.TrimSpace(strings.ToLower(channel))
+	acct := strings.TrimSpace(strings.ToLower(account))
+	for _, d := range diags {
+		if strings.TrimSpace(strings.ToLower(d.Channel)) == ch && strings.TrimSpace(strings.ToLower(d.Account)) == acct {
+			return d.Issues
+		}
+	}
+	return nil
+}
+
+func sessionScopeHint(channel, mode string) string {
+	switch strings.ToLower(strings.TrimSpace(mode)) {
+	case "channel":
+		return channel
+	case "account":
+		return channel + ":<account>"
+	case "thread":
+		return channel + ":<account>:<chat_id>:<thread_id>"
+	case "user":
+		return channel + ":<account>:<sender_id>"
+	default:
+		return channel + ":<account>:<chat_id>"
+	}
 }

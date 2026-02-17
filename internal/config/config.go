@@ -53,6 +53,8 @@ type ChannelsConfig struct {
 	Discord  DiscordConfig  `json:"discord"`
 	WhatsApp WhatsAppConfig `json:"whatsapp"`
 	Feishu   FeishuConfig   `json:"feishu"`
+	Slack    SlackConfig    `json:"slack"`
+	MSTeams  MSTeamsConfig  `json:"msteams"`
 }
 
 // TelegramConfig configures the Telegram channel.
@@ -77,6 +79,7 @@ type WhatsAppConfig struct {
 	AllowFrom        []string `json:"allowFrom"`
 	DropUnauthorized bool     `json:"dropUnauthorized" envconfig:"WHATSAPP_DROP_UNAUTHORIZED"`
 	IgnoreReactions  bool     `json:"ignoreReactions" envconfig:"WHATSAPP_IGNORE_REACTIONS"`
+	SessionScope     string   `json:"sessionScope" envconfig:"WHATSAPP_SESSION_SCOPE"`
 }
 
 // FeishuConfig configures the Feishu channel.
@@ -87,6 +90,89 @@ type FeishuConfig struct {
 	EncryptKey        string   `json:"encryptKey" envconfig:"FEISHU_ENCRYPT_KEY"`
 	VerificationToken string   `json:"verificationToken" envconfig:"FEISHU_VERIFICATION_TOKEN"`
 	AllowFrom         []string `json:"allowFrom"`
+}
+
+// DmPolicy controls direct-message access for channels.
+type DmPolicy string
+
+const (
+	DmPolicyPairing   DmPolicy = "pairing"
+	DmPolicyAllowlist DmPolicy = "allowlist"
+	DmPolicyOpen      DmPolicy = "open"
+	DmPolicyDisabled  DmPolicy = "disabled"
+)
+
+// GroupPolicy controls group/channel access for channels.
+type GroupPolicy string
+
+const (
+	GroupPolicyAllowlist GroupPolicy = "allowlist"
+	GroupPolicyOpen      GroupPolicy = "open"
+	GroupPolicyDisabled  GroupPolicy = "disabled"
+)
+
+// SlackConfig configures the Slack channel.
+type SlackConfig struct {
+	Enabled        bool                 `json:"enabled" envconfig:"SLACK_ENABLED"`
+	BotToken       string               `json:"botToken" envconfig:"SLACK_BOT_TOKEN"`
+	AppToken       string               `json:"appToken" envconfig:"SLACK_APP_TOKEN"`
+	InboundToken   string               `json:"inboundToken" envconfig:"SLACK_INBOUND_TOKEN"`
+	OutboundURL    string               `json:"outboundUrl" envconfig:"SLACK_OUTBOUND_URL"`
+	SessionScope   string               `json:"sessionScope" envconfig:"SLACK_SESSION_SCOPE"`
+	Accounts       []SlackAccountConfig `json:"accounts,omitempty"`
+	AllowFrom      []string             `json:"allowFrom"`
+	DmPolicy       DmPolicy             `json:"dmPolicy"`
+	GroupPolicy    GroupPolicy          `json:"groupPolicy"`
+	RequireMention bool                 `json:"requireMention" envconfig:"SLACK_REQUIRE_MENTION"`
+}
+
+// SlackAccountConfig configures one named Slack account.
+type SlackAccountConfig struct {
+	ID             string      `json:"id"`
+	Enabled        bool        `json:"enabled"`
+	BotToken       string      `json:"botToken"`
+	AppToken       string      `json:"appToken"`
+	InboundToken   string      `json:"inboundToken"`
+	OutboundURL    string      `json:"outboundUrl"`
+	SessionScope   string      `json:"sessionScope"`
+	AllowFrom      []string    `json:"allowFrom"`
+	DmPolicy       DmPolicy    `json:"dmPolicy"`
+	GroupPolicy    GroupPolicy `json:"groupPolicy"`
+	RequireMention bool        `json:"requireMention"`
+}
+
+// MSTeamsConfig configures the Microsoft Teams channel.
+type MSTeamsConfig struct {
+	Enabled        bool                   `json:"enabled" envconfig:"MSTEAMS_ENABLED"`
+	AppID          string                 `json:"appId" envconfig:"MSTEAMS_APP_ID"`
+	AppPassword    string                 `json:"appPassword" envconfig:"MSTEAMS_APP_PASSWORD"`
+	TenantID       string                 `json:"tenantId" envconfig:"MSTEAMS_TENANT_ID"`
+	InboundToken   string                 `json:"inboundToken" envconfig:"MSTEAMS_INBOUND_TOKEN"`
+	OutboundURL    string                 `json:"outboundUrl" envconfig:"MSTEAMS_OUTBOUND_URL"`
+	SessionScope   string                 `json:"sessionScope" envconfig:"MSTEAMS_SESSION_SCOPE"`
+	Accounts       []MSTeamsAccountConfig `json:"accounts,omitempty"`
+	AllowFrom      []string               `json:"allowFrom"`
+	GroupAllowFrom []string               `json:"groupAllowFrom"`
+	DmPolicy       DmPolicy               `json:"dmPolicy"`
+	GroupPolicy    GroupPolicy            `json:"groupPolicy"`
+	RequireMention bool                   `json:"requireMention" envconfig:"MSTEAMS_REQUIRE_MENTION"`
+}
+
+// MSTeamsAccountConfig configures one named Teams account.
+type MSTeamsAccountConfig struct {
+	ID             string      `json:"id"`
+	Enabled        bool        `json:"enabled"`
+	AppID          string      `json:"appId"`
+	AppPassword    string      `json:"appPassword"`
+	TenantID       string      `json:"tenantId"`
+	InboundToken   string      `json:"inboundToken"`
+	OutboundURL    string      `json:"outboundUrl"`
+	SessionScope   string      `json:"sessionScope"`
+	AllowFrom      []string    `json:"allowFrom"`
+	GroupAllowFrom []string    `json:"groupAllowFrom"`
+	DmPolicy       DmPolicy    `json:"dmPolicy"`
+	GroupPolicy    GroupPolicy `json:"groupPolicy"`
+	RequireMention bool        `json:"requireMention"`
 }
 
 // ---------------------------------------------------------------------------
@@ -330,6 +416,23 @@ func DefaultConfig() *Config {
 			Enabled:          false,
 			MessageThreshold: 50,
 			MaxObservations:  200,
+		},
+		Channels: ChannelsConfig{
+			Slack: SlackConfig{
+				DmPolicy:       DmPolicyPairing,
+				GroupPolicy:    GroupPolicyAllowlist,
+				RequireMention: true,
+				SessionScope:   "room",
+			},
+			MSTeams: MSTeamsConfig{
+				DmPolicy:       DmPolicyPairing,
+				GroupPolicy:    GroupPolicyAllowlist,
+				RequireMention: true,
+				SessionScope:   "room",
+			},
+			WhatsApp: WhatsAppConfig{
+				SessionScope: "room",
+			},
 		},
 	}
 }

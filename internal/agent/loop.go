@@ -96,6 +96,7 @@ type Loop struct {
 	activeSender      string
 	activeChannel     string
 	activeChatID      string
+	activeThreadID    string
 	activeTraceID     string
 	activeMessageType string
 	subagents         *subagentManager
@@ -222,10 +223,11 @@ func (l *Loop) Run(ctx context.Context) error {
 			if err := l.approvalMgr.Respond(id, approved); err != nil {
 				slog.Warn("Approval response failed", "id", id, "error", err)
 				l.bus.PublishOutbound(&bus.OutboundMessage{
-					Channel: msg.Channel,
-					ChatID:  msg.ChatID,
-					TraceID: msg.TraceID,
-					Content: fmt.Sprintf("No pending approval found for ID %s.", id),
+					Channel:  msg.Channel,
+					ChatID:   msg.ChatID,
+					ThreadID: msg.ThreadID,
+					TraceID:  msg.TraceID,
+					Content:  fmt.Sprintf("No pending approval found for ID %s.", id),
 				})
 			} else {
 				action := "denied"
@@ -233,10 +235,11 @@ func (l *Loop) Run(ctx context.Context) error {
 					action = "approved"
 				}
 				l.bus.PublishOutbound(&bus.OutboundMessage{
-					Channel: msg.Channel,
-					ChatID:  msg.ChatID,
-					TraceID: msg.TraceID,
-					Content: fmt.Sprintf("Approval %s: %s.", id, action),
+					Channel:  msg.Channel,
+					ChatID:   msg.ChatID,
+					ThreadID: msg.ThreadID,
+					TraceID:  msg.TraceID,
+					Content:  fmt.Sprintf("Approval %s: %s.", id, action),
 				})
 			}
 			continue
@@ -250,11 +253,12 @@ func (l *Loop) Run(ctx context.Context) error {
 
 		if response != "" {
 			l.bus.PublishOutbound(&bus.OutboundMessage{
-				Channel: msg.Channel,
-				ChatID:  msg.ChatID,
-				TraceID: msg.TraceID,
-				TaskID:  taskID,
-				Content: response,
+				Channel:  msg.Channel,
+				ChatID:   msg.ChatID,
+				ThreadID: msg.ThreadID,
+				TraceID:  msg.TraceID,
+				TaskID:   taskID,
+				Content:  response,
 			})
 			// Optimistic delivery mark
 			if l.timeline != nil && taskID != "" {
@@ -289,13 +293,16 @@ func (l *Loop) ProcessDirectWithTrace(ctx context.Context, content, sessionKey, 
 	}
 	prevChannel := l.activeChannel
 	prevChatID := l.activeChatID
+	prevThreadID := l.activeThreadID
 	prevTrace := l.activeTraceID
 	l.activeChannel = channel
 	l.activeChatID = chatID
+	l.activeThreadID = ""
 	l.activeTraceID = traceID
 	defer func() {
 		l.activeChannel = prevChannel
 		l.activeChatID = prevChatID
+		l.activeThreadID = prevThreadID
 		l.activeTraceID = prevTrace
 	}()
 
@@ -999,6 +1006,14 @@ func (l *Loop) injectObservations(messages []provider.Message, sessionID string)
 
 func (l *Loop) processMessage(ctx context.Context, msg *bus.InboundMessage) (response string, taskID string, err error) {
 	sessionKey := fmt.Sprintf("%s:%s", msg.Channel, msg.ChatID)
+	if msg.Metadata != nil {
+		if raw, ok := msg.Metadata[bus.MetaKeySessionScope].(string); ok {
+			scope := strings.TrimSpace(raw)
+			if scope != "" {
+				sessionKey = scope
+			}
+		}
+	}
 	if msg.TraceID == "" {
 		msg.TraceID = fmt.Sprintf("trace-%d", time.Now().UnixNano())
 	}
@@ -1049,6 +1064,7 @@ func (l *Loop) processMessage(ctx context.Context, msg *bus.InboundMessage) (res
 	l.activeSender = msg.SenderID
 	l.activeChannel = msg.Channel
 	l.activeChatID = msg.ChatID
+	l.activeThreadID = msg.ThreadID
 	l.activeTraceID = msg.TraceID
 	l.activeMessageType = msg.MessageType()
 
@@ -1374,11 +1390,12 @@ func (l *Loop) checkToolPolicy(ctx context.Context, toolName string, args map[st
 				toolName, tier, argsPreview, approvalID, approvalID)
 
 			l.bus.PublishOutbound(&bus.OutboundMessage{
-				Channel: l.activeChannel,
-				ChatID:  l.activeChatID,
-				TraceID: l.activeTraceID,
-				TaskID:  l.activeTaskID,
-				Content: prompt,
+				Channel:  l.activeChannel,
+				ChatID:   l.activeChatID,
+				ThreadID: l.activeThreadID,
+				TraceID:  l.activeTraceID,
+				TaskID:   l.activeTaskID,
+				Content:  prompt,
 			})
 
 			// Block with configurable timeout (default 60s)

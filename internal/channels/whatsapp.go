@@ -186,14 +186,19 @@ func (c *WhatsAppChannel) handleOutbound(msg *bus.OutboundMessage) {
 		c.logOutbound("error", msg)
 		// Mark delivery as pending for retry with backoff
 		if c.timeline != nil && msg.TaskID != "" {
-			nextAt := deliveryBackoff(0)
-			_ = c.timeline.UpdateTaskDelivery(msg.TaskID, timeline.DeliveryPending, &nextAt)
+			reason, cls := classifyDeliveryError(err)
+			if cls == deliveryTransient {
+				nextAt := deliveryBackoff(0)
+				_ = c.timeline.UpdateTaskDeliveryWithReason(msg.TaskID, timeline.DeliveryPending, &nextAt, reason)
+			} else {
+				_ = c.timeline.UpdateTaskDeliveryWithReason(msg.TaskID, timeline.DeliveryFailed, nil, reason)
+			}
 		}
 		return
 	}
 	c.logOutbound("sent", msg)
 	if c.timeline != nil && msg.TaskID != "" {
-		_ = c.timeline.UpdateTaskDelivery(msg.TaskID, timeline.DeliverySent, nil)
+		_ = c.timeline.UpdateTaskDeliveryWithReason(msg.TaskID, timeline.DeliverySent, nil, "")
 	}
 }
 
@@ -420,6 +425,8 @@ func (c *WhatsAppChannel) eventHandler(evt interface{}) {
 				Metadata: map[string]any{
 					bus.MetaKeyMessageType: msgType,
 					bus.MetaKeyIsFromMe:    v.Info.IsFromMe,
+					// Isolation boundary is configurable (channel/account/room/thread/user).
+					bus.MetaKeySessionScope: buildSessionScope(c.Name(), "default", v.Info.Chat.String(), "", sender, c.config.SessionScope),
 				},
 			})
 		}

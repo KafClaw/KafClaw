@@ -9,10 +9,10 @@
 
 | Document | Description |
 |----------|-------------|
-| [OWASP-AUDIT.md](OWASP-AUDIT.md) | Full OWASP Top 10 + NHI Top 10 security audit of the Go application, web UI, and HTTP gateway |
-| [ELECTRON-AUDIT.md](ELECTRON-AUDIT.md) | Security audit of the Electron desktop application |
-| [BOT-IDENTITY-PROPOSAL.md](BOT-IDENTITY-PROPOSAL.md) | Per-bot identity architecture proposal with GitHub App integration |
-| [AUTH-TOKEN-CONCEPT.md](AUTH-TOKEN-CONCEPT.md) | JWT-based authentication and authorization system design |
+| [owasp-audit.md](owasp-audit.md) | Full OWASP Top 10 + NHI Top 10 security audit of the Go application, web UI, and HTTP gateway |
+| [electron-audit.md](electron-audit.md) | Security audit of the Electron desktop application |
+| [bot-identity-proposal.md](bot-identity-proposal.md) | Per-bot identity architecture proposal with GitHub App integration |
+| [auth-token-concept.md](auth-token-concept.md) | JWT-based authentication and authorization system design |
 
 ---
 
@@ -66,7 +66,7 @@
 
 ### P2 - Next Release (Medium Effort)
 
-- [ ] Implement JWT-based authentication (see AUTH-TOKEN-CONCEPT.md)
+- [ ] Implement JWT-based authentication (see auth-token-concept.md)
 - [ ] Add rate limiting to HTTP endpoints
 - [ ] Add request body size limits
 - [ ] Shell tool: make strict allow-list mandatory
@@ -75,7 +75,7 @@
 
 ### P3 - Roadmap (High Effort)
 
-- [ ] Implement per-bot identity system (see BOT-IDENTITY-PROPOSAL.md)
+- [ ] Implement per-bot identity system (see bot-identity-proposal.md)
 - [ ] GitHub App integration for bot GitHub access
 - [ ] Scope-based authorization per endpoint
 - [ ] Inter-bot authenticated communication (group mode)

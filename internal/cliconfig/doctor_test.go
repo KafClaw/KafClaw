@@ -171,3 +171,42 @@ func TestDoctorGenerateGatewayToken(t *testing.T) {
 		t.Fatalf("expected generated auth token, got: %s", string(cfgAfter))
 	}
 }
+
+func TestDoctorReportsSlackTeamsAccountDiagnostics(t *testing.T) {
+	tmpDir := t.TempDir()
+	cfgDir := filepath.Join(tmpDir, ".kafclaw")
+	if err := os.MkdirAll(cfgDir, 0o755); err != nil {
+		t.Fatalf("mkdir config dir: %v", err)
+	}
+	cfg := `{
+	  "gateway": {"host": "127.0.0.1", "authToken": "token"},
+	  "channels": {
+	    "slack": {"enabled": true, "botToken": "", "inboundToken": "", "outboundUrl": ""},
+	    "msteams": {"enabled": true, "appId": "", "appPassword": "", "inboundToken": "", "outboundUrl": ""}
+	  }
+	}`
+	if err := os.WriteFile(filepath.Join(cfgDir, "config.json"), []byte(cfg), 0o600); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	origHome := os.Getenv("HOME")
+	defer os.Setenv("HOME", origHome)
+	_ = os.Setenv("HOME", tmpDir)
+
+	report, err := RunDoctor()
+	if err != nil {
+		t.Fatalf("run doctor: %v", err)
+	}
+	var slackWarn, teamsWarn bool
+	for _, c := range report.Checks {
+		if c.Name == "slack_account_default" && c.Status == DoctorWarn {
+			slackWarn = true
+		}
+		if c.Name == "msteams_account_default" && c.Status == DoctorWarn {
+			teamsWarn = true
+		}
+	}
+	if !slackWarn || !teamsWarn {
+		t.Fatalf("expected slack+teams account diagnostics warnings, got %#v", report.Checks)
+	}
+}

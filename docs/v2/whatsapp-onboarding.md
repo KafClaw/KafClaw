@@ -72,6 +72,12 @@ Once setup is verified and the buddy is approved:
 - **Denylist is permanent** — denied senders are blocked until explicitly removed.
 - **Token is one-time** — after a buddy is approved, the token is no longer needed for that sender.
 
+## Current capability note
+
+For channel parity status versus OpenClaw (what WhatsApp can do today in KafClaw, and what remains limited), see:
+
+- [WhatsApp Setup (Default Deny)](whatsapp-setup.md) -> **Parity snapshot (OpenClaw vs KafClaw)**
+
 ## CLI Quick Reference
 
 ```bash

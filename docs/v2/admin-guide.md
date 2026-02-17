@@ -95,6 +95,32 @@ WhatsApp-specific:
 | `DropUnauthorized` | `KAFCLAW_CHANNELS_WHATSAPP_DROP_UNAUTHORIZED` | `false` | Silently drop from unknown senders |
 | `IgnoreReactions` | `KAFCLAW_CHANNELS_WHATSAPP_IGNORE_REACTIONS` | `false` | Ignore reaction messages |
 
+Slack and Teams policy fields:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `dmPolicy` | `pairing|allowlist|open|disabled` | Access control for direct messages |
+| `groupPolicy` | `pairing|allowlist|open|disabled` | Access control for group/channel contexts |
+| `requireMention` | `bool` | Group messages require bot mention before processing |
+| `allowFrom` | `[]string` | Sender allowlist (prefix normalization: `slack:`, `msteams:`, `user:`) |
+| `groupAllowFrom` | `[]string` | Group target allowlist (`team:<id>/channel:<id>`, `<team>/<channel>`, `team:<id>`, `channel:<id>`) |
+| `sessionScope` | `channel|account|room|thread|user` | Session-isolation scope key strategy |
+| `accounts` | `[]account` | Per-account credentials/routing for provider multi-account setups |
+
+Slack and Teams routing fields:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `inboundToken` | `string` | Shared secret for bridge -> gateway inbound calls |
+| `outboundUrl` | `string` | Gateway -> bridge outbound endpoint |
+
+Operational notes:
+
+- Account isolation is enforced by scope keys that include provider/account dimensions in non-`channel` modes.
+- Default recommended scope for Slack/Teams is `room` to prevent cross-chat leakage.
+- For strict per-user isolation in shared rooms, use `user` scope.
+- Outbound requests may include `account_id` and `reply_mode` (`off|first|all`) for account-aware routing/thread strategy.
+
 ### Gateway Configuration
 
 | Field | Default | Env Var | Description |
@@ -266,6 +292,23 @@ Three-tier system stored in timeline DB:
 | `whatsapp_pending` | JIDs awaiting approval |
 
 Default-deny: empty allowlist means nobody is authorized. See [FR-001](../requirements/FR-001-whatsapp-auth-flow.md).
+
+### Slack and Teams access policy and isolation
+
+Slack and Teams use the same policy framework as WhatsApp, with added group semantics:
+
+- DM policy and group policy are evaluated independently.
+- Pairing mode blocks unknown senders until explicit `pairing approve`.
+- Group allowlist checks include sender and optional team/channel target constraints.
+- Mention gating can reduce accidental group processing when `GroupPolicy` is permissive.
+
+Isolation guarantees:
+
+- Session keys are namespaced by channel and can include account/chat/thread/sender based on `SessionScope`.
+- Cross-provider leakage is blocked by provider namespace in session keys.
+- Cross-account leakage is blocked when `SessionScope` is `account`, `room`, `thread`, or `user`.
+- Cross-room leakage is blocked when `SessionScope` is `room`, `thread`, or `user`.
+- Cross-thread leakage is blocked when `SessionScope` is `thread`.
 
 ---
 

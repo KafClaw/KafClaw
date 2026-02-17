@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/KafClaw/KafClaw/internal/channels"
 	"github.com/KafClaw/KafClaw/internal/config"
 )
 
@@ -236,6 +237,23 @@ func RunDoctorWithOptions(opts DoctorOptions) (DoctorReport, error) {
 			Name:    "orchestrator_endpoint_scope",
 			Status:  DoctorPass,
 			Message: "orchestrator.endpoint is empty or loopback",
+		})
+	}
+
+	for _, d := range channels.CollectChannelAccountDiagnostics(cfg) {
+		name := fmt.Sprintf("%s_account_%s", d.Channel, d.Account)
+		if len(d.Issues) == 0 {
+			report.Checks = append(report.Checks, DoctorCheck{
+				Name:    name,
+				Status:  DoctorPass,
+				Message: fmt.Sprintf("%s account %s configuration is consistent", d.Channel, d.Account),
+			})
+			continue
+		}
+		report.Checks = append(report.Checks, DoctorCheck{
+			Name:    name,
+			Status:  DoctorWarn,
+			Message: strings.Join(d.Issues, "; "),
 		})
 	}
 

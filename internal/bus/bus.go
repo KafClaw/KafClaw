@@ -11,6 +11,8 @@ import (
 const (
 	MetaKeyMessageType  = "message_type"
 	MetaKeyIsFromMe     = "is_from_me"
+	MetaKeySessionScope = "session_scope"
+	MetaKeyChannelAccount = "channel_account"
 	MessageTypeInternal = "internal"
 	MessageTypeExternal = "external"
 )
@@ -20,9 +22,12 @@ type InboundMessage struct {
 	Channel        string         `json:"channel"`
 	SenderID       string         `json:"sender_id"`
 	ChatID         string         `json:"chat_id"`
+	ThreadID       string         `json:"thread_id,omitempty"`
+	MessageID      string         `json:"message_id,omitempty"`
 	TraceID        string         `json:"trace_id"`
 	IdempotencyKey string         `json:"idempotency_key,omitempty"`
 	Content        string         `json:"content"`
+	Mentions       []string       `json:"mentions,omitempty"`
 	Media          []string       `json:"media,omitempty"`
 	Metadata       map[string]any `json:"metadata,omitempty"`
 	Timestamp      time.Time      `json:"timestamp"`
@@ -40,11 +45,19 @@ func (m *InboundMessage) MessageType() string {
 
 // OutboundMessage represents a message from the agent to a channel.
 type OutboundMessage struct {
-	Channel string `json:"channel"`
-	ChatID  string `json:"chat_id"`
-	TraceID string `json:"trace_id"`
-	TaskID  string `json:"task_id,omitempty"`
-	Content string `json:"content"`
+	Channel           string         `json:"channel"`
+	ChatID            string         `json:"chat_id"`
+	ThreadID          string         `json:"thread_id,omitempty"`
+	TraceID           string         `json:"trace_id"`
+	TaskID            string         `json:"task_id,omitempty"`
+	Content           string         `json:"content"`
+	MediaURLs         []string       `json:"media_urls,omitempty"`
+	Card              map[string]any `json:"card,omitempty"`
+	Action            string         `json:"action,omitempty"`
+	ActionParams      map[string]any `json:"action_params,omitempty"`
+	PollQuestion      string         `json:"poll_question,omitempty"`
+	PollOptions       []string       `json:"poll_options,omitempty"`
+	PollMaxSelections int            `json:"poll_max_selections,omitempty"`
 }
 
 // MessageBus decouples channels from the agent core.

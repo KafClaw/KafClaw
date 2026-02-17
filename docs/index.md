@@ -1,7 +1,7 @@
 # KafClaw Documentation
 
 <p align="center">
-  <img src="./assets/KafClaw.png" alt="KafClaw Logo" width="320" />
+  <img src="./assets/kafclaw.png" alt="KafClaw Logo" width="320" />
 </p>
 
 KafClaw is a Go-based agent runtime with three practical deployment modes:
@@ -17,6 +17,7 @@ KafClaw is a Go-based agent runtime with three practical deployment modes:
 
 ## Core References (v2)
 
+- [v2 Index](./v2/index.md)
 - [User Manual](./v2/user-manual.md)
 - [Operations Guide](./v2/operations-guide.md)
 - [Admin Guide](./v2/admin-guide.md)
@@ -36,5 +37,3 @@ KafClaw is a Go-based agent runtime with three practical deployment modes:
 
 - `docs/v2/` - primary product and operations docs
 - `docs/security/` - security audits and roadmap
-- `docs/bugs/` - bug records
-- `docs/tasklogs/` - implementation task logs

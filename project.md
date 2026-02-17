@@ -1,7 +1,3 @@
-# CLAUDE.md
-
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-
 ## Project Overview
 
 KafClaw (formerly KafClaw) is a personal AI assistant written in Go. The Go source lives in `kafclaw/`. Sensitive specs, tasks, research, and governance docs live in the `private/` directory (gitignored — tracked separately).
@@ -40,7 +36,7 @@ make release-patch            # or release-minor, release-major
 
 ```
 KafClaw/
-├── CLAUDE.md               ← this file
+├── project.md              ← this file
 ├── .github/workflows/      ← CI/CD (release.yml)
 ├── kafclaw/             ← Go source code
 │   ├── cmd/kafclaw/     ← CLI entry point (cobra commands)
@@ -143,7 +139,7 @@ All implementation tasks follow a **plan → implement → log** cycle:
 
 1. **Plan**: Create a task file in `private/v2/tasks/` using `TASK-xxx-short-description.md`. Include: Status, Priority, Objective, Steps, Verification, Acceptance Criteria.
 2. **Implement**: Set Status to `In Progress`, do the work.
-3. **Log**: When done, set Status to `Done` in the task file, then create a **public** tasklog entry in `docs/tasklogs/TASK-xxx-short-description.md` with: completion date, summary of what was done, insights/lessons learned, and relevant commit references.
+3. **Log**: When done, set Status to `Done` in the task file, then create a **public** tasklog entry in `docs/tasklogs/task-xxx-short-description.md` with: completion date, summary of what was done, insights/lessons learned, and relevant commit references.
 
 ### What goes where
 
