@@ -83,11 +83,9 @@ if [[ -z "$run_gateway_pct" ]]; then
   echo "ERROR: could not find runGateway coverage line" >&2
   exit 1
 fi
-# runGateway is a very large integration function with many network/provider branches.
-# We enforce a non-trivial floor to guarantee smoke tests execute core runtime paths.
-awk -v pct="$run_gateway_pct" 'BEGIN { if (pct+0 < 55.0) exit 1 }' || {
-  echo "ERROR: runGateway coverage is $run_gateway_pct%, expected >=55.0%" >&2
+if [[ "$run_gateway_pct" != "100.0" ]]; then
+  echo "ERROR: gateway critical function runGateway coverage is $run_gateway_pct%, expected 100.0%" >&2
   exit 1
-}
+fi
 
 echo "Critical coverage gate passed."
