@@ -2698,7 +2698,11 @@ func (b *bridge) downloadMedia(mediaURL string) ([]byte, string, error) {
 	if mediaURL == "" {
 		return nil, "", errors.New("empty media url")
 	}
-	req, err := http.NewRequest(http.MethodGet, mediaURL, nil)
+	parsed, err := validateMediaDownloadURL(mediaURL)
+	if err != nil {
+		return nil, "", err
+	}
+	req, err := http.NewRequest(http.MethodGet, parsed, nil)
 	if err != nil {
 		return nil, "", err
 	}
@@ -2719,6 +2723,46 @@ func (b *bridge) downloadMedia(mediaURL string) ([]byte, string, error) {
 		name = "upload.bin"
 	}
 	return data, name, nil
+}
+
+func validateMediaDownloadURL(raw string) (string, error) {
+	u, err := url.Parse(strings.TrimSpace(raw))
+	if err != nil {
+		return "", fmt.Errorf("invalid media url: %w", err)
+	}
+	if !strings.EqualFold(strings.TrimSpace(u.Scheme), "https") {
+		return "", errors.New("media url must use https")
+	}
+	host := strings.ToLower(strings.TrimSpace(u.Hostname()))
+	if host == "" {
+		return "", errors.New("media url host is missing")
+	}
+	if !isAllowedMediaHost(host) {
+		return "", fmt.Errorf("media url host not allowed: %s", host)
+	}
+	if strings.TrimSpace(u.User.String()) != "" {
+		return "", errors.New("media url user info is not allowed")
+	}
+	return u.String(), nil
+}
+
+func isAllowedMediaHost(host string) bool {
+	switch {
+	case host == "files.slack.com":
+		return true
+	case strings.HasSuffix(host, ".slack.com"):
+		return true
+	case strings.HasSuffix(host, ".microsoft.com"):
+		return true
+	case strings.HasSuffix(host, ".microsoftusercontent.com"):
+		return true
+	case strings.HasSuffix(host, ".teams.microsoft.com"):
+		return true
+	case strings.HasSuffix(host, ".sharepoint.com"):
+		return true
+	default:
+		return false
+	}
 }
 
 func jwkToRSAPublicKey(nB64, eB64 string) (*rsa.PublicKey, error) {

@@ -9,12 +9,12 @@ import (
 
 // Well-known metadata keys and message type constants.
 const (
-	MetaKeyMessageType  = "message_type"
-	MetaKeyIsFromMe     = "is_from_me"
-	MetaKeySessionScope = "session_scope"
+	MetaKeyMessageType    = "message_type"
+	MetaKeyIsFromMe       = "is_from_me"
+	MetaKeySessionScope   = "session_scope"
 	MetaKeyChannelAccount = "channel_account"
-	MessageTypeInternal = "internal"
-	MessageTypeExternal = "external"
+	MessageTypeInternal   = "internal"
+	MessageTypeExternal   = "external"
 )
 
 // InboundMessage represents a message from a channel to the agent.

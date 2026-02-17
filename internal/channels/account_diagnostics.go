@@ -27,7 +27,7 @@ func CollectChannelAccountDiagnostics(cfg *config.Config) []AccountDiagnostic {
 
 func slackAccountDiagnostic(cfg *config.Config) []AccountDiagnostic {
 	c := cfg.Channels.Slack
-	out := make([]AccountDiagnostic, 0, 1+len(c.Accounts))
+	out := make([]AccountDiagnostic, 0)
 	out = append(out, AccountDiagnostic{
 		Channel: "slack",
 		Account: "default",
@@ -50,7 +50,7 @@ func slackAccountDiagnostic(cfg *config.Config) []AccountDiagnostic {
 
 func teamsAccountDiagnostic(cfg *config.Config) []AccountDiagnostic {
 	c := cfg.Channels.MSTeams
-	out := make([]AccountDiagnostic, 0, 1+len(c.Accounts))
+	out := make([]AccountDiagnostic, 0)
 	out = append(out, AccountDiagnostic{
 		Channel: "msteams",
 		Account: "default",

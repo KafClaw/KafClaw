@@ -7,8 +7,8 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
-	"encoding/hex"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"math/big"
@@ -692,12 +692,19 @@ func TestSlackOutboundMediaUpload(t *testing.T) {
 	var uploaded int32
 	var mediaServed int32
 
+	mediaSrv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/media/file.txt" {
+			atomic.AddInt32(&mediaServed, 1)
+			_, _ = w.Write([]byte("hello media"))
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	defer mediaSrv.Close()
+
 	var slackAPI *httptest.Server
 	slackAPI = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
-		case "/media/file.txt":
-			atomic.AddInt32(&mediaServed, 1)
-			_, _ = w.Write([]byte("hello media"))
 		case "/files.uploadV2":
 			atomic.AddInt32(&uploaded, 1)
 			_ = r.ParseMultipartForm(2 << 20)
@@ -716,11 +723,27 @@ func TestSlackOutboundMediaUpload(t *testing.T) {
 	b := newTestBridge("http://example.invalid")
 	b.cfg.SlackAPIBase = slackAPI.URL
 	b.cfg.SlackBotToken = "xoxb-test"
+	mediaBase, err := url.Parse(mediaSrv.URL)
+	if err != nil {
+		t.Fatalf("parse media server url: %v", err)
+	}
+	baseTransport := mediaSrv.Client().Transport
+	b.client = &http.Client{
+		Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+			if strings.EqualFold(req.URL.Hostname(), "files.slack.com") {
+				clone := req.Clone(req.Context())
+				clone.URL.Scheme = mediaBase.Scheme
+				clone.URL.Host = mediaBase.Host
+				return baseTransport.RoundTrip(clone)
+			}
+			return http.DefaultTransport.RoundTrip(req)
+		}),
+	}
 
 	reqBody, _ := json.Marshal(map[string]any{
 		"chat_id":    "C123",
 		"content":    "caption",
-		"media_urls": []string{slackAPI.URL + "/media/file.txt"},
+		"media_urls": []string{"https://files.slack.com/media/file.txt"},
 	})
 	req := httptest.NewRequest(http.MethodPost, "/slack/outbound", bytes.NewReader(reqBody))
 	w := httptest.NewRecorder()
@@ -731,6 +754,12 @@ func TestSlackOutboundMediaUpload(t *testing.T) {
 	if atomic.LoadInt32(&mediaServed) != 1 || atomic.LoadInt32(&uploaded) != 1 {
 		t.Fatalf("expected media served=1 and uploaded=1, got %d/%d", mediaServed, uploaded)
 	}
+}
+
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return f(req)
 }
 
 func TestTeamsOutboundCardAndAttachment(t *testing.T) {
@@ -1540,6 +1569,37 @@ func TestRetryAndJWTUtilityHelpers(t *testing.T) {
 	roles, _ := diag["roles"].([]string)
 	if len(roles) != 1 || roles[0] != "Chat.Read" {
 		t.Fatalf("unexpected roles diagnostics: %#v", diag["roles"])
+	}
+}
+
+func TestValidateMediaDownloadURL(t *testing.T) {
+	tests := []struct {
+		name    string
+		raw     string
+		wantErr bool
+	}{
+		{name: "allow slack host", raw: "https://files.slack.com/path/file.bin"},
+		{name: "allow microsoft host", raw: "https://tenant.sharepoint.com/file"},
+		{name: "reject non-https", raw: "http://files.slack.com/path/file.bin", wantErr: true},
+		{name: "reject unknown host", raw: "https://example.com/file.bin", wantErr: true},
+		{name: "reject userinfo", raw: "https://user:pass@files.slack.com/file.bin", wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := validateMediaDownloadURL(tt.raw)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatalf("expected error for %q, got url=%q", tt.raw, got)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error for %q: %v", tt.raw, err)
+			}
+			if strings.TrimSpace(got) == "" {
+				t.Fatalf("expected normalized URL for %q", tt.raw)
+			}
+		})
 	}
 }
 
