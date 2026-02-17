@@ -14,6 +14,7 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/KafClaw/KafClaw/internal/approval"
@@ -88,7 +89,7 @@ type Loop struct {
 	workRepoGetter   func() string
 	model            string
 	maxIterations    int
-	running          bool
+	running          atomic.Bool
 	// activeTaskID tracks the current task being processed (for token accounting).
 	activeTaskID string
 	// activeSender tracks the sender of the current message (for policy checks).
@@ -202,11 +203,11 @@ func (l *Loop) registerDefaultTools() {
 
 // Run starts the agent loop, processing messages from the bus.
 func (l *Loop) Run(ctx context.Context) error {
-	l.running = true
+	l.running.Store(true)
 	slog.Info("Agent loop started")
 	l.startSubagentRetryWorker(ctx)
 
-	for l.running {
+	for l.running.Load() {
 		msg, err := l.bus.ConsumeInbound(ctx)
 		if err != nil {
 			if ctx.Err() != nil {
@@ -267,7 +268,7 @@ func (l *Loop) Run(ctx context.Context) error {
 
 // Stop signals the agent loop to stop.
 func (l *Loop) Stop() {
-	l.running = false
+	l.running.Store(false)
 }
 
 // ProcessDirect processes a message directly (for CLI usage).
