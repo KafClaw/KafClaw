@@ -221,6 +221,45 @@ func TestApplyModeAndPresetValidation(t *testing.T) {
 	}
 }
 
+func TestApplySubagentTuning(t *testing.T) {
+	cfg := config.DefaultConfig()
+	if err := RunProfileWizard(cfg, strings.NewReader(""), &bytes.Buffer{}, WizardParams{
+		Mode:             "local",
+		LLMPreset:        "skip",
+		SubMaxSpawnDepth: 3,
+		SubMaxChildren:   9,
+		SubMaxConcurrent: 4,
+		SubArchiveMins:   120,
+		SubAllowAgents:   "agent-a,agent-b,*",
+		SubModel:         "anthropic/test-model",
+		SubThinking:      "medium",
+		NonInteractive:   true,
+	}); err != nil {
+		t.Fatalf("run profile wizard: %v", err)
+	}
+	if cfg.Tools.Subagents.MaxSpawnDepth != 3 {
+		t.Fatalf("expected max spawn depth 3, got %d", cfg.Tools.Subagents.MaxSpawnDepth)
+	}
+	if cfg.Tools.Subagents.MaxChildrenPerAgent != 9 {
+		t.Fatalf("expected max children 9, got %d", cfg.Tools.Subagents.MaxChildrenPerAgent)
+	}
+	if cfg.Tools.Subagents.MaxConcurrent != 4 {
+		t.Fatalf("expected max concurrent 4, got %d", cfg.Tools.Subagents.MaxConcurrent)
+	}
+	if cfg.Tools.Subagents.ArchiveAfterMinutes != 120 {
+		t.Fatalf("expected archive mins 120, got %d", cfg.Tools.Subagents.ArchiveAfterMinutes)
+	}
+	if cfg.Tools.Subagents.Model != "anthropic/test-model" {
+		t.Fatalf("expected subagent model override, got %q", cfg.Tools.Subagents.Model)
+	}
+	if cfg.Tools.Subagents.Thinking != "medium" {
+		t.Fatalf("expected subagent thinking override, got %q", cfg.Tools.Subagents.Thinking)
+	}
+	if len(cfg.Tools.Subagents.AllowAgents) != 3 || cfg.Tools.Subagents.AllowAgents[0] != "agent-a" {
+		t.Fatalf("expected subagent allowAgents override, got %+v", cfg.Tools.Subagents.AllowAgents)
+	}
+}
+
 func TestErrorsIsEOF(t *testing.T) {
 	if !errorsIsEOF(io.EOF) {
 		t.Fatal("expected io.EOF recognized")

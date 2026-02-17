@@ -1,6 +1,8 @@
 package agent
 
 import (
+	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -105,5 +107,19 @@ func TestDeliveryBackoff(t *testing.T) {
 	maxDelay := 5*time.Minute + 1*time.Second
 	if next.After(before.Add(maxDelay)) {
 		t.Fatal("backoff should cap at 5min")
+	}
+}
+
+func TestDeliveryWorkerRunStopsOnContextCancel(t *testing.T) {
+	tl := newTestTimeline(t)
+	msgBus := bus.NewMessageBus()
+	worker := NewDeliveryWorker(tl, msgBus)
+	worker.interval = 10 * time.Millisecond
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	err := worker.Run(ctx)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("expected context canceled, got: %v", err)
 	}
 }

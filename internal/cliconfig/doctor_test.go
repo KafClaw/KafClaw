@@ -139,3 +139,35 @@ func TestDoctorFixMergesEnvFilesAndKeepsGatewayHost(t *testing.T) {
 		t.Fatalf("expected gateway host unchanged, got: %s", string(cfgAfter))
 	}
 }
+
+func TestDoctorGenerateGatewayToken(t *testing.T) {
+	tmpDir := t.TempDir()
+	cfgDir := filepath.Join(tmpDir, ".kafclaw")
+	if err := os.MkdirAll(cfgDir, 0o755); err != nil {
+		t.Fatalf("mkdir config dir: %v", err)
+	}
+	cfg := `{"gateway":{"host":"127.0.0.1","authToken":""}}`
+	if err := os.WriteFile(filepath.Join(cfgDir, "config.json"), []byte(cfg), 0o600); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	origHome := os.Getenv("HOME")
+	defer os.Setenv("HOME", origHome)
+	_ = os.Setenv("HOME", tmpDir)
+
+	report, err := RunDoctorWithOptions(DoctorOptions{GenerateGatewayToken: true})
+	if err != nil {
+		t.Fatalf("run doctor: %v", err)
+	}
+	if report.HasFailures() {
+		t.Fatalf("expected no failures, got %#v", report)
+	}
+
+	cfgAfter, err := os.ReadFile(filepath.Join(cfgDir, "config.json"))
+	if err != nil {
+		t.Fatalf("read config after token generation: %v", err)
+	}
+	if strings.Contains(string(cfgAfter), `"authToken": ""`) || strings.Contains(string(cfgAfter), `"authToken":""`) {
+		t.Fatalf("expected generated auth token, got: %s", string(cfgAfter))
+	}
+}

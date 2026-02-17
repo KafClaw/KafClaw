@@ -7,8 +7,10 @@ SOURCE_ENV := if [ -f "$$HOME/.bashrc" ]; then . "$$HOME/.bashrc"; elif [ -f "$$
 GO_MIN_VERSION := 1.24
 NODE_MIN_VERSION := 18
 NPM_MIN_VERSION := 9
+HOST_GOMODCACHE := $(shell go env GOMODCACHE)
+HOST_GOCACHE := $(shell go env GOCACHE)
 
-.PHONY: help check bootstrap build run rerun test test-classification install \
+.PHONY: help check bootstrap build run rerun test test-classification test-subagents-e2e install \
 	release release-major release-minor release-patch dist-go \
 	docker-build docker-up docker-down docker-logs \
 	run-standalone run-full run-headless \
@@ -103,6 +105,10 @@ test: ## Run all tests
 test-classification: ## Run internal/external message classification E2E test (verbose)
 	go test -v -run "TestInternalExternalClassificationE2E|TestMessageTypeAccessorDefaults|TestPolicyTierGatingByMessageType" ./internal/agent/
 
+test-subagents-e2e: ## Run subagent nested announce routing + deferred retry parity tests
+	mkdir -p .tmp/test-home
+	HOME=$$(pwd)/.tmp/test-home GOMODCACHE=$(HOST_GOMODCACHE) GOCACHE=$(HOST_GOCACHE) go test -v -run "TestLoopNestedAnnounceDeferredRetry_RoutesToRootRequester|TestLoopStartSubagentRetryWorker_Continuous|TestLoopStartSubagentRetryWorker_DeferredCleanupDelete" ./internal/agent/
+
 test-orchestrator: ## Run orchestrator tests (verbose)
 	go test -v ./internal/orchestrator/
 
@@ -131,11 +137,11 @@ run-full: build ## Mode 1: Full desktop — group + orchestrator enabled
 	./kafclaw gateway
 
 run-headless: build ## Mode 3: Headless — binds 0.0.0.0, auth token required
-	@if [ -z "$$MIKROBOT_GATEWAY_AUTH_TOKEN" ]; then \
+	@if [ -z "$$KAFCLAW_GATEWAY_AUTH_TOKEN" ] && [ -z "$$MIKROBOT_GATEWAY_AUTH_TOKEN" ]; then \
 		echo ""; \
-		echo "  Set MIKROBOT_GATEWAY_AUTH_TOKEN to secure the API:"; \
+		echo "  Set KAFCLAW_GATEWAY_AUTH_TOKEN to secure the API:"; \
 		echo ""; \
-		echo "    export MIKROBOT_GATEWAY_AUTH_TOKEN=mysecrettoken"; \
+		echo "    export KAFCLAW_GATEWAY_AUTH_TOKEN=mysecrettoken"; \
 		echo "    make run-headless"; \
 		echo ""; \
 		exit 1; \

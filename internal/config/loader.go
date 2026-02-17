@@ -11,6 +11,18 @@ import (
 	"github.com/kelseyhightower/envconfig"
 )
 
+type subagentFieldPresence struct {
+	MaxConcurrent       bool
+	MaxSpawnDepth       bool
+	MaxChildrenPerAgent bool
+	ArchiveAfterMinutes bool
+	AllowAgents         bool
+	Model               bool
+	Thinking            bool
+	ToolsAllow          bool
+	ToolsDeny           bool
+}
+
 const (
 	// ConfigDir is the default config directory name.
 	ConfigDir = ".kafclaw"
@@ -137,6 +149,7 @@ func migrateIfNeeded(data []byte, cfg *Config) bool {
 // file is rewritten in the new format.
 func Load() (*Config, error) {
 	cfg := DefaultConfig()
+	toolsPresence := subagentFieldPresence{}
 
 	// Load process env vars from ~/.config/kafclaw/env (and fallbacks) first.
 	LoadEnvFileCandidates()
@@ -149,11 +162,13 @@ func Load() (*Config, error) {
 
 	data, err := loadResolvedConfig(path)
 	if err == nil {
+		toolsPresence, _ = detectSubagentFieldPresence(data)
 		if err := json.Unmarshal(data, cfg); err != nil {
 			return nil, err
 		}
 		// Migrate old "agents.defaults" → new "paths" + "model" groups.
 		if migrateIfNeeded(data, cfg) {
+			cleanEmptyAgents(cfg)
 			// Persist the migrated config so the old layout is replaced.
 			if err := Save(cfg); err != nil {
 				fmt.Fprintf(os.Stderr, "config: auto-migration save failed: %v\n", err)
@@ -175,6 +190,18 @@ func Load() (*Config, error) {
 	envconfig.Process("MIKROBOT_GATEWAY", &cfg.Gateway)
 	envconfig.Process("MIKROBOT_TOOLS_EXEC", &cfg.Tools.Exec)
 	envconfig.Process("MIKROBOT_TOOLS_WEB_SEARCH", &cfg.Tools.Web.Search)
+	envconfig.Process("MIKROBOT_TOOLS_SUBAGENTS", &cfg.Tools.Subagents)
+	legacyAgentDefaults := SubagentsToolConfig{}
+	if cfg.Agents != nil {
+		legacyAgentDefaults = cfg.Agents.Defaults.Subagents
+	}
+	envconfig.Process("MIKROBOT_AGENTS_DEFAULTS_SUBAGENTS", &legacyAgentDefaults)
+	if !isZeroSubagentsToolConfig(legacyAgentDefaults) {
+		if cfg.Agents == nil {
+			cfg.Agents = &AgentsConfig{}
+		}
+		cfg.Agents.Defaults.Subagents = legacyAgentDefaults
+	}
 	envconfig.Process("MIKROBOT_GROUP", &cfg.Group)
 	envconfig.Process("MIKROBOT_ORCHESTRATOR", &cfg.Orchestrator)
 	envconfig.Process("MIKROBOT_SCHEDULER", &cfg.Scheduler)
@@ -190,6 +217,18 @@ func Load() (*Config, error) {
 	envconfig.Process("KAFCLAW_GATEWAY", &cfg.Gateway)
 	envconfig.Process("KAFCLAW_TOOLS_EXEC", &cfg.Tools.Exec)
 	envconfig.Process("KAFCLAW_TOOLS_WEB_SEARCH", &cfg.Tools.Web.Search)
+	envconfig.Process("KAFCLAW_TOOLS_SUBAGENTS", &cfg.Tools.Subagents)
+	agentDefaults := SubagentsToolConfig{}
+	if cfg.Agents != nil {
+		agentDefaults = cfg.Agents.Defaults.Subagents
+	}
+	envconfig.Process("KAFCLAW_AGENTS_DEFAULTS_SUBAGENTS", &agentDefaults)
+	if !isZeroSubagentsToolConfig(agentDefaults) {
+		if cfg.Agents == nil {
+			cfg.Agents = &AgentsConfig{}
+		}
+		cfg.Agents.Defaults.Subagents = agentDefaults
+	}
 	envconfig.Process("KAFCLAW_GROUP", &cfg.Group)
 	envconfig.Process("KAFCLAW_ORCHESTRATOR", &cfg.Orchestrator)
 	envconfig.Process("KAFCLAW_SCHEDULER", &cfg.Scheduler)
@@ -221,6 +260,25 @@ func Load() (*Config, error) {
 	expandHome(&cfg.Paths.WorkRepoPath)
 	expandHome(&cfg.Paths.SystemRepoPath)
 
+	mergeAgentsSubagentDefaults(cfg, toolsPresence)
+
+	if cfg.Tools.Subagents.MaxSpawnDepth <= 0 {
+		cfg.Tools.Subagents.MaxSpawnDepth = 1
+	}
+	if cfg.Tools.Subagents.MaxChildrenPerAgent <= 0 {
+		cfg.Tools.Subagents.MaxChildrenPerAgent = 5
+	}
+	if cfg.Tools.Subagents.MaxConcurrent <= 0 {
+		cfg.Tools.Subagents.MaxConcurrent = 8
+	}
+	if cfg.Tools.Subagents.ArchiveAfterMinutes <= 0 {
+		cfg.Tools.Subagents.ArchiveAfterMinutes = 60
+	}
+	if cfg.Agents != nil {
+		cfg.Agents.Defaults.Subagents = cfg.Tools.Subagents
+	}
+	cleanEmptyAgents(cfg)
+
 	// Resolve workspace path with backward compatibility:
 	// 1. Use ~/KafClaw-Workspace if it exists
 	// 2. Fall back to ~/KafClaw-Workspace if it exists (legacy)
@@ -240,6 +298,107 @@ func Load() (*Config, error) {
 	}
 
 	return cfg, nil
+}
+
+func mergeAgentsSubagentDefaults(cfg *Config, toolsPresence subagentFieldPresence) {
+	if cfg == nil || cfg.Agents == nil {
+		return
+	}
+	src := cfg.Agents.Defaults.Subagents
+	dst := &cfg.Tools.Subagents
+	def := DefaultConfig().Tools.Subagents
+	if !toolsPresence.MaxConcurrent && dst.MaxConcurrent == def.MaxConcurrent && src.MaxConcurrent > 0 {
+		dst.MaxConcurrent = src.MaxConcurrent
+	}
+	if !toolsPresence.MaxSpawnDepth && dst.MaxSpawnDepth == def.MaxSpawnDepth && src.MaxSpawnDepth > 0 {
+		dst.MaxSpawnDepth = src.MaxSpawnDepth
+	}
+	if !toolsPresence.MaxChildrenPerAgent && dst.MaxChildrenPerAgent == def.MaxChildrenPerAgent && src.MaxChildrenPerAgent > 0 {
+		dst.MaxChildrenPerAgent = src.MaxChildrenPerAgent
+	}
+	if !toolsPresence.ArchiveAfterMinutes && dst.ArchiveAfterMinutes == def.ArchiveAfterMinutes && src.ArchiveAfterMinutes > 0 {
+		dst.ArchiveAfterMinutes = src.ArchiveAfterMinutes
+	}
+	if !toolsPresence.Model && strings.TrimSpace(dst.Model) == "" && strings.TrimSpace(src.Model) != "" {
+		dst.Model = src.Model
+	}
+	if !toolsPresence.Thinking && strings.TrimSpace(dst.Thinking) == "" && strings.TrimSpace(src.Thinking) != "" {
+		dst.Thinking = src.Thinking
+	}
+	if !toolsPresence.AllowAgents && len(dst.AllowAgents) == 0 && len(src.AllowAgents) > 0 {
+		dst.AllowAgents = append([]string{}, src.AllowAgents...)
+	}
+	if !toolsPresence.ToolsAllow && len(dst.Tools.Allow) == 0 && len(src.Tools.Allow) > 0 {
+		dst.Tools.Allow = append([]string{}, src.Tools.Allow...)
+	}
+	if !toolsPresence.ToolsDeny && len(dst.Tools.Deny) == 0 && len(src.Tools.Deny) > 0 {
+		dst.Tools.Deny = append([]string{}, src.Tools.Deny...)
+	}
+}
+
+func isZeroSubagentsToolConfig(c SubagentsToolConfig) bool {
+	return c.MaxConcurrent == 0 &&
+		c.MaxSpawnDepth == 0 &&
+		c.MaxChildrenPerAgent == 0 &&
+		c.ArchiveAfterMinutes == 0 &&
+		strings.TrimSpace(c.Model) == "" &&
+		strings.TrimSpace(c.Thinking) == "" &&
+		len(c.AllowAgents) == 0 &&
+		len(c.Tools.Allow) == 0 &&
+		len(c.Tools.Deny) == 0
+}
+
+func cleanEmptyAgents(cfg *Config) {
+	if cfg == nil || cfg.Agents == nil {
+		return
+	}
+	if isZeroSubagentsToolConfig(cfg.Agents.Defaults.Subagents) {
+		cfg.Agents = nil
+	}
+}
+
+func detectSubagentFieldPresence(data []byte) (subagentFieldPresence, subagentFieldPresence) {
+	var outTools subagentFieldPresence
+	var outAgents subagentFieldPresence
+	var root map[string]any
+	if err := json.Unmarshal(data, &root); err != nil || root == nil {
+		return outTools, outAgents
+	}
+	outTools = readSubagentPresence(nestedMap(root, "tools", "subagents"))
+	outAgents = readSubagentPresence(nestedMap(root, "agents", "defaults", "subagents"))
+	return outTools, outAgents
+}
+
+func readSubagentPresence(node map[string]any) subagentFieldPresence {
+	p := subagentFieldPresence{}
+	if node == nil {
+		return p
+	}
+	_, p.MaxConcurrent = node["maxConcurrent"]
+	_, p.MaxSpawnDepth = node["maxSpawnDepth"]
+	_, p.MaxChildrenPerAgent = node["maxChildrenPerAgent"]
+	_, p.ArchiveAfterMinutes = node["archiveAfterMinutes"]
+	_, p.AllowAgents = node["allowAgents"]
+	_, p.Model = node["model"]
+	_, p.Thinking = node["thinking"]
+	toolsNode, _ := node["tools"].(map[string]any)
+	if toolsNode != nil {
+		_, p.ToolsAllow = toolsNode["allow"]
+		_, p.ToolsDeny = toolsNode["deny"]
+	}
+	return p
+}
+
+func nestedMap(root map[string]any, keys ...string) map[string]any {
+	cur := root
+	for _, k := range keys {
+		next, _ := cur[k].(map[string]any)
+		if next == nil {
+			return nil
+		}
+		cur = next
+	}
+	return cur
 }
 
 // Save writes the configuration to the config file.

@@ -103,6 +103,70 @@ This can create service user, install unit files, and write runtime env file.
 - Runtime env: `~/.config/kafclaw/env`
 - State DB: `~/.kafclaw/timeline.db`
 
+## 8. Subagents (Phase 2)
+
+KafClaw now supports sub-agent spawning through tools used by the agent loop:
+
+- `sessions_spawn`: spawn a background child run
+- `subagents`: list, kill, and steer child runs for the current parent session
+- `subagents(action=kill_all)`: stop all active child runs for the current parent session
+- `agents_list`: discover allowed `agentId` targets for `sessions_spawn`
+
+Steering behavior in v1:
+
+- `subagents(action=steer)` safely stops the target run (if still active)
+- then spawns a new child run with the steering input appended to the original task
+- control scope is root-session scoped (nested child sessions can manage sibling runs within the same root request)
+- target selectors for `kill`/`steer`: run ID, `last`, numeric index, label prefix, or child session key
+
+Timeout support:
+
+- `sessions_spawn` accepts `runTimeoutSeconds` to hard-stop long child runs
+- `sessions_spawn` also accepts `timeoutSeconds` as compatibility alias
+- `sessions_spawn(cleanup=delete)` deletes child session transcript after successful announce delivery
+
+Default safety limits:
+
+- `tools.subagents.maxSpawnDepth = 1` (no nested subagent-of-subagent by default)
+- `tools.subagents.maxChildrenPerAgent = 5` (max active children per parent session)
+- `tools.subagents.maxConcurrent = 8` (max active subagents globally)
+- `tools.subagents.archiveAfterMinutes = 60` (retention/cleanup default)
+
+Optional defaults for spawned children:
+
+- `tools.subagents.model` (pin a default child model)
+- `tools.subagents.thinking` (default thinking level tag)
+- `tools.subagents.tools.allow` / `tools.subagents.tools.deny` (child tool policy)
+
+Onboarding supports direct subagent tuning flags:
+
+```bash
+./kafclaw onboard --subagents-max-spawn-depth 2 --subagents-max-children 6 --subagents-max-concurrent 8 --subagents-allow-agents agent-main,agent-research --subagents-model anthropic/claude-sonnet-4-5 --subagents-thinking medium
+```
+
+Audit hardening:
+
+- spawn, kill, and steer operations are written as timeline `SYSTEM` events (`SUBAGENT` classification) when trace IDs are present
+- subagent run registry is persisted under `~/.kafclaw/subagents/` and restored after restart
+- completion announce messages are normalized to `Status/Result/Notes`; `ANNOUNCE_SKIP` suppresses the announce
+- announce delivery tracks retry/backoff state and retries deferred announcements after restart
+- announce target routing uses requester channel/chat first, then session-key fallback (`requester -> root -> parent -> active`)
+
+## 9. Configure (Post-Onboarding)
+
+Use guided configuration updates:
+
+```bash
+./kafclaw configure
+./kafclaw configure --subagents-allow-agents agent-main,agent-research --non-interactive
+```
+
+Clear allowlist (back to current-agent-only default):
+
+```bash
+./kafclaw configure --clear-subagents-allow-agents --non-interactive
+```
+
 ## Next
 
 - [Operations and Maintenance](./maintenance.md)

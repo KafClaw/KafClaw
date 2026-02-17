@@ -8,13 +8,15 @@ import (
 )
 
 var doctorFix bool
+var doctorGenerateGatewayToken bool
 
 var doctorCmd = &cobra.Command{
 	Use:   "doctor",
 	Short: "Run config and setup diagnostics",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		report, err := cliconfig.RunDoctorWithOptions(cliconfig.DoctorOptions{
-			Fix: doctorFix,
+			Fix:                  doctorFix,
+			GenerateGatewayToken: doctorGenerateGatewayToken,
 		})
 		if err != nil {
 			return err
@@ -42,5 +44,6 @@ var doctorCmd = &cobra.Command{
 
 func init() {
 	doctorCmd.Flags().BoolVar(&doctorFix, "fix", false, "Apply safe fixes (merge env files, enforce loopback gateway host)")
+	doctorCmd.Flags().BoolVar(&doctorGenerateGatewayToken, "generate-gateway-token", false, "Generate and persist a new gateway auth token")
 	rootCmd.AddCommand(doctorCmd)
 }

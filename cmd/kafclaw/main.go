@@ -1,4 +1,4 @@
-// Package main is the entry point for gonanobot CLI.
+// Package main is the entry point for the KafClaw CLI.
 package main
 
 import (

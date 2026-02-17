@@ -3,17 +3,22 @@ package agent
 
 import (
 	"context"
+	"crypto/sha1"
+	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/KafClaw/KafClaw/internal/approval"
 	"github.com/KafClaw/KafClaw/internal/bus"
+	"github.com/KafClaw/KafClaw/internal/config"
 	"github.com/KafClaw/KafClaw/internal/memory"
 	"github.com/KafClaw/KafClaw/internal/policy"
 	"github.com/KafClaw/KafClaw/internal/provider"
@@ -29,24 +34,36 @@ type GroupTracePublisher interface {
 	PublishAudit(ctx context.Context, eventType, traceID, detail string) error
 }
 
+var subagentRetryInterval = 8 * time.Second
+
 // LoopOptions contains configuration for the agent loop.
 type LoopOptions struct {
-	Bus              *bus.MessageBus
-	Provider         provider.LLMProvider
-	Timeline         *timeline.TimelineService
-	Policy           policy.Engine
-	MemoryService    *memory.MemoryService
-	AutoIndexer      *memory.AutoIndexer
-	ExpertiseTracker *memory.ExpertiseTracker
-	WorkingMemory    *memory.WorkingMemoryStore
-	Observer         *memory.Observer
-	GroupPublisher   GroupTracePublisher
-	Workspace        string
-	WorkRepo         string
-	SystemRepo       string
-	WorkRepoGetter   func() string
-	Model            string
-	MaxIterations    int
+	Bus                   *bus.MessageBus
+	Provider              provider.LLMProvider
+	Timeline              *timeline.TimelineService
+	Policy                policy.Engine
+	MemoryService         *memory.MemoryService
+	AutoIndexer           *memory.AutoIndexer
+	ExpertiseTracker      *memory.ExpertiseTracker
+	WorkingMemory         *memory.WorkingMemoryStore
+	Observer              *memory.Observer
+	GroupPublisher        GroupTracePublisher
+	Workspace             string
+	WorkRepo              string
+	SystemRepo            string
+	WorkRepoGetter        func() string
+	Model                 string
+	MaxIterations         int
+	MaxSubagentSpawnDepth int
+	MaxSubagentChildren   int
+	MaxSubagentConcurrent int
+	SubagentArchiveAfter  int
+	AgentID               string
+	SubagentAllowAgents   []string
+	SubagentModel         string
+	SubagentThinking      string
+	SubagentToolsAllow    []string
+	SubagentToolsDeny     []string
 }
 
 // Loop is the core agent processing engine.
@@ -80,6 +97,16 @@ type Loop struct {
 	activeChatID      string
 	activeTraceID     string
 	activeMessageType string
+	subagents         *subagentManager
+	agentID           string
+	subagentAllowList []string
+	subagentModel     string
+	subagentThinking  string
+	subagentTools     subagentToolPolicy
+	announceMu        sync.Mutex
+	announceSent      map[string]time.Time
+	retryWorkerMu     sync.Mutex
+	retryWorkerOn     bool
 }
 
 // NewLoop creates a new agent loop.
@@ -115,6 +142,33 @@ func NewLoop(opts LoopOptions) *Loop {
 		workRepoGetter:   opts.WorkRepoGetter,
 		model:            opts.Model,
 		maxIterations:    maxIter,
+		subagents: newSubagentManager(
+			SubagentLimits{
+				MaxSpawnDepth:       opts.MaxSubagentSpawnDepth,
+				MaxChildrenPerAgent: opts.MaxSubagentChildren,
+				MaxConcurrent:       opts.MaxSubagentConcurrent,
+			},
+			resolveSubagentStatePath(opts.Workspace),
+			opts.SubagentArchiveAfter,
+		),
+		agentID: strings.TrimSpace(opts.AgentID),
+		subagentAllowList: func() []string {
+			out := make([]string, 0, len(opts.SubagentAllowAgents))
+			for _, v := range opts.SubagentAllowAgents {
+				v = strings.TrimSpace(v)
+				if v != "" {
+					out = append(out, v)
+				}
+			}
+			return out
+		}(),
+		subagentModel:    strings.TrimSpace(opts.SubagentModel),
+		subagentThinking: strings.TrimSpace(opts.SubagentThinking),
+		subagentTools: subagentToolPolicy{
+			Allow: append([]string{}, opts.SubagentToolsAllow...),
+			Deny:  append([]string{}, opts.SubagentToolsDeny...),
+		},
+		announceSent: make(map[string]time.Time),
 	}
 
 	// Register default tools
@@ -140,12 +194,17 @@ func (l *Loop) registerDefaultTools() {
 		l.registry.Register(tools.NewRememberTool(l.memoryService))
 		l.registry.Register(tools.NewRecallTool(l.memoryService))
 	}
+
+	l.registry.Register(tools.NewSessionsSpawnTool(l.spawnSubagentFromTool))
+	l.registry.Register(tools.NewSubagentsTool(l.listSubagentsForTool, l.killSubagentForTool, l.steerSubagentForTool))
+	l.registry.Register(tools.NewAgentsListTool(l.listSubagentAgentsForTool))
 }
 
 // Run starts the agent loop, processing messages from the bus.
 func (l *Loop) Run(ctx context.Context) error {
 	l.running = true
 	slog.Info("Agent loop started")
+	l.startSubagentRetryWorker(ctx)
 
 	for l.running {
 		msg, err := l.bus.ConsumeInbound(ctx)
@@ -227,6 +286,17 @@ func (l *Loop) ProcessDirectWithTrace(ctx context.Context, content, sessionKey, 
 	if traceID == "" {
 		traceID = fmt.Sprintf("trace-%d", time.Now().UnixNano())
 	}
+	prevChannel := l.activeChannel
+	prevChatID := l.activeChatID
+	prevTrace := l.activeTraceID
+	l.activeChannel = channel
+	l.activeChatID = chatID
+	l.activeTraceID = traceID
+	defer func() {
+		l.activeChannel = prevChannel
+		l.activeChatID = prevChatID
+		l.activeTraceID = prevTrace
+	}()
 
 	// CLI direct calls are always internal (owner). Bus-routed messages
 	// have activeMessageType set by processMessage before calling here.
@@ -1436,4 +1506,820 @@ func (l *Loop) buildToolDefinitions() []provider.ToolDefinition {
 // SessionKey builds a session key from channel and chat ID.
 func SessionKey(channel, chatID string) string {
 	return strings.Join([]string{channel, chatID}, ":")
+}
+
+func (l *Loop) currentSessionKey() string {
+	channel := strings.TrimSpace(l.activeChannel)
+	chatID := strings.TrimSpace(l.activeChatID)
+	if channel == "" || chatID == "" {
+		return "cli:default"
+	}
+	return SessionKey(channel, chatID)
+}
+
+func (l *Loop) subagentPolicy() policy.Engine {
+	return &subagentPolicy{
+		base:      l.policy,
+		session:   l.currentSessionKey(),
+		manager:   l.subagents,
+		allowList: append([]string{}, l.subagentTools.Allow...),
+		denyList:  append([]string{}, l.subagentTools.Deny...),
+	}
+}
+
+func (l *Loop) spawnSubagentFromTool(ctx context.Context, req tools.SpawnRequest) (tools.SpawnResult, error) {
+	parentSession := l.currentSessionKey()
+	depth, err := l.subagents.canSpawn(parentSession)
+	if err != nil {
+		return tools.SpawnResult{}, err
+	}
+	targetAgentID, err := l.resolveRequestedSubagentAgentID(req.AgentID)
+	if err != nil {
+		return tools.SpawnResult{}, err
+	}
+
+	childModel := strings.TrimSpace(req.Model)
+	if childModel == "" {
+		childModel = l.subagentModel
+	}
+	if childModel == "" {
+		childModel = l.model
+	}
+	childThinking := strings.TrimSpace(req.Thinking)
+	if childThinking == "" {
+		childThinking = l.subagentThinking
+	}
+
+	var (
+		childCtx context.Context
+		cancel   context.CancelFunc
+	)
+	timeoutSeconds := req.RunTimeoutSeconds
+	if timeoutSeconds <= 0 && req.TimeoutSeconds > 0 {
+		timeoutSeconds = req.TimeoutSeconds
+	}
+	if timeoutSeconds > 0 {
+		childCtx, cancel = context.WithTimeout(context.Background(), time.Duration(timeoutSeconds)*time.Second)
+	} else {
+		childCtx, cancel = context.WithCancel(context.Background())
+	}
+	run := l.subagents.register(
+		parentSession,
+		parentSession,
+		parentChannelOrDefault(l.activeChannel),
+		strings.TrimSpace(l.activeChatID),
+		strings.TrimSpace(l.activeTraceID),
+		req.Task,
+		req.Label,
+		childModel,
+		childThinking,
+		targetAgentID,
+		req.Cleanup,
+		depth,
+		cancel,
+	)
+	parentChannel := l.activeChannel
+	parentChatID := l.activeChatID
+	parentTraceID := l.activeTraceID
+
+	childTrace := parentTraceID
+	if childTrace == "" {
+		childTrace = fmt.Sprintf("subagent-%d", time.Now().UnixNano())
+	}
+	childTrace = fmt.Sprintf("%s:%s", childTrace, run.RunID)
+
+	go func(runID, childSessionKey, task, selectedModel, thinking string) {
+		l.subagents.markRunning(runID)
+
+		childLoop := NewLoop(LoopOptions{
+			Provider:              l.provider,
+			Timeline:              l.timeline,
+			Policy:                l.subagentPolicy(),
+			MemoryService:         l.memoryService,
+			AutoIndexer:           l.autoIndexer,
+			ExpertiseTracker:      l.expertiseTracker,
+			WorkingMemory:         l.workingMemory,
+			Observer:              l.observer,
+			GroupPublisher:        l.groupPublisher,
+			Workspace:             l.workspace,
+			WorkRepo:              l.workRepo,
+			SystemRepo:            l.systemRepo,
+			WorkRepoGetter:        l.workRepoGetter,
+			Model:                 selectedModel,
+			MaxIterations:         l.maxIterations,
+			MaxSubagentSpawnDepth: l.subagents.limits.MaxSpawnDepth,
+			MaxSubagentChildren:   l.subagents.limits.MaxChildrenPerAgent,
+			MaxSubagentConcurrent: l.subagents.limits.MaxConcurrent,
+			SubagentModel:         l.subagentModel,
+			SubagentThinking:      l.subagentThinking,
+			SubagentToolsAllow:    append([]string{}, l.subagentTools.Allow...),
+			SubagentToolsDeny:     append([]string{}, l.subagentTools.Deny...),
+		})
+
+		response, runErr := childLoop.ProcessDirectWithTrace(childCtx, task, childSessionKey, childTrace)
+		status := "completed"
+		if runErr != nil {
+			if errors.Is(runErr, context.DeadlineExceeded) || errors.Is(childCtx.Err(), context.DeadlineExceeded) {
+				status = "timeout"
+			} else if childCtx.Err() != nil {
+				status = "killed"
+			} else {
+				status = "failed"
+			}
+		}
+		announceOutput := strings.TrimSpace(response)
+		if runErr != nil && strings.TrimSpace(runErr.Error()) != "" {
+			announceOutput = strings.TrimSpace(runErr.Error())
+		}
+		l.subagents.markCompletionOutput(runID, truncateStr(announceOutput, 1200))
+		l.subagents.markFinished(runID, status, runErr)
+
+		if persisted, ok := l.subagents.getRun(runID); ok {
+			_ = l.publishSubagentAnnounceWithRetry(
+				context.Background(),
+				persisted,
+				status,
+				response,
+				runErr,
+				parentChannel,
+				parentChatID,
+				parentTraceID,
+			)
+		}
+	}(run.RunID, run.ChildSessionKey, req.Task, childModel, childThinking)
+
+	l.addSubagentAuditEvent("spawn_accepted", map[string]any{
+		"run_id":            run.RunID,
+		"parent_session":    run.ParentSession,
+		"child_session_key": run.ChildSessionKey,
+		"agent_id":          run.AgentID,
+		"label":             run.Label,
+		"depth":             run.Depth,
+		"model":             childModel,
+		"thinking":          childThinking,
+		"cleanup":           req.Cleanup,
+	})
+
+	return tools.SpawnResult{
+		Status:          "accepted",
+		RunID:           run.RunID,
+		ChildSessionKey: run.ChildSessionKey,
+		Message:         fmt.Sprintf("subagent run accepted (model=%s)", childModel),
+	}, nil
+}
+
+func resolveSubagentStatePath(workspace string) string {
+	ws := strings.TrimSpace(workspace)
+	if ws != "" {
+		sum := sha1.Sum([]byte(ws))
+		suffix := hex.EncodeToString(sum[:6])
+		if home, err := os.UserHomeDir(); err == nil {
+			home = strings.TrimSpace(home)
+			if home != "" {
+				return filepath.Join(home, ".kafclaw", "subagents", fmt.Sprintf("runs-%s.json", suffix))
+			}
+		}
+		return filepath.Join(ws, ".kafclaw", "subagents", "runs.json")
+	}
+	if home, err := os.UserHomeDir(); err == nil {
+		home = strings.TrimSpace(home)
+		if home != "" {
+			return filepath.Join(home, ".kafclaw", "subagents", "runs.json")
+		}
+	}
+	return ""
+}
+
+func (l *Loop) listSubagentsForTool() []tools.SubagentRunView {
+	parentSession := l.currentSessionKey()
+	runs := l.subagents.listByController(parentSession)
+	out := make([]tools.SubagentRunView, 0, len(runs))
+	for _, run := range runs {
+		out = append(out, tools.SubagentRunView{
+			RunID:           run.RunID,
+			ParentSession:   run.ParentSession,
+			RootSession:     run.RootSession,
+			RequestedBy:     run.RequestedBy,
+			ChildSessionKey: run.ChildSessionKey,
+			AgentID:         run.AgentID,
+			Task:            run.Task,
+			Label:           run.Label,
+			Model:           run.Model,
+			Thinking:        run.Thinking,
+			Cleanup:         run.Cleanup,
+			Status:          run.Status,
+			Depth:           run.Depth,
+			CreatedAt:       run.CreatedAt,
+			StartedAt:       run.StartedAt,
+			EndedAt:         run.EndedAt,
+			Error:           run.Error,
+		})
+	}
+	return out
+}
+
+func (l *Loop) listSubagentAgentsForTool() tools.AgentDiscovery {
+	current := strings.TrimSpace(l.agentID)
+	if current == "" {
+		current = "default"
+	}
+	allowRaw := append([]string{}, l.subagentAllowList...)
+	allow := make([]string, 0, len(allowRaw))
+	seen := map[string]struct{}{}
+	wildcard := false
+	for _, v := range allowRaw {
+		v = strings.TrimSpace(v)
+		if v == "" {
+			continue
+		}
+		if v == "*" {
+			wildcard = true
+		}
+		if _, ok := seen[v]; ok {
+			continue
+		}
+		seen[v] = struct{}{}
+		allow = append(allow, v)
+	}
+	effective := make([]string, 0, len(allow)+1)
+	if len(allow) == 0 {
+		effective = append(effective, current)
+	} else {
+		for _, v := range allow {
+			if v == "*" {
+				continue
+			}
+			effective = append(effective, v)
+		}
+	}
+	if len(effective) == 0 && wildcard {
+		effective = append(effective, current)
+	}
+	configuredNames := map[string]string{}
+	configuredSet := map[string]struct{}{}
+	if cfg, err := config.Load(); err == nil && cfg != nil && cfg.Agents != nil {
+		for _, entry := range cfg.Agents.List {
+			id := strings.TrimSpace(entry.ID)
+			if id == "" {
+				continue
+			}
+			configuredSet[id] = struct{}{}
+			name := strings.TrimSpace(entry.Name)
+			if name != "" {
+				configuredNames[id] = name
+			}
+		}
+	}
+	agents := make([]tools.AgentDiscoveryEntry, 0, len(effective))
+	for _, id := range effective {
+		_, configured := configuredSet[id]
+		if !configured {
+			configured = id == current
+		}
+		agents = append(agents, tools.AgentDiscoveryEntry{
+			ID:         id,
+			Name:       configuredNames[id],
+			Configured: configured,
+		})
+	}
+	return tools.AgentDiscovery{
+		CurrentAgentID:   current,
+		AllowAgents:      allow,
+		EffectiveTargets: effective,
+		Wildcard:         wildcard,
+		Agents:           agents,
+	}
+}
+
+type subagentAnnounceFields struct {
+	Status string
+	Result string
+	Notes  string
+}
+
+func (l *Loop) buildSubagentAnnounce(ctx context.Context, run *subagentRun, status, response string, runErr error) (string, bool) {
+	runID := ""
+	label := ""
+	model := ""
+	thinking := ""
+	agentID := ""
+	if run != nil {
+		runID = strings.TrimSpace(run.RunID)
+		label = strings.TrimSpace(run.Label)
+		model = strings.TrimSpace(run.Model)
+		thinking = strings.TrimSpace(run.Thinking)
+		agentID = strings.TrimSpace(run.AgentID)
+	}
+	result := strings.TrimSpace(response)
+	if runErr != nil {
+		result = fmt.Sprintf("Error: %s", strings.TrimSpace(runErr.Error()))
+	}
+	if result == "" && run != nil {
+		result = strings.TrimSpace(run.CompletionOutput)
+	}
+	if result == "" {
+		result = "No additional details."
+	}
+	notesParts := make([]string, 0, 4)
+	if label != "" {
+		notesParts = append(notesParts, "label="+label)
+	}
+	if model != "" {
+		notesParts = append(notesParts, "model="+model)
+	}
+	if thinking != "" {
+		notesParts = append(notesParts, "thinking="+thinking)
+	}
+	if agentID != "" {
+		notesParts = append(notesParts, "agent="+agentID)
+	}
+	fallback := subagentAnnounceFields{
+		Status: strings.ToLower(strings.TrimSpace(status)),
+		Result: truncateStr(result, 1000),
+		Notes:  strings.Join(notesParts, ", "),
+	}
+	normalized, skip := l.normalizeSubagentAnnounceWithRetry(ctx, fallback.Result, fallback)
+	if skip {
+		return "", true
+	}
+	if normalized.Status == "" {
+		normalized.Status = fallback.Status
+	}
+	if normalized.Result == "" {
+		normalized.Result = fallback.Result
+	}
+	if normalized.Notes == "" {
+		normalized.Notes = fallback.Notes
+	}
+	header := "[subagent]"
+	if runID != "" {
+		header = fmt.Sprintf("[subagent %s]", runID)
+	}
+	return fmt.Sprintf("%s\nStatus: %s\nResult: %s\nNotes: %s", header, normalized.Status, normalized.Result, normalized.Notes), false
+}
+
+func (l *Loop) normalizeSubagentAnnounceWithRetry(ctx context.Context, candidate string, fallback subagentAnnounceFields) (subagentAnnounceFields, bool) {
+	normalized, skip, complete := normalizeSubagentAnnounceText(candidate, fallback)
+	if skip {
+		return normalized, true
+	}
+	if complete || l.provider == nil {
+		return normalized, false
+	}
+	attempts := 3
+	baseDelay := 120 * time.Millisecond
+	for attempt := 0; attempt < attempts; attempt++ {
+		reqCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
+		resp, err := l.provider.Chat(reqCtx, &provider.ChatRequest{
+			Model:       l.model,
+			MaxTokens:   220,
+			Temperature: 0.1,
+			Messages: []provider.Message{
+				{
+					Role:    "system",
+					Content: "Normalize subagent completion text into exactly three lines: Status: <status>, Result: <summary>, Notes: <notes>. Return ANNOUNCE_SKIP to suppress the announce.",
+				},
+				{
+					Role:    "user",
+					Content: candidate,
+				},
+			},
+		})
+		cancel()
+		if err == nil && resp != nil {
+			parsed, parsedSkip, parsedComplete := normalizeSubagentAnnounceText(resp.Content, fallback)
+			if parsedSkip {
+				return parsed, true
+			}
+			if parsedComplete {
+				return parsed, false
+			}
+		}
+		if attempt == attempts-1 {
+			break
+		}
+		time.Sleep(baseDelay * time.Duration(1<<attempt))
+	}
+	return fallback, false
+}
+
+func normalizeSubagentAnnounceText(raw string, fallback subagentAnnounceFields) (subagentAnnounceFields, bool, bool) {
+	trimmed := strings.TrimSpace(raw)
+	if strings.EqualFold(trimmed, "ANNOUNCE_SKIP") {
+		return subagentAnnounceFields{}, true, true
+	}
+	out := fallback
+	if trimmed == "" {
+		return out, false, false
+	}
+	var (
+		gotStatus bool
+		gotResult bool
+		gotNotes  bool
+	)
+	for _, line := range strings.Split(trimmed, "\n") {
+		part := strings.TrimSpace(line)
+		if part == "" {
+			continue
+		}
+		lower := strings.ToLower(part)
+		switch {
+		case strings.HasPrefix(lower, "status:"):
+			out.Status = strings.TrimSpace(part[len("status:"):])
+			gotStatus = true
+		case strings.HasPrefix(lower, "result:"):
+			out.Result = strings.TrimSpace(part[len("result:"):])
+			gotResult = true
+		case strings.HasPrefix(lower, "notes:"):
+			out.Notes = strings.TrimSpace(part[len("notes:"):])
+			gotNotes = true
+		}
+	}
+	if !gotResult {
+		out.Result = truncateStr(trimmed, 1000)
+	}
+	return out, false, gotStatus && gotResult && gotNotes
+}
+
+func parentChannelOrDefault(v string) string {
+	v = strings.TrimSpace(v)
+	if v == "" {
+		return "cli"
+	}
+	return v
+}
+
+func splitSessionKey(sessionKey string) (string, string, bool) {
+	sessionKey = strings.TrimSpace(sessionKey)
+	if sessionKey == "" {
+		return "", "", false
+	}
+	parts := strings.SplitN(sessionKey, ":", 2)
+	if len(parts) != 2 {
+		return "", "", false
+	}
+	channel := strings.TrimSpace(parts[0])
+	chatID := strings.TrimSpace(parts[1])
+	if channel == "" || chatID == "" {
+		return "", "", false
+	}
+	return channel, chatID, true
+}
+
+func (l *Loop) resolveSubagentAnnounceRoute(run *subagentRun, defaultChannel, defaultChatID, defaultTrace string) (channel, chatID, traceID string, ok bool) {
+	if run == nil {
+		return "", "", "", false
+	}
+	channel = strings.TrimSpace(run.RequesterChan)
+	chatID = strings.TrimSpace(run.RequesterChatID)
+	traceID = strings.TrimSpace(run.RequesterTrace)
+	if traceID == "" {
+		traceID = strings.TrimSpace(defaultTrace)
+	}
+	if traceID == "" {
+		traceID = strings.TrimSpace(l.activeTraceID)
+	}
+	if channel != "" && chatID != "" {
+		return channel, chatID, traceID, true
+	}
+
+	defChannel := strings.TrimSpace(defaultChannel)
+	defChatID := strings.TrimSpace(defaultChatID)
+	if defChannel != "" && defChatID != "" {
+		return defChannel, defChatID, traceID, true
+	}
+
+	candidates := []string{
+		run.RequestedBy,
+		run.RootSession,
+		run.ParentSession,
+		l.currentSessionKey(),
+		"cli:default",
+	}
+	for _, key := range candidates {
+		c, ch, parsed := splitSessionKey(key)
+		if !parsed {
+			continue
+		}
+		return c, ch, traceID, true
+	}
+	return "", "", traceID, false
+}
+
+func (l *Loop) publishSubagentAnnounceWithRetry(
+	ctx context.Context,
+	run *subagentRun,
+	status, response string,
+	runErr error,
+	defaultChannel, defaultChatID, defaultTrace string,
+) bool {
+	if run == nil {
+		return false
+	}
+	announceID := strings.TrimSpace(run.AnnounceID)
+	if announceID == "" {
+		announceID = buildSubagentAnnounceID(run.ChildSessionKey, run.RunID)
+	}
+	if run.AnnouncedAt != nil {
+		return true
+	}
+	l.announceMu.Lock()
+	if sentAt, exists := l.announceSent[announceID]; exists && time.Since(sentAt) < 24*time.Hour {
+		l.announceMu.Unlock()
+		l.subagents.markAnnounceAttempt(run.RunID, true)
+		return true
+	}
+	l.announceMu.Unlock()
+
+	channel, chatID, traceID, routeOK := l.resolveSubagentAnnounceRoute(run, defaultChannel, defaultChatID, defaultTrace)
+	if l.bus == nil || !routeOK {
+		l.subagents.markAnnounceAttempt(run.RunID, false)
+		return false
+	}
+	announceContent, skip := l.buildSubagentAnnounce(ctx, run, status, response, runErr)
+	if skip {
+		l.subagents.markAnnounceAttempt(run.RunID, true)
+		if run.Cleanup == "delete" {
+			_ = l.sessions.Delete(run.ChildSessionKey)
+		}
+		return true
+	}
+	backoff := 150 * time.Millisecond
+	for attempt := 0; attempt < 3; attempt++ {
+		delivered := true
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					delivered = false
+				}
+			}()
+			l.bus.PublishOutbound(&bus.OutboundMessage{
+				Channel: channel,
+				ChatID:  chatID,
+				TraceID: traceID,
+				TaskID:  announceID,
+				Content: announceContent,
+			})
+		}()
+		if delivered {
+			l.subagents.markAnnounceAttempt(run.RunID, true)
+			l.announceMu.Lock()
+			l.announceSent[announceID] = time.Now()
+			l.announceMu.Unlock()
+			if run.Cleanup == "delete" {
+				_ = l.sessions.Delete(run.ChildSessionKey)
+			}
+			return true
+		}
+		time.Sleep(backoff)
+		backoff *= 2
+	}
+	l.subagents.markAnnounceAttempt(run.RunID, false)
+	return false
+}
+
+func (l *Loop) retryPendingSubagentAnnounces() {
+	if l.subagents == nil {
+		return
+	}
+	pending := l.subagents.pendingAnnounceRuns(25)
+	for _, run := range pending {
+		_ = l.publishSubagentAnnounceWithRetry(
+			context.Background(),
+			&run,
+			run.Status,
+			run.CompletionOutput,
+			nil,
+			run.RequesterChan,
+			run.RequesterChatID,
+			run.RequesterTrace,
+		)
+	}
+}
+
+func (l *Loop) startSubagentRetryWorker(ctx context.Context) {
+	if l.bus == nil || l.subagents == nil {
+		return
+	}
+	l.retryWorkerMu.Lock()
+	if l.retryWorkerOn {
+		l.retryWorkerMu.Unlock()
+		return
+	}
+	l.retryWorkerOn = true
+	l.retryWorkerMu.Unlock()
+
+	go func() {
+		ticker := time.NewTicker(subagentRetryInterval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				l.retryWorkerMu.Lock()
+				l.retryWorkerOn = false
+				l.retryWorkerMu.Unlock()
+				return
+			case <-ticker.C:
+				l.retryPendingSubagentAnnounces()
+			}
+		}
+	}()
+}
+
+func (l *Loop) resolveRequestedSubagentAgentID(requested string) (string, error) {
+	current := strings.TrimSpace(l.agentID)
+	if current == "" {
+		current = "default"
+	}
+	target := strings.TrimSpace(requested)
+	if target == "" {
+		target = current
+	}
+	allow := l.subagentAllowList
+	if len(allow) == 0 {
+		if target != current {
+			return "", fmt.Errorf("agentId %q is not allowed (default allows only current agent %q)", target, current)
+		}
+		return target, nil
+	}
+	if containsAllowAgent(allow, target) {
+		return target, nil
+	}
+	return "", fmt.Errorf("agentId %q is not allowed by tools.subagents.allowAgents", target)
+}
+
+func containsAllowAgent(allow []string, target string) bool {
+	for _, v := range allow {
+		v = strings.TrimSpace(v)
+		if v == "" {
+			continue
+		}
+		if v == "*" || v == target {
+			return true
+		}
+	}
+	return false
+}
+
+func (l *Loop) killSubagentForTool(runID string) (bool, error) {
+	parentSession := l.currentSessionKey()
+	target := strings.TrimSpace(runID)
+	killed, err := l.subagents.killByRunID(parentSession, target)
+	if err != nil {
+		return false, err
+	}
+	l.addSubagentAuditEvent("kill", map[string]any{
+		"run_id":         target,
+		"parent_session": parentSession,
+		"killed":         killed,
+	})
+	return killed, nil
+}
+
+func (l *Loop) steerSubagentForTool(runID, input string) (tools.SpawnResult, error) {
+	parentSession := l.currentSessionKey()
+	target := strings.TrimSpace(runID)
+	steerInput := strings.TrimSpace(input)
+	if target == "" {
+		return tools.SpawnResult{}, fmt.Errorf("target run id is required")
+	}
+	if steerInput == "" {
+		return tools.SpawnResult{}, fmt.Errorf("steer input is required")
+	}
+
+	targetRun, err := l.subagents.getByRunID(parentSession, target)
+	if err != nil {
+		return tools.SpawnResult{}, err
+	}
+
+	if _, killErr := l.killSubagentForTool(target); killErr != nil {
+		return tools.SpawnResult{}, killErr
+	}
+
+	task := fmt.Sprintf("%s\n\n[STEER]\n%s", targetRun.Task, steerInput)
+	label := strings.TrimSpace(targetRun.Label)
+	if label == "" {
+		label = "steered"
+	}
+	res, spawnErr := l.spawnSubagentFromTool(context.Background(), tools.SpawnRequest{
+		Task:     task,
+		Label:    fmt.Sprintf("%s-steer", label),
+		Model:    targetRun.Model,
+		Thinking: targetRun.Thinking,
+		Cleanup:  targetRun.Cleanup,
+	})
+	if spawnErr != nil {
+		return tools.SpawnResult{}, spawnErr
+	}
+	l.addSubagentAuditEvent("steer", map[string]any{
+		"target_run_id":   target,
+		"new_run_id":      res.RunID,
+		"parent_session":  parentSession,
+		"steer_input_len": len(steerInput),
+	})
+	res.Message = fmt.Sprintf("steered from %s", target)
+	return res, nil
+}
+
+func (l *Loop) addSubagentAuditEvent(action string, details map[string]any) {
+	if l.timeline == nil || l.activeTraceID == "" {
+		return
+	}
+	meta, _ := json.Marshal(details)
+	_ = l.timeline.AddEvent(&timeline.TimelineEvent{
+		EventID:        fmt.Sprintf("SUBAGENT_%s_%d", action, time.Now().UnixNano()),
+		TraceID:        l.activeTraceID,
+		Timestamp:      time.Now(),
+		SenderID:       "AGENT",
+		SenderName:     "SubagentController",
+		EventType:      "SYSTEM",
+		ContentText:    fmt.Sprintf("subagent %s", action),
+		Classification: "SUBAGENT",
+		Authorized:     true,
+		Metadata:       string(meta),
+	})
+}
+
+type subagentPolicy struct {
+	base      policy.Engine
+	session   string
+	manager   *subagentManager
+	allowList []string
+	denyList  []string
+}
+
+type subagentToolPolicy struct {
+	Allow []string
+	Deny  []string
+}
+
+func (p *subagentPolicy) Evaluate(ctx policy.Context) policy.Decision {
+	if toolDeniedByPolicy(ctx.Tool, p.denyList, p.allowList) {
+		return policy.Decision{
+			Allow:   false,
+			Reason:  "subagent_tool_denied_by_policy",
+			Tier:    ctx.Tier,
+			Ts:      time.Now(),
+			TraceID: ctx.TraceID,
+		}
+	}
+
+	if ctx.Tool == "sessions_spawn" && p.manager != nil {
+		depth := p.manager.currentDepth(p.session)
+		if depth >= p.manager.limits.MaxSpawnDepth {
+			return policy.Decision{
+				Allow:   false,
+				Reason:  "subagent_spawn_depth_limit",
+				Tier:    ctx.Tier,
+				Ts:      time.Now(),
+				TraceID: ctx.TraceID,
+			}
+		}
+	}
+
+	if p.base != nil {
+		return p.base.Evaluate(ctx)
+	}
+	return policy.Decision{
+		Allow:   true,
+		Reason:  "no_policy_engine",
+		Tier:    ctx.Tier,
+		Ts:      time.Now(),
+		TraceID: ctx.TraceID,
+	}
+}
+
+func toolDeniedByPolicy(tool string, deny, allow []string) bool {
+	name := strings.TrimSpace(tool)
+	if name == "" {
+		return false
+	}
+	for _, pattern := range deny {
+		if matchToolPattern(name, strings.TrimSpace(pattern)) {
+			return true
+		}
+	}
+	if len(allow) == 0 {
+		return false
+	}
+	for _, pattern := range allow {
+		if matchToolPattern(name, strings.TrimSpace(pattern)) {
+			return false
+		}
+	}
+	return true
+}
+
+func matchToolPattern(name, pattern string) bool {
+	if pattern == "" {
+		return false
+	}
+	if pattern == "*" || pattern == name {
+		return true
+	}
+	if strings.HasSuffix(pattern, "*") {
+		prefix := strings.TrimSuffix(pattern, "*")
+		return strings.HasPrefix(name, prefix)
+	}
+	return false
 }

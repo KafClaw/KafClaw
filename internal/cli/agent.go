@@ -58,18 +58,28 @@ func runAgent(cmd *cobra.Command, args []string) {
 
 	// Check API Key
 	if cfg.Providers.OpenAI.APIKey == "" {
-		fmt.Println("Error: API key not found. Set MIKROBOT_OPENAI_API_KEY, OPENROUTER_API_KEY, or use config.json")
+		fmt.Println("Error: API key not found. Set KAFCLAW_OPENAI_API_KEY / OPENROUTER_API_KEY (legacy: MIKROBOT_OPENAI_API_KEY) or use config.json")
 		os.Exit(1)
 	}
 
 	loop := agent.NewLoop(agent.LoopOptions{
-		Bus:           msgBus,
-		Provider:      prov,
-		Workspace:     cfg.Paths.Workspace,
-		WorkRepo:      cfg.Paths.WorkRepoPath,
-		SystemRepo:    cfg.Paths.SystemRepoPath,
-		Model:         cfg.Model.Name,
-		MaxIterations: cfg.Model.MaxToolIterations,
+		Bus:                   msgBus,
+		Provider:              prov,
+		Workspace:             cfg.Paths.Workspace,
+		WorkRepo:              cfg.Paths.WorkRepoPath,
+		SystemRepo:            cfg.Paths.SystemRepoPath,
+		Model:                 cfg.Model.Name,
+		MaxIterations:         cfg.Model.MaxToolIterations,
+		MaxSubagentSpawnDepth: cfg.Tools.Subagents.MaxSpawnDepth,
+		MaxSubagentChildren:   cfg.Tools.Subagents.MaxChildrenPerAgent,
+		MaxSubagentConcurrent: cfg.Tools.Subagents.MaxConcurrent,
+		SubagentArchiveAfter:  cfg.Tools.Subagents.ArchiveAfterMinutes,
+		AgentID:               cfg.Group.AgentID,
+		SubagentAllowAgents:   cfg.Tools.Subagents.AllowAgents,
+		SubagentModel:         cfg.Tools.Subagents.Model,
+		SubagentThinking:      cfg.Tools.Subagents.Thinking,
+		SubagentToolsAllow:    cfg.Tools.Subagents.Tools.Allow,
+		SubagentToolsDeny:     cfg.Tools.Subagents.Tools.Deny,
 	})
 
 	fmt.Printf("🤖 KafClaw (%s)\n", cfg.Model.Name)

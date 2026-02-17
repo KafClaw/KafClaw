@@ -154,7 +154,7 @@ By default, KafClaw binds to `127.0.0.1` — only reachable from the local machi
 To make the gateway accessible from other machines on your LAN (e.g., Jetson Nano serving a home network):
 
 ```bash
-export MIKROBOT_GATEWAY_AUTH_TOKEN=mysecrettoken
+export KAFCLAW_GATEWAY_AUTH_TOKEN=mysecrettoken
 make run-headless
 ```
 
@@ -167,13 +167,13 @@ http://<server-ip>:18790/chat      # API
 
 **Common pitfalls:**
 - **Wrong protocol:** The gateway serves plain `http://`. Using `https://` in the browser will fail silently unless TLS is configured (`tlsCert`/`tlsKey` in gateway config).
-- **Still binding localhost:** If the startup log shows `http://127.0.0.1:18791`, the gateway is not network-accessible. Check that `MIKROBOT_GATEWAY_HOST=0.0.0.0` is set.
+- **Still binding localhost:** If the startup log shows `http://127.0.0.1:18791`, the gateway is not network-accessible. Check that `KAFCLAW_GATEWAY_HOST=0.0.0.0` is set.
 - **Firewall:** Ensure ports 18790 and 18791 are open on the server's firewall.
 
 To bind to a specific IP instead of all interfaces:
 
 ```bash
-MIKROBOT_GATEWAY_HOST=192.168.0.199 make run
+KAFCLAW_GATEWAY_HOST=192.168.0.199 make run
 ```
 
 Or set permanently in `~/.kafclaw/config.json`:

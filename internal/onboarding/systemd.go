@@ -152,6 +152,7 @@ func renderSystemUnit(opts SetupOptions, home string) string {
 		fmt.Sprintf("ExecStart=%s gateway --port %d", escapedExec, opts.Port),
 		"Restart=always",
 		"RestartSec=5",
+		"Environment=KAFCLAW_GATEWAY_AUTH_TOKEN=",
 		"Environment=MIKROBOT_GATEWAY_AUTH_TOKEN=",
 		"EnvironmentFile=-" + filepath.Join(home, ".config", "kafclaw", "env"),
 		"WorkingDirectory=" + home,
@@ -178,6 +179,7 @@ func renderEnvFile(home string) string {
 	return strings.Join([]string{
 		"# KafClaw runtime environment",
 		"# Loaded via systemd EnvironmentFile",
+		"KAFCLAW_GATEWAY_AUTH_TOKEN=",
 		"MIKROBOT_GATEWAY_AUTH_TOKEN=",
 		"KAFCLAW_CONFIG=" + filepath.Join(home, ".kafclaw", "config.json"),
 		"KAFCLAW_HOME=" + home,

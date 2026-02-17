@@ -3,6 +3,17 @@
 [![CodeQL](https://github.com/KafClaw/KafClaw/actions/workflows/235168059/badge.svg)](https://github.com/KafClaw/KafClaw/actions/workflows/235168059)
 [![Release](https://github.com/KafClaw/KafClaw/actions/workflows/release.yml/badge.svg)](https://github.com/KafClaw/KafClaw/actions/workflows/release.yml)
 
+KafClaw is backed by [Scalytics](https://www.scalytics.io). We do not create, operate, or endorse any crypto tokens. If you see token-based fundraising using the KafClaw name, it is not affiliated with this project.
+
+## Platform Suite
+
+KafClaw is part of a broader infrastructure stack:
+
+- **KafScale**: Kafka-compatible + S3-compatible platform for event transport and large artifact flows.  
+  [kafscale.io](https://kafscale.io) • [github.com/kafscale](https://github.com/kafscale)
+- **GitClaw**: agent-first self-hosted Git platform for repository workflows and automation.
+- **KafClaw**: agent runtime and coordination layer (local, Kafka-connected, and remote gateway modes).
+
 **Enterprise-grade multi-agent collaboration over Apache Kafka.**
 
 KafClaw is an agent coordination framework built in Go. It connects autonomous AI agents through Kafka-based messaging, giving them group collaboration, hierarchical orchestration, shared memory, and distributed skill routing — without coupling them to any single LLM provider, runtime, or deployment model.
@@ -139,7 +150,7 @@ cd KafClaw
 make run-standalone    # No Kafka, no orchestrator
 make run               # Default gateway
 make run-full          # Group + orchestrator enabled
-make run-headless      # Server mode (requires MIKROBOT_GATEWAY_AUTH_TOKEN)
+make run-headless      # Server mode (requires KAFCLAW_GATEWAY_AUTH_TOKEN)
 ```
 
 ---
@@ -176,12 +187,12 @@ Loaded in order: environment variables > `~/.kafclaw/config.json` > defaults.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `MIKROBOT_GROUP_ENABLED` | `false` | Enable Kafka group collaboration |
-| `MIKROBOT_ORCHESTRATOR_ENABLED` | `false` | Enable hierarchical orchestration |
-| `MIKROBOT_ORCHESTRATOR_ROLE` | `worker` | Agent role: `orchestrator`, `worker`, `observer` |
-| `MIKROBOT_KAFKA_BROKERS` | `localhost:9092` | Kafka broker addresses |
-| `MIKROBOT_GATEWAY_HOST` | `127.0.0.1` | API bind address |
-| `MIKROBOT_GATEWAY_AUTH_TOKEN` | *(empty)* | Bearer token for headless mode |
+| `KAFCLAW_GROUP_ENABLED` | `false` | Enable Kafka group collaboration (legacy: `MIKROBOT_GROUP_ENABLED`) |
+| `KAFCLAW_ORCHESTRATOR_ENABLED` | `false` | Enable hierarchical orchestration (legacy: `MIKROBOT_ORCHESTRATOR_ENABLED`) |
+| `KAFCLAW_ORCHESTRATOR_ROLE` | `worker` | Agent role: `orchestrator`, `worker`, `observer` (legacy: `MIKROBOT_ORCHESTRATOR_ROLE`) |
+| `KAFCLAW_GROUP_KAFKA_BROKERS` | `localhost:9092` | Kafka broker addresses (legacy: `MIKROBOT_KAFKA_BROKERS`) |
+| `KAFCLAW_GATEWAY_HOST` | `127.0.0.1` | API bind address (legacy: `MIKROBOT_GATEWAY_HOST`) |
+| `KAFCLAW_GATEWAY_AUTH_TOKEN` | *(empty)* | Bearer token for headless mode (legacy: `MIKROBOT_GATEWAY_AUTH_TOKEN`) |
 
 Gateway ports: **18790** (API), **18791** (dashboard).
 

@@ -112,6 +112,7 @@ Once the gateway is running:
 > See also: [FR-003 CLI Runtime Modes](../requirements/FR-003-cli-runtime-modes.md)
 
 KafClaw provides the following CLI commands. Run `kafclaw --help` for the full list.
+Core startup commands: `onboard`, `doctor`, `status`, `gateway`, `agent`, `config`.
 
 ### 3.1 `gateway`
 
@@ -145,7 +146,24 @@ Initialize configuration.
 ```bash
 kafclaw onboard
 kafclaw onboard --force   # reset to defaults
+kafclaw onboard --non-interactive --profile local --llm skip
+kafclaw onboard --non-interactive --profile remote --llm openai-compatible --llm-api-base http://localhost:11434/v1 --llm-model llama3.1:8b
 ```
+
+Common onboarding profiles:
+- `local`
+- `local-kafka`
+- `remote`
+
+Useful onboarding flags:
+- `--systemd` to install service/override/env (Linux)
+- `--subagents-max-spawn-depth`, `--subagents-max-children`, `--subagents-max-concurrent`
+- `--subagents-archive-minutes`, `--subagents-model`, `--subagents-thinking`
+
+Subagent runtime notes:
+- `sessions_spawn` accepts `runTimeoutSeconds` for per-run hard timeout
+- `subagents` supports selectors (`last`, numeric index, runId prefix, label prefix, child session key)
+- `subagents(action=kill_all)` stops all active children for the current parent session
 
 ### 3.4 `status`
 
@@ -163,7 +181,44 @@ Install binary to `/usr/local/bin`.
 kafclaw install
 ```
 
-### 3.6 `whatsapp-setup`
+### 3.6 `doctor`
+
+Run diagnostics for config, env, and runtime safety defaults.
+
+```bash
+kafclaw doctor
+kafclaw doctor --fix
+kafclaw doctor --generate-gateway-token
+```
+
+### 3.7 `config`
+
+Read and update config values from CLI.
+
+```bash
+kafclaw config get gateway.host
+kafclaw config set gateway.host 127.0.0.1
+```
+
+### 3.8 `configure`
+
+Guided config updates (higher-level than raw key/value `config set`).
+
+```bash
+kafclaw configure
+kafclaw configure --subagents-allow-agents agent-main,agent-research --non-interactive
+kafclaw configure --clear-subagents-allow-agents --non-interactive
+```
+
+### 3.9 `kshark`
+
+Kafka diagnostics helper.
+
+```bash
+kafclaw kshark --broker localhost:9092 --test-connection
+```
+
+### 3.10 `whatsapp-setup`
 
 Interactive WhatsApp configuration wizard.
 
@@ -173,7 +228,7 @@ kafclaw whatsapp-setup
 
 Prompts for: enable, pairing token, allowlist, denylist.
 
-### 3.7 `whatsapp-auth`
+### 3.11 `whatsapp-auth`
 
 Manage WhatsApp JID authorization.
 
@@ -183,7 +238,7 @@ kafclaw whatsapp-auth --approve "+1234567890@s.whatsapp.net"
 kafclaw whatsapp-auth --deny "+0987654321@s.whatsapp.net"
 ```
 
-### 3.8 `group`
+### 3.12 `group`
 
 Group collaboration management (requires Kafka).
 

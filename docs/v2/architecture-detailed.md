@@ -576,7 +576,7 @@ Destructive deletion, VCS deletion, disk destruction, device redirection, permis
 |------|---------|-------------|
 | Standalone | `make run` | Local binary, no Kafka, localhost only (binds 127.0.0.1) |
 | Full | `make run-full` | + Kafka + orchestrator (binds 127.0.0.1) |
-| Headless | `make run-headless` | Binds 0.0.0.0, requires `MIKROBOT_GATEWAY_AUTH_TOKEN` |
+| Headless | `make run-headless` | Binds 0.0.0.0, requires `KAFCLAW_GATEWAY_AUTH_TOKEN` |
 | Remote | `make electron-start-remote` | Electron UI connects to headless server |
 | Docker | `make docker-up` | Container deployment |
 
@@ -587,7 +587,7 @@ By default, KafClaw binds to `127.0.0.1` (localhost only) — this is intentiona
 To expose the gateway on your LAN (e.g., running on a Jetson Nano, accessing from a laptop):
 
 ```bash
-export MIKROBOT_GATEWAY_AUTH_TOKEN=mysecrettoken
+export KAFCLAW_GATEWAY_AUTH_TOKEN=mysecrettoken
 make run-headless    # binds 0.0.0.0, requires auth token
 ```
 
@@ -596,8 +596,8 @@ Then access from another machine: `http://<server-ip>:18791/` (note: **http**, n
 You can also bind to a specific LAN IP or override the host manually:
 
 ```bash
-MIKROBOT_GATEWAY_HOST=0.0.0.0 make run           # expose any mode
-MIKROBOT_GATEWAY_HOST=192.168.0.199 make run      # bind to specific IP
+KAFCLAW_GATEWAY_HOST=0.0.0.0 make run           # expose any mode
+KAFCLAW_GATEWAY_HOST=192.168.0.199 make run      # bind to specific IP
 ```
 
 ---

@@ -2,6 +2,8 @@ package cliconfig
 
 import (
 	"bufio"
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"net"
 	"net/url"
@@ -32,7 +34,8 @@ type DoctorReport struct {
 }
 
 type DoctorOptions struct {
-	Fix bool
+	Fix                  bool
+	GenerateGatewayToken bool
 }
 
 type RuntimeMode string
@@ -123,6 +126,32 @@ func RunDoctorWithOptions(opts DoctorOptions) (DoctorReport, error) {
 		Message: "config loaded successfully",
 	})
 
+	if opts.GenerateGatewayToken {
+		token, genErr := randomToken()
+		if genErr != nil {
+			report.Checks = append(report.Checks, DoctorCheck{
+				Name:    "gateway_token",
+				Status:  DoctorFail,
+				Message: fmt.Sprintf("failed to generate token: %v", genErr),
+			})
+		} else {
+			cfg.Gateway.AuthToken = token
+			if saveErr := config.Save(cfg); saveErr != nil {
+				report.Checks = append(report.Checks, DoctorCheck{
+					Name:    "gateway_token",
+					Status:  DoctorFail,
+					Message: fmt.Sprintf("generated token but failed to save config: %v", saveErr),
+				})
+			} else {
+				report.Checks = append(report.Checks, DoctorCheck{
+					Name:    "gateway_token",
+					Status:  DoctorPass,
+					Message: "generated and saved gateway auth token",
+				})
+			}
+		}
+	}
+
 	if cfg.Paths.Workspace == "" {
 		report.Checks = append(report.Checks, DoctorCheck{
 			Name:    "workspace_path",
@@ -185,7 +214,7 @@ func RunDoctorWithOptions(opts DoctorOptions) (DoctorReport, error) {
 			report.Checks = append(report.Checks, DoctorCheck{
 				Name:    "remote_auth_token",
 				Status:  DoctorFail,
-				Message: "remote gateway requires gateway.authToken (or MIKROBOT_GATEWAY_AUTH_TOKEN)",
+				Message: "remote gateway requires gateway.authToken (or KAFCLAW_GATEWAY_AUTH_TOKEN / legacy MIKROBOT_GATEWAY_AUTH_TOKEN)",
 			})
 		} else {
 			report.Checks = append(report.Checks, DoctorCheck{
@@ -324,6 +353,14 @@ func trimEnvQuotes(v string) string {
 
 func errorsIsNotExist(err error) bool {
 	return os.IsNotExist(err)
+}
+
+func randomToken() (string, error) {
+	buf := make([]byte, 32)
+	if _, err := rand.Read(buf); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(buf), nil
 }
 
 func isLoopbackHost(host string) bool {

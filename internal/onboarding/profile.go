@@ -29,18 +29,25 @@ const (
 )
 
 type WizardParams struct {
-	Mode           string
-	Profile        string
-	LLMPreset      string
-	LLMToken       string
-	LLMAPIBase     string
-	LLMModel       string
-	KafkaBrokers   string
-	GroupName      string
-	AgentID        string
-	Role           string
-	RemoteAuth     string
-	NonInteractive bool
+	Mode             string
+	Profile          string
+	LLMPreset        string
+	LLMToken         string
+	LLMAPIBase       string
+	LLMModel         string
+	KafkaBrokers     string
+	GroupName        string
+	AgentID          string
+	Role             string
+	RemoteAuth       string
+	SubMaxSpawnDepth int
+	SubMaxChildren   int
+	SubMaxConcurrent int
+	SubArchiveMins   int
+	SubModel         string
+	SubThinking      string
+	SubAllowAgents   string
+	NonInteractive   bool
 }
 
 func RunProfileWizard(cfg *config.Config, in io.Reader, out io.Writer, p WizardParams) error {
@@ -53,6 +60,7 @@ func RunProfileWizard(cfg *config.Config, in io.Reader, out io.Writer, p WizardP
 	if err := applyMode(cfg, mode, p); err != nil {
 		return err
 	}
+	applySubagentTuning(cfg, p)
 
 	preset, err := resolveLLMPreset(reader, out, p)
 	if err != nil {
@@ -62,6 +70,30 @@ func RunProfileWizard(cfg *config.Config, in io.Reader, out io.Writer, p WizardP
 		return err
 	}
 	return nil
+}
+
+func applySubagentTuning(cfg *config.Config, p WizardParams) {
+	if p.SubMaxSpawnDepth > 0 {
+		cfg.Tools.Subagents.MaxSpawnDepth = p.SubMaxSpawnDepth
+	}
+	if p.SubMaxChildren > 0 {
+		cfg.Tools.Subagents.MaxChildrenPerAgent = p.SubMaxChildren
+	}
+	if p.SubMaxConcurrent > 0 {
+		cfg.Tools.Subagents.MaxConcurrent = p.SubMaxConcurrent
+	}
+	if p.SubArchiveMins > 0 {
+		cfg.Tools.Subagents.ArchiveAfterMinutes = p.SubArchiveMins
+	}
+	if strings.TrimSpace(p.SubModel) != "" {
+		cfg.Tools.Subagents.Model = strings.TrimSpace(p.SubModel)
+	}
+	if strings.TrimSpace(p.SubThinking) != "" {
+		cfg.Tools.Subagents.Thinking = strings.TrimSpace(p.SubThinking)
+	}
+	if strings.TrimSpace(p.SubAllowAgents) != "" {
+		cfg.Tools.Subagents.AllowAgents = parseCSV(p.SubAllowAgents)
+	}
 }
 
 func resolveMode(reader *bufio.Reader, out io.Writer, p WizardParams) (RuntimeMode, error) {
@@ -303,8 +335,33 @@ func BuildProfileSummary(cfg *config.Config) string {
 		fmt.Sprintf("- llm.model: %s", firstNonEmpty(strings.TrimSpace(cfg.Model.Name), "(empty)")),
 		fmt.Sprintf("- llm.apiBase: %s", llmBase),
 		fmt.Sprintf("- llm.apiKey: %s", tokenState),
+		fmt.Sprintf("- subagents.maxSpawnDepth: %d", cfg.Tools.Subagents.MaxSpawnDepth),
+		fmt.Sprintf("- subagents.maxChildrenPerAgent: %d", cfg.Tools.Subagents.MaxChildrenPerAgent),
+		fmt.Sprintf("- subagents.maxConcurrent: %d", cfg.Tools.Subagents.MaxConcurrent),
+		fmt.Sprintf("- subagents.archiveAfterMinutes: %d", cfg.Tools.Subagents.ArchiveAfterMinutes),
+		fmt.Sprintf("- subagents.allowAgents: %s", firstNonEmpty(strings.Join(cfg.Tools.Subagents.AllowAgents, ","), "(current agent only)")),
+		fmt.Sprintf("- subagents.model: %s", firstNonEmpty(strings.TrimSpace(cfg.Tools.Subagents.Model), "(inherit main model)")),
+		fmt.Sprintf("- subagents.thinking: %s", firstNonEmpty(strings.TrimSpace(cfg.Tools.Subagents.Thinking), "(inherit/default)")),
 		"",
 	}, "\n")
+}
+
+func parseCSV(raw string) []string {
+	parts := strings.Split(raw, ",")
+	out := make([]string, 0, len(parts))
+	seen := make(map[string]struct{})
+	for _, part := range parts {
+		v := strings.TrimSpace(part)
+		if v == "" {
+			continue
+		}
+		if _, ok := seen[v]; ok {
+			continue
+		}
+		seen[v] = struct{}{}
+		out = append(out, v)
+	}
+	return out
 }
 
 func ConfirmApply(reader *bufio.Reader, out io.Writer) (bool, error) {

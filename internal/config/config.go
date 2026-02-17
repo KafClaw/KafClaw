@@ -8,6 +8,7 @@ import "time"
 type Config struct {
 	Paths        PathsConfig          `json:"paths"`
 	Model        ModelConfig          `json:"model"`
+	Agents       *AgentsConfig        `json:"agents,omitempty"`
 	Channels     ChannelsConfig       `json:"channels"`
 	Providers    ProvidersConfig      `json:"providers"`
 	Gateway      GatewayConfig        `json:"gateway"`
@@ -150,8 +151,27 @@ type OrchestratorConfig struct {
 
 // ToolsConfig contains tool-specific settings.
 type ToolsConfig struct {
-	Exec ExecToolConfig `json:"exec"`
-	Web  WebToolConfig  `json:"web"`
+	Exec      ExecToolConfig      `json:"exec"`
+	Web       WebToolConfig       `json:"web"`
+	Subagents SubagentsToolConfig `json:"subagents"`
+}
+
+// AgentsConfig mirrors OpenClaw-style defaults block for future compatibility.
+type AgentsConfig struct {
+	Defaults AgentDefaultsConfig `json:"defaults"`
+	List     []AgentListEntry    `json:"list,omitempty"`
+}
+
+// AgentDefaultsConfig contains default agent-level settings.
+type AgentDefaultsConfig struct {
+	Subagents SubagentsToolConfig `json:"subagents"`
+}
+
+// AgentListEntry describes a configured agent identity.
+type AgentListEntry struct {
+	ID      string `json:"id"`
+	Name    string `json:"name,omitempty"`
+	Default bool   `json:"default,omitempty"`
 }
 
 // ---------------------------------------------------------------------------
@@ -200,6 +220,23 @@ type WebToolConfig struct {
 type SearchConfig struct {
 	APIKey     string `json:"apiKey" envconfig:"BRAVE_API_KEY"`
 	MaxResults int    `json:"maxResults"`
+}
+
+// SubagentsToolConfig contains limits for spawned child agent sessions.
+type SubagentsToolConfig struct {
+	MaxConcurrent       int                `json:"maxConcurrent" envconfig:"MAX_CONCURRENT"`
+	MaxSpawnDepth       int                `json:"maxSpawnDepth" envconfig:"MAX_SPAWN_DEPTH"`
+	MaxChildrenPerAgent int                `json:"maxChildrenPerAgent" envconfig:"MAX_CHILDREN_PER_AGENT"`
+	ArchiveAfterMinutes int                `json:"archiveAfterMinutes" envconfig:"ARCHIVE_AFTER_MINUTES"`
+	AllowAgents         []string           `json:"allowAgents" envconfig:"ALLOW_AGENTS"`
+	Model               string             `json:"model" envconfig:"MODEL"`
+	Thinking            string             `json:"thinking" envconfig:"THINKING"`
+	Tools               SubagentToolPolicy `json:"tools"`
+}
+
+type SubagentToolPolicy struct {
+	Allow []string `json:"allow"`
+	Deny  []string `json:"deny"`
 }
 
 // ---------------------------------------------------------------------------
@@ -261,6 +298,12 @@ func DefaultConfig() *Config {
 				Search: SearchConfig{
 					MaxResults: 10,
 				},
+			},
+			Subagents: SubagentsToolConfig{
+				MaxConcurrent:       8,
+				MaxSpawnDepth:       1,
+				MaxChildrenPerAgent: 5,
+				ArchiveAfterMinutes: 60,
 			},
 		},
 		Group: GroupConfig{

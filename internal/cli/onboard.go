@@ -35,6 +35,13 @@ var onboardGroupName string
 var onboardAgentID string
 var onboardRole string
 var onboardRemoteAuth string
+var onboardSubMaxSpawnDepth int
+var onboardSubMaxChildren int
+var onboardSubMaxConcurrent int
+var onboardSubArchiveMins int
+var onboardSubModel string
+var onboardSubThinking string
+var onboardSubAllowAgents string
 var onboardNonInteractive bool
 
 func init() {
@@ -51,6 +58,13 @@ func init() {
 	onboardCmd.Flags().StringVar(&onboardAgentID, "agent-id", "", "Agent ID for local-kafka mode")
 	onboardCmd.Flags().StringVar(&onboardRole, "role", "", "Orchestrator role for local-kafka mode")
 	onboardCmd.Flags().StringVar(&onboardRemoteAuth, "remote-auth-token", "", "Gateway auth token for remote mode")
+	onboardCmd.Flags().IntVar(&onboardSubMaxSpawnDepth, "subagents-max-spawn-depth", 0, "Override subagent max spawn depth")
+	onboardCmd.Flags().IntVar(&onboardSubMaxChildren, "subagents-max-children", 0, "Override max active children per parent session")
+	onboardCmd.Flags().IntVar(&onboardSubMaxConcurrent, "subagents-max-concurrent", 0, "Override max active subagents globally")
+	onboardCmd.Flags().IntVar(&onboardSubArchiveMins, "subagents-archive-minutes", 0, "Override subagent archive-after minutes")
+	onboardCmd.Flags().StringVar(&onboardSubAllowAgents, "subagents-allow-agents", "", "Comma-separated agent IDs allowed for sessions_spawn agentId (use '*' for any)")
+	onboardCmd.Flags().StringVar(&onboardSubModel, "subagents-model", "", "Default model for spawned subagents")
+	onboardCmd.Flags().StringVar(&onboardSubThinking, "subagents-thinking", "", "Default thinking level for spawned subagents")
 	onboardCmd.Flags().BoolVar(&onboardSystemd, "systemd", false, "Install systemd service + override + env file (Linux)")
 	onboardCmd.Flags().StringVar(&onboardServiceUser, "service-user", "kafclaw", "Service user for systemd setup")
 	onboardCmd.Flags().StringVar(&onboardServiceBinary, "service-binary", "/usr/local/bin/kafclaw", "kafclaw binary path for systemd ExecStart")
@@ -90,18 +104,25 @@ func runOnboard(cmd *cobra.Command, args []string) {
 
 	// 2.1 Guided mode/provider onboarding
 	if err := onboarding.RunProfileWizard(cfg, cmd.InOrStdin(), cmd.OutOrStdout(), onboarding.WizardParams{
-		Profile:        onboardProfile,
-		Mode:           onboardMode,
-		LLMPreset:      onboardLLMPreset,
-		LLMToken:       onboardLLMToken,
-		LLMAPIBase:     onboardLLMAPIBase,
-		LLMModel:       onboardLLMModel,
-		KafkaBrokers:   onboardKafkaBrokers,
-		GroupName:      onboardGroupName,
-		AgentID:        onboardAgentID,
-		Role:           onboardRole,
-		RemoteAuth:     onboardRemoteAuth,
-		NonInteractive: onboardNonInteractive,
+		Profile:          onboardProfile,
+		Mode:             onboardMode,
+		LLMPreset:        onboardLLMPreset,
+		LLMToken:         onboardLLMToken,
+		LLMAPIBase:       onboardLLMAPIBase,
+		LLMModel:         onboardLLMModel,
+		KafkaBrokers:     onboardKafkaBrokers,
+		GroupName:        onboardGroupName,
+		AgentID:          onboardAgentID,
+		Role:             onboardRole,
+		RemoteAuth:       onboardRemoteAuth,
+		SubMaxSpawnDepth: onboardSubMaxSpawnDepth,
+		SubMaxChildren:   onboardSubMaxChildren,
+		SubMaxConcurrent: onboardSubMaxConcurrent,
+		SubArchiveMins:   onboardSubArchiveMins,
+		SubAllowAgents:   onboardSubAllowAgents,
+		SubModel:         onboardSubModel,
+		SubThinking:      onboardSubThinking,
+		NonInteractive:   onboardNonInteractive,
 	}); err != nil {
 		fmt.Printf("Onboarding wizard error: %v\n", err)
 		return

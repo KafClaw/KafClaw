@@ -117,3 +117,67 @@ func TestBuildMessagesExternalContext(t *testing.T) {
 		t.Error("System prompt should not contain internal request context")
 	}
 }
+
+func TestBuildIdentityEnvelope(t *testing.T) {
+	tmpDir := t.TempDir()
+	soul := "# Soul\n\nKafClaw protects operator intent.\nIt keeps responses concise.\n\n## Extra\nIgnored\n"
+	if err := os.WriteFile(filepath.Join(tmpDir, "SOUL.md"), []byte(soul), 0o644); err != nil {
+		t.Fatalf("write soul: %v", err)
+	}
+
+	builder := NewContextBuilder(tmpDir, "", "", tools.NewRegistry())
+	identity := builder.BuildIdentityEnvelope("agent-1", "KafClaw", "gpt-test")
+
+	if identity.AgentID != "agent-1" || identity.AgentName != "KafClaw" || identity.Model != "gpt-test" {
+		t.Fatalf("unexpected identity core fields: %+v", identity)
+	}
+	if !strings.Contains(identity.SoulSummary, "protects operator intent") {
+		t.Fatalf("expected summary from first paragraph, got %q", identity.SoulSummary)
+	}
+	if len(identity.Capabilities) == 0 {
+		t.Fatal("expected default tool capabilities fallback")
+	}
+	if len(identity.Channels) != 1 || identity.Channels[0] != "cli" {
+		t.Fatalf("unexpected channels: %#v", identity.Channels)
+	}
+	if identity.Status != "active" || identity.JoinedAt == "" {
+		t.Fatalf("unexpected status/joined fields: %+v", identity)
+	}
+}
+
+func TestContextCognitivePromptHintAndSystemRepoPath(t *testing.T) {
+	if hint := cognitivePromptHint("convergent"); !strings.Contains(hint, "Convergent") {
+		t.Fatalf("missing convergent hint: %q", hint)
+	}
+	if hint := cognitivePromptHint("divergent"); !strings.Contains(hint, "Divergent") {
+		t.Fatalf("missing divergent hint: %q", hint)
+	}
+	if hint := cognitivePromptHint("critical"); !strings.Contains(hint, "Critical") {
+		t.Fatalf("missing critical hint: %q", hint)
+	}
+	if hint := cognitivePromptHint("systems"); !strings.Contains(hint, "Systems") {
+		t.Fatalf("missing systems hint: %q", hint)
+	}
+	if hint := cognitivePromptHint("adaptive"); hint != "" {
+		t.Fatalf("expected empty adaptive hint, got: %q", hint)
+	}
+
+	ws := t.TempDir()
+	explicit := filepath.Join(ws, "custom-system-repo")
+	if err := os.MkdirAll(explicit, 0o755); err != nil {
+		t.Fatalf("mkdir explicit: %v", err)
+	}
+	builder := NewContextBuilder(ws, "", explicit, tools.NewRegistry())
+	if got := builder.systemRepoPath(); got != explicit {
+		t.Fatalf("expected explicit system repo path %q, got %q", explicit, got)
+	}
+
+	fallback := filepath.Join(ws, "Bottibot-REPO-01")
+	if err := os.MkdirAll(fallback, 0o755); err != nil {
+		t.Fatalf("mkdir fallback: %v", err)
+	}
+	builder = NewContextBuilder(ws, "", "", tools.NewRegistry())
+	if got := builder.systemRepoPath(); got != fallback {
+		t.Fatalf("expected fallback path %q, got %q", fallback, got)
+	}
+}

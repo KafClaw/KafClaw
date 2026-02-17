@@ -116,6 +116,55 @@ WhatsApp-specific:
 | `Exec.RestrictToWorkspace` | `true` | `KAFCLAW_TOOLS_EXEC_RESTRICT_WORKSPACE` | Confine shell to workspace |
 | `Web.Search.MaxResults` | `10` | — | Max web search results |
 | `Web.Search.APIKey` | *(empty)* | `KAFCLAW_BRAVE_API_KEY` | Brave Search API key |
+| `Subagents.MaxConcurrent` | `8` | `KAFCLAW_TOOLS_SUBAGENTS_MAX_CONCURRENT` | Max active subagent runs globally |
+| `Subagents.MaxSpawnDepth` | `1` | `KAFCLAW_TOOLS_SUBAGENTS_MAX_SPAWN_DEPTH` | Max spawn depth (default prevents nested child spawning) |
+| `Subagents.MaxChildrenPerAgent` | `5` | `KAFCLAW_TOOLS_SUBAGENTS_MAX_CHILDREN_PER_AGENT` | Max active child runs per parent session |
+| `Subagents.ArchiveAfterMinutes` | `60` | `KAFCLAW_TOOLS_SUBAGENTS_ARCHIVE_AFTER_MINUTES` | Subagent retention/archive window |
+| `Subagents.AllowAgents` | *(current agent only)* | `KAFCLAW_TOOLS_SUBAGENTS_ALLOW_AGENTS` | Allowed `agentId` values for `sessions_spawn` (`*` allows any) |
+| `Subagents.Model` | *(inherit main model)* | `KAFCLAW_TOOLS_SUBAGENTS_MODEL` | Default model for spawned subagents |
+| `Subagents.Thinking` | *(empty)* | `KAFCLAW_TOOLS_SUBAGENTS_THINKING` | Default thinking level for spawned subagents |
+
+Subagent control operations:
+
+- `sessions_spawn`: enqueue child run in background
+- `sessions_spawn(agentId=<id>)`: target a specific agent identity (must be allowed by `tools.subagents.allowAgents`)
+- `sessions_spawn(timeoutSeconds=<n>)`: compatibility alias for `runTimeoutSeconds`
+- `sessions_spawn(cleanup=delete|keep)`: child-session cleanup mode after completion announce
+- `agents_list`: discover allowed spawn targets (`agentId`) for the current agent/session
+- `subagents(action=list)`: show runs for current root-session scope
+- `subagents(action=kill,target=<selector>)`: stop run (cascade kill descendants)
+- `subagents(action=kill_all)`: stop all active child runs for current root session scope
+- `subagents(action=steer,target=<selector>,input=<text>)`: stop target and spawn a steered replacement run
+- child loop policy is depth-aware: `sessions_spawn` is denied at/after max depth
+- optional child allow/deny policy via `tools.subagents.tools.allow` and `tools.subagents.tools.deny` (wildcard suffix `*` supported)
+- selectors for `target`: run ID, `last`, numeric index, label prefix, or child session key
+- `sessions_spawn` supports `runTimeoutSeconds` for per-run timeout
+- subagent completion announce retries are tracked with persisted backoff state
+- subagent completion announce output is normalized to `Status/Result/Notes` and supports `ANNOUNCE_SKIP`
+
+`agents_list` response contract:
+
+- `currentAgentId`: resolved current agent identity
+- `allowAgents`: raw configured allowlist (`*` if wildcard enabled)
+- `effectiveTargets`: concrete spawn targets for `sessions_spawn(agentId=...)`
+- `wildcard`: whether allowlist contains `*`
+- `agents[]`: normalized entries with:
+  - `id`
+  - `configured` (true when present in effective target set)
+  - `name` (optional; populated from `agents.list[].name` when configured)
+
+Audit:
+
+- subagent lifecycle writes timeline `SYSTEM` events with classification `SUBAGENT` (`spawn_accepted`, `kill`, `steer`) when trace IDs are active.
+- subagent registry persists under `~/.kafclaw/subagents/` and is restored on restart.
+
+Announce routing parity:
+
+- completion announces resolve target route in this order:
+  - explicit requester channel/chat
+  - spawn-time defaults
+  - requester/root/parent session-key fallback
+  - active session fallback (`channel:chat`)
 
 ### ER1 Configuration
 

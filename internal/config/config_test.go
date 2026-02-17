@@ -30,6 +30,12 @@ func TestDefaultConfig(t *testing.T) {
 	if cfg.Tools.Exec.Timeout != 60*time.Second {
 		t.Errorf("expected exec timeout 60s, got %v", cfg.Tools.Exec.Timeout)
 	}
+	if cfg.Tools.Subagents.MaxConcurrent != 8 {
+		t.Errorf("expected subagents maxConcurrent 8, got %d", cfg.Tools.Subagents.MaxConcurrent)
+	}
+	if cfg.Tools.Subagents.ArchiveAfterMinutes != 60 {
+		t.Errorf("expected subagents archiveAfterMinutes 60, got %d", cfg.Tools.Subagents.ArchiveAfterMinutes)
+	}
 }
 
 func TestLoadDefaults(t *testing.T) {
@@ -180,5 +186,90 @@ func TestEnvOverride(t *testing.T) {
 
 	if cfg.Gateway.Port != 8080 {
 		t.Errorf("expected port 8080 from env, got %d", cfg.Gateway.Port)
+	}
+}
+
+func TestLoadAgentsDefaultsSubagentsCompatibility(t *testing.T) {
+	tmpDir := t.TempDir()
+	configDir := filepath.Join(tmpDir, ".kafclaw")
+	os.MkdirAll(configDir, 0755)
+	configFile := filepath.Join(configDir, "config.json")
+
+	configJSON := `{
+		"agents": {
+			"defaults": {
+				"subagents": {
+					"maxConcurrent": 3,
+					"maxSpawnDepth": 2,
+					"maxChildrenPerAgent": 4,
+					"archiveAfterMinutes": 15,
+					"model": "openai/gpt-4.1",
+					"thinking": "medium",
+					"allowAgents": ["agent-main","agent-research"]
+				}
+			}
+		}
+	}`
+	os.WriteFile(configFile, []byte(configJSON), 0600)
+
+	origHome := os.Getenv("HOME")
+	os.Setenv("HOME", tmpDir)
+	defer os.Setenv("HOME", origHome)
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
+
+	if cfg.Tools.Subagents.MaxConcurrent != 3 ||
+		cfg.Tools.Subagents.MaxSpawnDepth != 2 ||
+		cfg.Tools.Subagents.MaxChildrenPerAgent != 4 ||
+		cfg.Tools.Subagents.ArchiveAfterMinutes != 15 {
+		t.Fatalf("expected tools.subagents to inherit agents.defaults.subagents, got %+v", cfg.Tools.Subagents)
+	}
+	if cfg.Tools.Subagents.Model != "openai/gpt-4.1" || cfg.Tools.Subagents.Thinking != "medium" {
+		t.Fatalf("expected model/thinking inherited from agents.defaults.subagents, got %+v", cfg.Tools.Subagents)
+	}
+	if len(cfg.Tools.Subagents.AllowAgents) != 2 {
+		t.Fatalf("expected allowAgents inherited, got %+v", cfg.Tools.Subagents.AllowAgents)
+	}
+}
+
+func TestLoadToolsSubagentsPrecedenceOverAgentsDefaults(t *testing.T) {
+	tmpDir := t.TempDir()
+	configDir := filepath.Join(tmpDir, ".kafclaw")
+	os.MkdirAll(configDir, 0755)
+	configFile := filepath.Join(configDir, "config.json")
+
+	configJSON := `{
+		"agents": {
+			"defaults": {
+				"subagents": {
+					"maxConcurrent": 3,
+					"maxSpawnDepth": 2,
+					"maxChildrenPerAgent": 4
+				}
+			}
+		},
+		"tools": {
+			"subagents": {
+				"maxConcurrent": 9,
+				"maxSpawnDepth": 1,
+				"maxChildrenPerAgent": 7
+			}
+		}
+	}`
+	os.WriteFile(configFile, []byte(configJSON), 0600)
+
+	origHome := os.Getenv("HOME")
+	os.Setenv("HOME", tmpDir)
+	defer os.Setenv("HOME", origHome)
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
+	if cfg.Tools.Subagents.MaxConcurrent != 9 || cfg.Tools.Subagents.MaxSpawnDepth != 1 || cfg.Tools.Subagents.MaxChildrenPerAgent != 7 {
+		t.Fatalf("expected tools.subagents to override agents.defaults.subagents, got %+v", cfg.Tools.Subagents)
 	}
 }

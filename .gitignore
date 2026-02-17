@@ -36,3 +36,7 @@ dist/
 electron/node_modules/
 electron/dist/
 .DS_Store
+
+# Local planning / scratch
+/task.md
+/.tmp/

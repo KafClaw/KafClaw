@@ -1,6 +1,8 @@
 # KafClaw Documentation
 
-![KafClaw Logo](./assets/KafClaw.png)
+<p align="center">
+  <img src="./assets/KafClaw.png" alt="KafClaw Logo" width="320" />
+</p>
 
 KafClaw is a Go-based agent runtime with three practical deployment modes:
 
