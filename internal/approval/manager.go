@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"sync"
 	"time"
 
@@ -139,7 +140,7 @@ func (m *Manager) cleanup(id string) {
 
 func newApprovalID() string {
 	var b [8]byte
-	if _, err := rand.Read(b[:]); err == nil {
+	if _, err := io.ReadFull(rand.Reader, b[:]); err == nil {
 		return hex.EncodeToString(b[:])
 	}
 	return fmt.Sprintf("appr-%d", time.Now().UnixNano())

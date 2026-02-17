@@ -82,6 +82,9 @@ WhatsApp/CLI/Web/Scheduler --> Message Bus --> Agent Loop --> LLM Provider
 | `make rerun` | Kill ports 18790/18791, rebuild, run |
 | `make install` | Install via `kafclaw install` |
 | `make test` | `go test ./...` |
+| `make test-smoke` | Fast critical-path smoke tests |
+| `make test-critical` | Enforce 100% critical logic coverage |
+| `make test-fuzz` | Run fuzz tests on critical guard logic |
 | `make release-patch` | Bump patch version, tag, push |
 | `make release-minor` | Bump minor version, tag, push |
 | `make release-major` | Bump major version, tag, push |
@@ -94,6 +97,9 @@ WhatsApp/CLI/Web/Scheduler --> Message Bus --> Agent Loop --> LLM Provider
 
 ```bash
 go test ./...                  # all tests
+make test-smoke                # critical-path smoke tests
+make test-critical             # hard 100% coverage gate for critical logic
+make test-fuzz                 # fuzz critical guard logic
 go test ./internal/tools/      # single package
 go test ./internal/memory/     # memory tests
 ```

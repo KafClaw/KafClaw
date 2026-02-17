@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"os/exec"
@@ -37,7 +38,7 @@ import (
 
 func newTraceID() string {
 	var b [8]byte
-	if _, err := rand.Read(b[:]); err == nil {
+	if _, err := io.ReadFull(rand.Reader, b[:]); err == nil {
 		return hex.EncodeToString(b[:])
 	}
 	return fmt.Sprintf("%d", time.Now().UnixNano())
@@ -50,6 +51,10 @@ var gatewayCmd = &cobra.Command{
 }
 
 func runGateway(cmd *cobra.Command, args []string) {
+	runGatewayMain(cmd, args)
+}
+
+func runGatewayMain(cmd *cobra.Command, args []string) {
 	printHeader("🌐 KafClaw Gateway")
 	fmt.Println("Starting KafClaw Gateway...")
 
