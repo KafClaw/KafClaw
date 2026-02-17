@@ -10,9 +10,9 @@ import (
 
 func TestFormatER1Memory(t *testing.T) {
 	m := er1Memory{
-		ID:         "mem-1",
-		Transcript: "Went to the park with Sarah",
-		Tags:       []string{"personal", "outdoor"},
+		ID:          "mem-1",
+		Transcript:  "Went to the park with Sarah",
+		Tags:        []string{"personal", "outdoor"},
 		LocationLat: 52.5200,
 		LocationLon: 13.4050,
 		Description: "Weekend walk",

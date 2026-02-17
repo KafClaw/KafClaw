@@ -36,13 +36,13 @@ type OrchestratorHandler func(env *GroupEnvelope)
 
 // GroupRouter routes incoming Kafka messages to the appropriate handler.
 type GroupRouter struct {
-	manager        *Manager
-	msgBus         *bus.MessageBus
-	consumer       Consumer
-	topics         TopicNames
-	extTopics      ExtendedTopicNames
-	skillPrefix    string
-	orchHandler    OrchestratorHandler
+	manager     *Manager
+	msgBus      *bus.MessageBus
+	consumer    Consumer
+	topics      TopicNames
+	extTopics   ExtendedTopicNames
+	skillPrefix string
+	orchHandler OrchestratorHandler
 }
 
 // NewGroupRouter creates a router that bridges Kafka messages into the bus.

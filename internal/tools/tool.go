@@ -30,9 +30,9 @@ type TieredTool interface {
 
 // Risk tier constants.
 const (
-	TierReadOnly  = 0 // Read-only internal tools
-	TierWrite     = 1 // Controlled write/internal effects
-	TierHighRisk  = 2 // External or high-impact actions
+	TierReadOnly = 0 // Read-only internal tools
+	TierWrite    = 1 // Controlled write/internal effects
+	TierHighRisk = 2 // External or high-impact actions
 )
 
 // ToolTier returns the risk tier for a tool.

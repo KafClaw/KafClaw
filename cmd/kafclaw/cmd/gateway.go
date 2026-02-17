@@ -878,15 +878,15 @@ func runGateway(cmd *cobra.Command, args []string) {
 			var taskInfo map[string]any
 			if task, err := timeSvc.GetTaskByTraceID(traceID); err == nil && task != nil {
 				taskInfo = map[string]any{
-					"task_id":          task.TaskID,
-					"status":           task.Status,
-					"delivery_status":  task.DeliveryStatus,
-					"prompt_tokens":    task.PromptTokens,
+					"task_id":           task.TaskID,
+					"status":            task.Status,
+					"delivery_status":   task.DeliveryStatus,
+					"prompt_tokens":     task.PromptTokens,
 					"completion_tokens": task.CompletionTokens,
-					"total_tokens":     task.TotalTokens,
-					"channel":          task.Channel,
-					"created_at":       task.CreatedAt,
-					"completed_at":     task.CompletedAt,
+					"total_tokens":      task.TotalTokens,
+					"channel":           task.Channel,
+					"created_at":        task.CreatedAt,
+					"completed_at":      task.CompletedAt,
 				}
 			}
 
@@ -1029,7 +1029,7 @@ func runGateway(cmd *cobra.Command, args []string) {
 
 			var body struct {
 				GroupName    string `json:"group_name"`
-				LFSProxyURL string `json:"lfs_proxy_url"`
+				LFSProxyURL  string `json:"lfs_proxy_url"`
 				KafkaBrokers string `json:"kafka_brokers"`
 				AgentID      string `json:"agent_id"`
 			}
@@ -1145,26 +1145,26 @@ func runGateway(cmd *cobra.Command, args []string) {
 				mgr := grpState.Manager()
 				if mgr == nil {
 					json.NewEncoder(w).Encode(map[string]any{
-						"enabled":       cfg.Group.Enabled,
-						"group_name":    cfg.Group.GroupName,
-						"lfs_proxy_url": cfg.Group.LFSProxyURL,
-						"api_key":       maskSecret(cfg.Group.LFSProxyAPIKey),
-						"kafka_brokers": cfg.Group.KafkaBrokers,
-						"consumer_group": cfg.Group.ConsumerGroup,
-						"agent_id":      cfg.Group.AgentID,
+						"enabled":          cfg.Group.Enabled,
+						"group_name":       cfg.Group.GroupName,
+						"lfs_proxy_url":    cfg.Group.LFSProxyURL,
+						"api_key":          maskSecret(cfg.Group.LFSProxyAPIKey),
+						"kafka_brokers":    cfg.Group.KafkaBrokers,
+						"consumer_group":   cfg.Group.ConsumerGroup,
+						"agent_id":         cfg.Group.AgentID,
 						"poll_interval_ms": cfg.Group.PollIntervalMs,
 					})
 					return
 				}
 				grpCfg := mgr.Config()
 				json.NewEncoder(w).Encode(map[string]any{
-					"enabled":       grpCfg.Enabled,
-					"group_name":    grpCfg.GroupName,
-					"lfs_proxy_url": grpCfg.LFSProxyURL,
-					"api_key":       maskSecret(grpCfg.LFSProxyAPIKey),
-					"kafka_brokers": grpCfg.KafkaBrokers,
-					"consumer_group": grpCfg.ConsumerGroup,
-					"agent_id":      mgr.AgentID(),
+					"enabled":          grpCfg.Enabled,
+					"group_name":       grpCfg.GroupName,
+					"lfs_proxy_url":    grpCfg.LFSProxyURL,
+					"api_key":          maskSecret(grpCfg.LFSProxyAPIKey),
+					"kafka_brokers":    grpCfg.KafkaBrokers,
+					"consumer_group":   grpCfg.ConsumerGroup,
+					"agent_id":         mgr.AgentID(),
 					"poll_interval_ms": grpCfg.PollIntervalMs,
 				})
 				return
@@ -1199,7 +1199,7 @@ func runGateway(cmd *cobra.Command, args []string) {
 					}
 				}
 				json.NewEncoder(w).Encode(map[string]any{
-					"status":         "ok",
+					"status":          "ok",
 					"requires_rejoin": requiresRejoin,
 				})
 				return
@@ -1626,9 +1626,9 @@ func runGateway(cmd *cobra.Command, args []string) {
 			filter := timeline.AuditFilter{
 				Source:    r.URL.Query().Get("source"),
 				EventType: r.URL.Query().Get("event_type"),
-				AgentID:  r.URL.Query().Get("agent_id"),
-				Limit:    limit,
-				Offset:   offset,
+				AgentID:   r.URL.Query().Get("agent_id"),
+				Limit:     limit,
+				Offset:    offset,
 			}
 
 			entries, err := timeSvc.ListUnifiedAudit(filter)
@@ -2129,9 +2129,9 @@ func runGateway(cmd *cobra.Command, args []string) {
 				"observer_enabled":      observerEnabled,
 				"observer_threshold":    observerThreshold,
 				"observer_max_obs":      observerMaxObs,
-				"er1_url":              er1URL,
+				"er1_url":               er1URL,
 				"er1_sync_interval_sec": er1SyncIntervalSec,
-				"max_chunks":           50000,
+				"max_chunks":            50000,
 			}
 
 			json.NewEncoder(w).Encode(map[string]any{

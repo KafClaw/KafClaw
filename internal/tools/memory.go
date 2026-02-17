@@ -17,9 +17,11 @@ func NewRememberTool(service *memory.MemoryService) *RememberTool {
 	return &RememberTool{service: service}
 }
 
-func (t *RememberTool) Name() string        { return "remember" }
-func (t *RememberTool) Description() string  { return "Store a piece of information in long-term memory for later recall. Use this when the user asks you to remember something." }
-func (t *RememberTool) Tier() int            { return TierWrite }
+func (t *RememberTool) Name() string { return "remember" }
+func (t *RememberTool) Description() string {
+	return "Store a piece of information in long-term memory for later recall. Use this when the user asks you to remember something."
+}
+func (t *RememberTool) Tier() int { return TierWrite }
 
 func (t *RememberTool) Parameters() map[string]any {
 	return map[string]any{
@@ -67,9 +69,11 @@ func NewRecallTool(service *memory.MemoryService) *RecallTool {
 	return &RecallTool{service: service}
 }
 
-func (t *RecallTool) Name() string        { return "recall" }
-func (t *RecallTool) Description() string  { return "Search long-term memory for information relevant to a query. Returns the most relevant stored memories." }
-func (t *RecallTool) Tier() int            { return TierReadOnly }
+func (t *RecallTool) Name() string { return "recall" }
+func (t *RecallTool) Description() string {
+	return "Search long-term memory for information relevant to a query. Returns the most relevant stored memories."
+}
+func (t *RecallTool) Tier() int { return TierReadOnly }
 
 func (t *RecallTool) Parameters() map[string]any {
 	return map[string]any{

@@ -51,27 +51,27 @@ type LoopOptions struct {
 
 // Loop is the core agent processing engine.
 type Loop struct {
-	bus            *bus.MessageBus
-	provider       provider.LLMProvider
-	timeline       *timeline.TimelineService
-	policy         policy.Engine
+	bus              *bus.MessageBus
+	provider         provider.LLMProvider
+	timeline         *timeline.TimelineService
+	policy           policy.Engine
 	memoryService    *memory.MemoryService
 	autoIndexer      *memory.AutoIndexer
 	expertiseTracker *memory.ExpertiseTracker
 	workingMemory    *memory.WorkingMemoryStore
 	observer         *memory.Observer
 	groupPublisher   GroupTracePublisher
-	approvalMgr    *approval.Manager
-	registry       *tools.Registry
-	sessions       *session.Manager
-	contextBuilder *ContextBuilder
-	workspace      string
-	workRepo       string
-	systemRepo     string
-	workRepoGetter func() string
-	model          string
-	maxIterations  int
-	running        bool
+	approvalMgr      *approval.Manager
+	registry         *tools.Registry
+	sessions         *session.Manager
+	contextBuilder   *ContextBuilder
+	workspace        string
+	workRepo         string
+	systemRepo       string
+	workRepoGetter   func() string
+	model            string
+	maxIterations    int
+	running          bool
 	// activeTaskID tracks the current task being processed (for token accounting).
 	activeTaskID string
 	// activeSender tracks the sender of the current message (for policy checks).
@@ -95,26 +95,26 @@ func NewLoop(opts LoopOptions) *Loop {
 	ctxBuilder := NewContextBuilder(opts.Workspace, opts.WorkRepo, opts.SystemRepo, registry)
 
 	loop := &Loop{
-		bus:            opts.Bus,
-		provider:       opts.Provider,
-		timeline:       opts.Timeline,
-		policy:         opts.Policy,
+		bus:              opts.Bus,
+		provider:         opts.Provider,
+		timeline:         opts.Timeline,
+		policy:           opts.Policy,
 		memoryService:    opts.MemoryService,
 		autoIndexer:      opts.AutoIndexer,
 		expertiseTracker: opts.ExpertiseTracker,
 		workingMemory:    opts.WorkingMemory,
 		observer:         opts.Observer,
 		groupPublisher:   opts.GroupPublisher,
-		approvalMgr:    approval.NewManager(opts.Timeline),
-		registry:       registry,
-		sessions:       session.NewManager(opts.Workspace),
-		contextBuilder: ctxBuilder,
-		workspace:      opts.Workspace,
-		workRepo:       opts.WorkRepo,
-		systemRepo:     opts.SystemRepo,
-		workRepoGetter: opts.WorkRepoGetter,
-		model:          opts.Model,
-		maxIterations:  maxIter,
+		approvalMgr:      approval.NewManager(opts.Timeline),
+		registry:         registry,
+		sessions:         session.NewManager(opts.Workspace),
+		contextBuilder:   ctxBuilder,
+		workspace:        opts.Workspace,
+		workRepo:         opts.WorkRepo,
+		systemRepo:       opts.SystemRepo,
+		workRepoGetter:   opts.WorkRepoGetter,
+		model:            opts.Model,
+		maxIterations:    maxIter,
 	}
 
 	// Register default tools
@@ -1291,9 +1291,9 @@ func (l *Loop) checkToolPolicy(ctx context.Context, toolName string, args map[st
 				Tier:      tier,
 				Arguments: args,
 				Sender:    l.activeSender,
-				Channel: l.activeChannel,
-				TraceID: l.activeTraceID,
-				TaskID:  l.activeTaskID,
+				Channel:   l.activeChannel,
+				TraceID:   l.activeTraceID,
+				TaskID:    l.activeTaskID,
 			}
 			approvalID := l.approvalMgr.Create(req)
 

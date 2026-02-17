@@ -169,4 +169,3 @@ func (m *Manager) HandleMemoryItem(env *GroupEnvelope) {
 		}
 	}
 }
-

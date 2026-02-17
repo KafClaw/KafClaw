@@ -7,19 +7,19 @@ import (
 // TimelineEvent represents a single interaction in the history.
 type TimelineEvent struct {
 	ID             int64     `json:"id"`
-	EventID        string    `json:"event_id"`       // Unique ID (e.g. WhatsApp MessageID)
-	TraceID        string    `json:"trace_id"`       // End-to-end trace identifier
-	SpanID         string    `json:"span_id"`        // Span identifier (optional)
-	ParentSpanID   string    `json:"parent_span_id"` // Parent span (optional)
-	Timestamp      time.Time `json:"timestamp"`      // When it happened
-	SenderID       string    `json:"sender_id"`      // Phone number
-	SenderName     string    `json:"sender_name"`    // Display name
-	EventType      string    `json:"event_type"`     // TEXT, AUDIO, IMAGE, SYSTEM
-	ContentText    string    `json:"content_text"`   // The text or transcript
-	MediaPath      string    `json:"media_path"`     // Path to local file if any
-	VectorID       string    `json:"vector_id"`      // Qdrant ID
-	Classification string    `json:"classification"` // ABM1 Category
-	Authorized     bool      `json:"authorized"`     // Whether sender is in AllowFrom list
+	EventID        string    `json:"event_id"`           // Unique ID (e.g. WhatsApp MessageID)
+	TraceID        string    `json:"trace_id"`           // End-to-end trace identifier
+	SpanID         string    `json:"span_id"`            // Span identifier (optional)
+	ParentSpanID   string    `json:"parent_span_id"`     // Parent span (optional)
+	Timestamp      time.Time `json:"timestamp"`          // When it happened
+	SenderID       string    `json:"sender_id"`          // Phone number
+	SenderName     string    `json:"sender_name"`        // Display name
+	EventType      string    `json:"event_type"`         // TEXT, AUDIO, IMAGE, SYSTEM
+	ContentText    string    `json:"content_text"`       // The text or transcript
+	MediaPath      string    `json:"media_path"`         // Path to local file if any
+	VectorID       string    `json:"vector_id"`          // Qdrant ID
+	Classification string    `json:"classification"`     // ABM1 Category
+	Authorized     bool      `json:"authorized"`         // Whether sender is in AllowFrom list
 	Metadata       string    `json:"metadata,omitempty"` // JSON blob for rich span detail
 }
 
@@ -78,16 +78,16 @@ const (
 
 // TraceNode represents a node in the trace graph.
 type TraceNode struct {
-	ID           string  `json:"id"`
-	SpanID       string  `json:"span_id"`
-	ParentSpanID string  `json:"parent_span_id"`
-	Type         string  `json:"type"` // INBOUND, LLM, TOOL, OUTBOUND, POLICY
-	Title        string  `json:"title"`
-	StartTime    string  `json:"start_time"`
-	EndTime      string  `json:"end_time"`
-	DurationMs   int     `json:"duration_ms"`
-	AgentID      string  `json:"agent_id"`
-	Output       string  `json:"output"`
+	ID           string `json:"id"`
+	SpanID       string `json:"span_id"`
+	ParentSpanID string `json:"parent_span_id"`
+	Type         string `json:"type"` // INBOUND, LLM, TOOL, OUTBOUND, POLICY
+	Title        string `json:"title"`
+	StartTime    string `json:"start_time"`
+	EndTime      string `json:"end_time"`
+	DurationMs   int    `json:"duration_ms"`
+	AgentID      string `json:"agent_id"`
+	Output       string `json:"output"`
 }
 
 // TraceEdge represents an edge in the trace graph.
@@ -107,18 +107,18 @@ type TraceGraph struct {
 
 // GroupTrace represents a trace span from a remote agent.
 type GroupTrace struct {
-	ID            int64     `json:"id"`
-	TraceID       string    `json:"trace_id"`
-	SourceAgentID string    `json:"source_agent_id"`
-	SpanID        string    `json:"span_id"`
-	ParentSpanID  string    `json:"parent_span_id"`
-	SpanType      string    `json:"span_type"`
-	Title         string    `json:"title"`
-	Content       string    `json:"content"`
+	ID            int64      `json:"id"`
+	TraceID       string     `json:"trace_id"`
+	SourceAgentID string     `json:"source_agent_id"`
+	SpanID        string     `json:"span_id"`
+	ParentSpanID  string     `json:"parent_span_id"`
+	SpanType      string     `json:"span_type"`
+	Title         string     `json:"title"`
+	Content       string     `json:"content"`
 	StartedAt     *time.Time `json:"started_at"`
 	EndedAt       *time.Time `json:"ended_at"`
-	DurationMs    int       `json:"duration_ms"`
-	CreatedAt     time.Time `json:"created_at"`
+	DurationMs    int        `json:"duration_ms"`
+	CreatedAt     time.Time  `json:"created_at"`
 }
 
 // GroupMemberRecord represents a persisted group member in the database.
@@ -153,13 +153,13 @@ type GroupMembershipHistoryRecord struct {
 
 // GroupStats holds aggregated communication statistics.
 type GroupStats struct {
-	TasksByStatus    map[string]int     `json:"tasks_by_status"`
-	TasksLast24h     int                `json:"tasks_last_24h"`
-	TasksLast7d      int                `json:"tasks_last_7d"`
-	AvgResponseSecs  float64            `json:"avg_response_secs"`
-	MaxResponseSecs  float64            `json:"max_response_secs"`
-	AvgDelegation    float64            `json:"avg_delegation_depth"`
-	MaxDelegation    int                `json:"max_delegation_depth"`
+	TasksByStatus    map[string]int      `json:"tasks_by_status"`
+	TasksLast24h     int                 `json:"tasks_last_24h"`
+	TasksLast7d      int                 `json:"tasks_last_7d"`
+	AvgResponseSecs  float64             `json:"avg_response_secs"`
+	MaxResponseSecs  float64             `json:"max_response_secs"`
+	AvgDelegation    float64             `json:"avg_delegation_depth"`
+	MaxDelegation    int                 `json:"max_delegation_depth"`
 	MemberActivity   []AgentActivityStat `json:"member_activity"`
 	TracePerformance []AgentTraceStat    `json:"trace_performance"`
 }
@@ -184,7 +184,7 @@ type AgentTraceStat struct {
 type UnifiedAuditEntry struct {
 	ID        int64     `json:"id"`
 	Source    string    `json:"source"`     // "delegation", "policy", "approval"
-	EventType string   `json:"event_type"` // submitted, accepted, allowed, denied, pending, approved, etc.
+	EventType string    `json:"event_type"` // submitted, accepted, allowed, denied, pending, approved, etc.
 	Tier      int       `json:"tier"`
 	AgentID   string    `json:"agent_id"`
 	TargetID  string    `json:"target_id"`
@@ -196,11 +196,11 @@ type UnifiedAuditEntry struct {
 type AuditFilter struct {
 	EventType string
 	Source    string
-	AgentID  string
-	StartAt  *time.Time
-	EndAt    *time.Time
-	Limit    int
-	Offset   int
+	AgentID   string
+	StartAt   *time.Time
+	EndAt     *time.Time
+	Limit     int
+	Offset    int
 }
 
 // GroupTaskRecord represents a group collaboration task.

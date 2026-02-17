@@ -6,15 +6,15 @@ import "time"
 // Config is the root configuration struct.
 // Top-level groups: Paths, Model, Channels, Providers, Gateway, Tools.
 type Config struct {
-	Paths        PathsConfig        `json:"paths"`
-	Model        ModelConfig        `json:"model"`
-	Channels     ChannelsConfig     `json:"channels"`
-	Providers    ProvidersConfig    `json:"providers"`
-	Gateway      GatewayConfig      `json:"gateway"`
-	Tools        ToolsConfig        `json:"tools"`
-	Group        GroupConfig        `json:"group"`
-	Orchestrator OrchestratorConfig `json:"orchestrator"`
-	Scheduler    SchedulerConfig    `json:"scheduler"`
+	Paths        PathsConfig          `json:"paths"`
+	Model        ModelConfig          `json:"model"`
+	Channels     ChannelsConfig       `json:"channels"`
+	Providers    ProvidersConfig      `json:"providers"`
+	Gateway      GatewayConfig        `json:"gateway"`
+	Tools        ToolsConfig          `json:"tools"`
+	Group        GroupConfig          `json:"group"`
+	Orchestrator OrchestratorConfig   `json:"orchestrator"`
+	Scheduler    SchedulerConfig      `json:"scheduler"`
 	ER1          ER1IntegrationConfig `json:"er1"`
 	Observer     ObserverMemoryConfig `json:"observer"`
 }
@@ -138,7 +138,7 @@ type GatewayConfig struct {
 // OrchestratorConfig contains settings for the agent orchestrator.
 type OrchestratorConfig struct {
 	Enabled  bool   `json:"enabled" envconfig:"ENABLED"`
-	Role     string `json:"role" envconfig:"ROLE"`         // "orchestrator", "worker", "observer"
+	Role     string `json:"role" envconfig:"ROLE"` // "orchestrator", "worker", "observer"
 	ZoneID   string `json:"zoneId" envconfig:"ZONE_ID"`
 	ParentID string `json:"parentId" envconfig:"PARENT_ID"`
 	Endpoint string `json:"endpoint" envconfig:"ENDPOINT"` // This agent's remote API URL
@@ -160,16 +160,16 @@ type ToolsConfig struct {
 
 // GroupConfig contains settings for group collaboration.
 type GroupConfig struct {
-	Enabled        bool   `json:"enabled" envconfig:"ENABLED"`
-	GroupName      string `json:"groupName" envconfig:"GROUP_NAME"`
-	LFSProxyURL    string `json:"lfsProxyUrl" envconfig:"KAFSCALE_LFS_PROXY_URL"`
-	LFSProxyAPIKey string `json:"lfsProxyApiKey" envconfig:"KAFSCALE_LFS_PROXY_API_KEY"`
-	KafkaBrokers   string `json:"kafkaBrokers" envconfig:"KAFKA_BROKERS"`
-	ConsumerGroup  string `json:"consumerGroup" envconfig:"KAFKA_CONSUMER_GROUP"`
-	AgentID        string `json:"agentId" envconfig:"AGENT_ID"`
-	PollIntervalMs int    `json:"pollIntervalMs" envconfig:"POLL_INTERVAL_MS"`
-	OnboardMode       string `json:"onboardMode" envconfig:"ONBOARD_MODE"` // "open" (default) or "gated"
-	MaxDelegationDepth int   `json:"maxDelegationDepth" envconfig:"MAX_DELEGATION_DEPTH"`
+	Enabled            bool   `json:"enabled" envconfig:"ENABLED"`
+	GroupName          string `json:"groupName" envconfig:"GROUP_NAME"`
+	LFSProxyURL        string `json:"lfsProxyUrl" envconfig:"KAFSCALE_LFS_PROXY_URL"`
+	LFSProxyAPIKey     string `json:"lfsProxyApiKey" envconfig:"KAFSCALE_LFS_PROXY_API_KEY"`
+	KafkaBrokers       string `json:"kafkaBrokers" envconfig:"KAFKA_BROKERS"`
+	ConsumerGroup      string `json:"consumerGroup" envconfig:"KAFKA_CONSUMER_GROUP"`
+	AgentID            string `json:"agentId" envconfig:"AGENT_ID"`
+	PollIntervalMs     int    `json:"pollIntervalMs" envconfig:"POLL_INTERVAL_MS"`
+	OnboardMode        string `json:"onboardMode" envconfig:"ONBOARD_MODE"` // "open" (default) or "gated"
+	MaxDelegationDepth int    `json:"maxDelegationDepth" envconfig:"MAX_DELEGATION_DEPTH"`
 }
 
 // ---------------------------------------------------------------------------

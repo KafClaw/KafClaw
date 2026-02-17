@@ -94,8 +94,8 @@ func TestNoAllowlistMeansAllSendersAllowed(t *testing.T) {
 
 func TestExternalMessageRestrictedToReadOnly(t *testing.T) {
 	eng := NewDefaultEngine()
-	eng.MaxAutoTier = 2       // owner can use shell
-	eng.ExternalMaxTier = 0   // external users: read-only
+	eng.MaxAutoTier = 2     // owner can use shell
+	eng.ExternalMaxTier = 0 // external users: read-only
 
 	// External + tier 1 (write) → denied
 	d := eng.Evaluate(Context{

@@ -85,8 +85,8 @@ func TestUpdateTaskStatus(t *testing.T) {
 	svc := newTestTimeline(t)
 
 	task, err := svc.CreateTask(&AgentTask{
-		Channel:  "cli",
-		ChatID:   "default",
+		Channel:   "cli",
+		ChatID:    "default",
 		ContentIn: "hi",
 	})
 	if err != nil {
@@ -146,16 +146,16 @@ func TestListPendingDeliveries(t *testing.T) {
 
 	// Create a completed task with pending delivery
 	task, _ := svc.CreateTask(&AgentTask{
-		Channel:  "webui",
-		ChatID:   "1",
+		Channel:   "webui",
+		ChatID:    "1",
 		ContentIn: "test",
 	})
 	_ = svc.UpdateTaskStatus(task.TaskID, TaskStatusCompleted, "done", "")
 
 	// Create a processing task (should not appear)
 	task2, _ := svc.CreateTask(&AgentTask{
-		Channel:  "cli",
-		ChatID:   "default",
+		Channel:   "cli",
+		ChatID:    "default",
 		ContentIn: "test2",
 	})
 	_ = svc.UpdateTaskStatus(task2.TaskID, TaskStatusProcessing, "", "")
