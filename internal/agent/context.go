@@ -17,10 +17,10 @@ import (
 
 // ContextBuilder assembles the system prompt and messages.
 type ContextBuilder struct {
-	workspace string
-	workRepo  string
+	workspace  string
+	workRepo   string
 	systemRepo string
-	registry  *tools.Registry
+	registry   *tools.Registry
 }
 
 // NewContextBuilder creates a new ContextBuilder.

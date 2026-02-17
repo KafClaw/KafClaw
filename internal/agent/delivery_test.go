@@ -32,8 +32,8 @@ func TestDeliveryWorkerPollPicksPendingTasks(t *testing.T) {
 
 	// Create a completed task with pending delivery
 	task, err := tl.CreateTask(&timeline.AgentTask{
-		Channel:  "whatsapp",
-		ChatID:   "123@s.whatsapp.net",
+		Channel:   "whatsapp",
+		ChatID:    "123@s.whatsapp.net",
 		ContentIn: "hello",
 	})
 	if err != nil {
@@ -64,8 +64,8 @@ func TestDeliveryWorkerMaxRetryMarksFailed(t *testing.T) {
 
 	// Create a completed task
 	task, err := tl.CreateTask(&timeline.AgentTask{
-		Channel:  "webui",
-		ChatID:   "1",
+		Channel:   "webui",
+		ChatID:    "1",
 		ContentIn: "test",
 	})
 	if err != nil {

@@ -38,7 +38,7 @@ func (m *mockProvider) DefaultModel() string { return "mock-model" }
 
 // TestInternalExternalClassificationE2E exercises the full pipeline:
 //
-//   Bus → processMessage → BuildMessages (prompt injection) → policy check → timeline task
+//	Bus → processMessage → BuildMessages (prompt injection) → policy check → timeline task
 //
 // for both internal (owner) and external (other user) messages, then prints a
 // trace-style report showing how the system differentiates the two.

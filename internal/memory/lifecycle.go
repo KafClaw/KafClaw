@@ -29,14 +29,14 @@ type LifecycleManager struct {
 // DefaultPolicies returns the standard retention policies.
 func DefaultPolicies() []RetentionPolicy {
 	return []RetentionPolicy{
-		{SourcePrefix: "soul:", TTL: 0},             // permanent
-		{SourcePrefix: "user", TTL: 0},              // permanent (explicit memories)
-		{SourcePrefix: "consolidated:", TTL: 0},      // permanent (summarized)
-		{SourcePrefix: "observation:", TTL: 0},       // permanent (compressed observations)
-		{SourcePrefix: "er1:", TTL: 0},               // permanent (ER1 personal memories)
-		{SourcePrefix: "conversation:", TTL: 30 * 24 * time.Hour},  // 30 days
-		{SourcePrefix: "tool:", TTL: 14 * 24 * time.Hour},          // 14 days
-		{SourcePrefix: "group:", TTL: 60 * 24 * time.Hour},         // 60 days
+		{SourcePrefix: "soul:", TTL: 0},                           // permanent
+		{SourcePrefix: "user", TTL: 0},                            // permanent (explicit memories)
+		{SourcePrefix: "consolidated:", TTL: 0},                   // permanent (summarized)
+		{SourcePrefix: "observation:", TTL: 0},                    // permanent (compressed observations)
+		{SourcePrefix: "er1:", TTL: 0},                            // permanent (ER1 personal memories)
+		{SourcePrefix: "conversation:", TTL: 30 * 24 * time.Hour}, // 30 days
+		{SourcePrefix: "tool:", TTL: 14 * 24 * time.Hour},         // 14 days
+		{SourcePrefix: "group:", TTL: 60 * 24 * time.Hour},        // 60 days
 	}
 }
 

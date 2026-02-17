@@ -1,4 +1,6 @@
 # KafClaw
+[![CI](https://github.com/scalytics/KafClaw/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/scalytics/KafClaw/actions/workflows/ci.yml)
+[![Release](https://github.com/scalytics/KafClaw/actions/workflows/release.yml/badge.svg)](https://github.com/scalytics/KafClaw/actions/workflows/release.yml)
 
 **Enterprise-grade multi-agent collaboration over Apache Kafka.**
 
@@ -232,4 +234,3 @@ KShark is a built-in Kafka diagnostic tool for verifying connectivity and inspec
 Licensed under the [Apache License, Version 2.0](LICENSE).
 
 This project is a hard fork of [HKUDS/nanobot](https://github.com/HKUDS/nanobot), which was originally released under the MIT License. The original MIT license and attribution are preserved in the [NOTICE](NOTICE) file, as required.
-
