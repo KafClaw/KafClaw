@@ -51,6 +51,10 @@ var gatewayCmd = &cobra.Command{
 }
 
 func runGateway(cmd *cobra.Command, args []string) {
+	runGatewayMain(cmd, args)
+}
+
+func runGatewayMain(cmd *cobra.Command, args []string) {
 	printHeader("🌐 KafClaw Gateway")
 	fmt.Println("Starting KafClaw Gateway...")
 
