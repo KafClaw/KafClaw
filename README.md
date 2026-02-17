@@ -2,6 +2,8 @@
 [![CI (Smoke+Fuzz+Go)](https://github.com/scalytics/KafClaw/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/scalytics/KafClaw/actions/workflows/ci.yml)
 [![Release](https://github.com/scalytics/KafClaw/actions/workflows/release.yml/badge.svg?branch=main)](https://github.com/scalytics/KafClaw/actions/workflows/release.yml)
 [![Pages](https://github.com/scalytics/KafClaw/actions/workflows/pages.yml/badge.svg?branch=main)](https://github.com/scalytics/KafClaw/actions/workflows/pages.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/KafClaw/KafClaw)](https://goreportcard.com/report/github.com/KafClaw/KafClaw)
+[![License](https://img.shields.io/github/license/KafClaw/KafClaw)](LICENSE)
 
 KafClaw is backed by [Scalytics](https://www.scalytics.io). We do not create, operate, or endorse any crypto tokens. If you see token-based fundraising using the KafClaw name, it is not affiliated with this project.
 
