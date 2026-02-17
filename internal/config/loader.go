@@ -187,6 +187,8 @@ func Load() (*Config, error) {
 	envconfig.Process("MIKROBOT_CHANNELS_DISCORD", &cfg.Channels.Discord)
 	envconfig.Process("MIKROBOT_CHANNELS_WHATSAPP", &cfg.Channels.WhatsApp)
 	envconfig.Process("MIKROBOT_CHANNELS_FEISHU", &cfg.Channels.Feishu)
+	envconfig.Process("MIKROBOT_CHANNELS_SLACK", &cfg.Channels.Slack)
+	envconfig.Process("MIKROBOT_CHANNELS_MSTEAMS", &cfg.Channels.MSTeams)
 	envconfig.Process("MIKROBOT_GATEWAY", &cfg.Gateway)
 	envconfig.Process("MIKROBOT_TOOLS_EXEC", &cfg.Tools.Exec)
 	envconfig.Process("MIKROBOT_TOOLS_WEB_SEARCH", &cfg.Tools.Web.Search)
@@ -214,6 +216,8 @@ func Load() (*Config, error) {
 	envconfig.Process("KAFCLAW_CHANNELS_DISCORD", &cfg.Channels.Discord)
 	envconfig.Process("KAFCLAW_CHANNELS_WHATSAPP", &cfg.Channels.WhatsApp)
 	envconfig.Process("KAFCLAW_CHANNELS_FEISHU", &cfg.Channels.Feishu)
+	envconfig.Process("KAFCLAW_CHANNELS_SLACK", &cfg.Channels.Slack)
+	envconfig.Process("KAFCLAW_CHANNELS_MSTEAMS", &cfg.Channels.MSTeams)
 	envconfig.Process("KAFCLAW_GATEWAY", &cfg.Gateway)
 	envconfig.Process("KAFCLAW_TOOLS_EXEC", &cfg.Tools.Exec)
 	envconfig.Process("KAFCLAW_TOOLS_WEB_SEARCH", &cfg.Tools.Web.Search)
@@ -277,6 +281,20 @@ func Load() (*Config, error) {
 	if cfg.Agents != nil {
 		cfg.Agents.Defaults.Subagents = cfg.Tools.Subagents
 	}
+
+	if cfg.Channels.Slack.DmPolicy == "" {
+		cfg.Channels.Slack.DmPolicy = DmPolicyPairing
+	}
+	if cfg.Channels.Slack.GroupPolicy == "" {
+		cfg.Channels.Slack.GroupPolicy = GroupPolicyAllowlist
+	}
+	if cfg.Channels.MSTeams.DmPolicy == "" {
+		cfg.Channels.MSTeams.DmPolicy = DmPolicyPairing
+	}
+	if cfg.Channels.MSTeams.GroupPolicy == "" {
+		cfg.Channels.MSTeams.GroupPolicy = GroupPolicyAllowlist
+	}
+
 	cleanEmptyAgents(cfg)
 
 	// Resolve workspace path with backward compatibility:

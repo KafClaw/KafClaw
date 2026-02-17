@@ -86,6 +86,9 @@ func TestDeliveryWorkerMaxRetryMarksFailed(t *testing.T) {
 	if got.DeliveryStatus != timeline.DeliveryFailed {
 		t.Fatalf("expected failed delivery, got %s", got.DeliveryStatus)
 	}
+	if got.ErrorText != "terminal:max_retries_exceeded" {
+		t.Fatalf("expected reason code in error_text, got %q", got.ErrorText)
+	}
 }
 
 func TestDeliveryBackoff(t *testing.T) {

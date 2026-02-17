@@ -178,6 +178,12 @@ func runGatewayMain(cmd *cobra.Command, args []string) {
 		if cfg.Channels.Discord.Enabled {
 			identity.Channels = append(identity.Channels, "discord")
 		}
+		if cfg.Channels.Slack.Enabled {
+			identity.Channels = append(identity.Channels, "slack")
+		}
+		if cfg.Channels.MSTeams.Enabled {
+			identity.Channels = append(identity.Channels, "msteams")
+		}
 		mgr := group.NewManager(grpCfg, timeSvc, identity)
 		// Bridge group memory items into local vector store for RAG
 		if memorySvc != nil {
@@ -418,6 +424,8 @@ func runGatewayMain(cmd *cobra.Command, args []string) {
 	// 6. Setup Channels
 	// WhatsApp
 	wa := channels.NewWhatsAppChannel(cfg.Channels.WhatsApp, msgBus, prov, timeSvc)
+	slack := channels.NewSlackChannel(cfg.Channels.Slack, msgBus, timeSvc)
+	msteams := channels.NewMSTeamsChannel(cfg.Channels.MSTeams, msgBus, timeSvc)
 
 	// 7. Start Everything
 	ctx, cancel := context.WithCancel(context.Background())
@@ -459,6 +467,12 @@ func runGatewayMain(cmd *cobra.Command, args []string) {
 	// Start Channels
 	if err := wa.Start(ctx); err != nil {
 		fmt.Printf("Failed to start WhatsApp: %v\n", err)
+	}
+	if err := slack.Start(ctx); err != nil {
+		fmt.Printf("Failed to start Slack: %v\n", err)
+	}
+	if err := msteams.Start(ctx); err != nil {
+		fmt.Printf("Failed to start MSTeams: %v\n", err)
 	}
 
 	// Route web UI outbound to WhatsApp and timeline
@@ -683,6 +697,149 @@ func runGatewayMain(cmd *cobra.Command, args []string) {
 			token := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
 			valid := token == cfg.Gateway.AuthToken
 			json.NewEncoder(w).Encode(map[string]any{"valid": valid, "auth_required": true})
+		})
+
+		type channelInboundRequest struct {
+			AccountID    string `json:"account_id"`
+			SenderID     string `json:"sender_id"`
+			ChatID       string `json:"chat_id"`
+			ThreadID     string `json:"thread_id"`
+			MessageID    string `json:"message_id"`
+			Text         string `json:"text"`
+			IsGroup      bool   `json:"is_group"`
+			WasMentioned bool   `json:"was_mentioned"`
+			GroupID      string `json:"group_id"`
+			ChannelID    string `json:"channel_id"`
+		}
+
+		verifyChannelToken := func(r *http.Request, expected string) bool {
+			expected = strings.TrimSpace(expected)
+			if expected == "" {
+				return true
+			}
+			h := strings.TrimSpace(r.Header.Get("X-Channel-Token"))
+			if h == "" {
+				h = strings.TrimSpace(strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer "))
+			}
+			return h == expected
+		}
+
+		resolveSlackInboundToken := func(accountID string) string {
+			id := strings.TrimSpace(strings.ToLower(accountID))
+			if id == "" || id == "default" {
+				return cfg.Channels.Slack.InboundToken
+			}
+			for _, acct := range cfg.Channels.Slack.Accounts {
+				if strings.EqualFold(strings.TrimSpace(acct.ID), id) {
+					if strings.TrimSpace(acct.InboundToken) != "" {
+						return acct.InboundToken
+					}
+					return cfg.Channels.Slack.InboundToken
+				}
+			}
+			return cfg.Channels.Slack.InboundToken
+		}
+
+		resolveMSTeamsInboundToken := func(accountID string) string {
+			id := strings.TrimSpace(strings.ToLower(accountID))
+			if id == "" || id == "default" {
+				return cfg.Channels.MSTeams.InboundToken
+			}
+			for _, acct := range cfg.Channels.MSTeams.Accounts {
+				if strings.EqualFold(strings.TrimSpace(acct.ID), id) {
+					if strings.TrimSpace(acct.InboundToken) != "" {
+						return acct.InboundToken
+					}
+					return cfg.Channels.MSTeams.InboundToken
+				}
+			}
+			return cfg.Channels.MSTeams.InboundToken
+		}
+
+		// API: Slack inbound bridge (POST)
+		mux.HandleFunc("/api/v1/channels/slack/inbound", func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Access-Control-Allow-Origin", "*")
+			w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Channel-Token")
+			w.Header().Set("Content-Type", "application/json")
+			if r.Method == "OPTIONS" {
+				return
+			}
+			if r.Method != "POST" {
+				http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+				return
+			}
+			var body channelInboundRequest
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				http.Error(w, "invalid body", http.StatusBadRequest)
+				return
+			}
+			if !verifyChannelToken(r, resolveSlackInboundToken(body.AccountID)) {
+				http.Error(w, "invalid channel token", http.StatusUnauthorized)
+				return
+			}
+			if strings.TrimSpace(body.SenderID) == "" || strings.TrimSpace(body.ChatID) == "" {
+				http.Error(w, "sender_id and chat_id required", http.StatusBadRequest)
+				return
+			}
+			if err := slack.HandleInboundWithAccount(
+				body.AccountID,
+				body.SenderID,
+				body.ChatID,
+				body.ThreadID,
+				body.MessageID,
+				body.Text,
+				body.IsGroup,
+				body.WasMentioned,
+			); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			json.NewEncoder(w).Encode(map[string]any{"ok": true})
+		})
+
+		// API: MSTeams inbound bridge (POST)
+		mux.HandleFunc("/api/v1/channels/msteams/inbound", func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Access-Control-Allow-Origin", "*")
+			w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Channel-Token")
+			w.Header().Set("Content-Type", "application/json")
+			if r.Method == "OPTIONS" {
+				return
+			}
+			if r.Method != "POST" {
+				http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+				return
+			}
+			var body channelInboundRequest
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				http.Error(w, "invalid body", http.StatusBadRequest)
+				return
+			}
+			if !verifyChannelToken(r, resolveMSTeamsInboundToken(body.AccountID)) {
+				http.Error(w, "invalid channel token", http.StatusUnauthorized)
+				return
+			}
+			if strings.TrimSpace(body.SenderID) == "" || strings.TrimSpace(body.ChatID) == "" {
+				http.Error(w, "sender_id and chat_id required", http.StatusBadRequest)
+				return
+			}
+			if err := msteams.HandleInboundWithContext(
+				body.AccountID,
+				body.SenderID,
+				body.ChatID,
+				body.ThreadID,
+				body.MessageID,
+				body.Text,
+				body.IsGroup,
+				body.WasMentioned,
+				body.GroupID,
+				body.ChannelID,
+			); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			json.NewEncoder(w).Encode(map[string]any{"ok": true})
 		})
 
 		// Orchestrator API endpoints

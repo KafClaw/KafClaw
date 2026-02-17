@@ -19,13 +19,17 @@ Primary v2 reference set for KafClaw.
 | [operations-guide](./operations-guide.md) | Build, deploy, networking, database, observability, API reference |
 | [user-manual](./user-manual.md) | Installation, quick start, CLI, dashboard, WhatsApp, memory, Day2Day, FAQ |
 | [security-risks](./security-risks.md) | Threat model, mitigations, best practices |
+| [subagents-threat-model](./subagents-threat-model.md) | Subagent risk model and isolation guidance |
 | [whatsapp-setup](./whatsapp-setup.md) | Default-deny WhatsApp authorization |
+| [whatsapp-onboarding](./whatsapp-onboarding.md) | WhatsApp onboarding flow and operator checklist |
 | [workspace-policy](./workspace-policy.md) | Fixed workspace path and state isolation |
+| [workshop-setup](./workshop-setup.md) | Workshop/lab environment setup |
 | [docker-deployment](./docker-deployment.md) | Docker Compose deployment guide |
 | [release](./release.md) | Versioning, Make targets, CI/CD |
 | [memory-notes](./memory-notes.md) | Personal context notes |
+| [slack-teams-bridge](./slack-teams-bridge.md) | Slack/Teams bridge setup, pairing, isolation, known limits |
 
 ## Scope
 
 - `docs/v2/` is the current documentation set.
-- `docs/security/`, `docs/bugs/`, and `docs/tasklogs/` keep audit and implementation history.
+- `docs/security/` keeps security audits and roadmap notes.

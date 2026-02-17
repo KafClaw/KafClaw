@@ -55,7 +55,7 @@ func (w *DeliveryWorker) poll() {
 	for _, task := range tasks {
 		if task.DeliveryAttempts >= w.maxRetry {
 			slog.Warn("Delivery max retries exceeded", "task_id", task.TaskID, "attempts", task.DeliveryAttempts)
-			_ = w.timeline.UpdateTaskDelivery(task.TaskID, timeline.DeliveryFailed, nil)
+			_ = w.timeline.UpdateTaskDeliveryWithReason(task.TaskID, timeline.DeliveryFailed, nil, "terminal:max_retries_exceeded")
 			continue
 		}
 
@@ -69,7 +69,7 @@ func (w *DeliveryWorker) poll() {
 		})
 
 		// Mark as sent (the channel subscriber can override on failure)
-		_ = w.timeline.UpdateTaskDelivery(task.TaskID, timeline.DeliverySent, nil)
+		_ = w.timeline.UpdateTaskDeliveryWithReason(task.TaskID, timeline.DeliverySent, nil, "")
 		slog.Info("Delivery worker dispatched", "task_id", task.TaskID, "channel", task.Channel)
 	}
 }

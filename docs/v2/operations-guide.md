@@ -193,6 +193,42 @@ Or set permanently in `~/.kafclaw/config.json`:
 }
 ```
 
+### channel bridge operations (slack/teams)
+
+Slack and Teams provider traffic is handled by `cmd/channelbridge` (default bind `:18888`) and forwarded to gateway inbound APIs.
+
+Build and run:
+
+```bash
+go build -o /tmp/channelbridge ./cmd/channelbridge
+/tmp/channelbridge
+```
+
+Bridge ingress endpoints:
+
+- `POST /slack/events`
+- `POST /slack/commands`
+- `POST /slack/interactions`
+- `POST /teams/messages`
+
+Forward targets in gateway:
+
+- `POST /api/v1/channels/slack/inbound`
+- `POST /api/v1/channels/msteams/inbound`
+
+Bridge auth controls:
+
+- Slack request signature verification with `SLACK_SIGNING_SECRET`
+- Teams ingress bearer gate with `MSTEAMS_INBOUND_BEARER`
+- Teams Bot Framework JWT validation via `MSTEAMS_OPENID_CONFIG` + JWKS (`aud`, `iss`, `exp`, `nbf`, trusted service URL host)
+
+Bridge observability and diagnostics:
+
+- `GET /healthz`
+- `GET /status`
+- `GET /slack/probe` (Slack token diagnostics)
+- `GET /teams/probe` (bot + graph diagnostics, permission coverage, capability checks)
+
 ---
 
 ## 4. Network and Ports
@@ -201,6 +237,7 @@ Or set permanently in `~/.kafclaw/config.json`:
 |------|---------|-------------|
 | 18790 | API Server | POST /chat endpoint |
 | 18791 | Dashboard | REST API + Web UI |
+| 18888 | Channel bridge (optional) | Slack/Teams ingress and outbound bridge |
 
 Default bind: `127.0.0.1` (localhost only). Configure via:
 
@@ -416,6 +453,19 @@ Delivery worker polls every 5 seconds, retries up to 5 times with exponential ba
 | GET | `/api/v1/approvals/pending` | Pending approvals |
 | POST | `/api/v1/approvals/{id}` | Approve/deny |
 
+### Port 18888 — channel bridge sidecar
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/healthz` | Liveness |
+| GET | `/status` | Counters and caches |
+| GET | `/slack/probe` | Slack token/auth probe |
+| GET | `/teams/probe` | Teams bot + graph credential diagnostics |
+| POST | `/slack/events` | Slack Events API ingress |
+| POST | `/slack/commands` | Slack slash command ingress |
+| POST | `/slack/interactions` | Slack interactions ingress |
+| POST | `/teams/messages` | Teams bot activity ingress |
+
 ---
 
 ## 8. Health Checks and Backup
@@ -500,3 +550,22 @@ lsof -ti tcp:18791 -sTCP:LISTEN | xargs kill
 ### Dashboard Failure
 
 If the dashboard server fails to bind its port, it triggers context cancellation that stops the entire gateway. The dashboard is considered essential for operation.
+
+### channel bridge troubleshooting
+
+If Slack/Teams messages are not processing:
+
+1. Verify bridge liveness: `curl -s http://127.0.0.1:18888/healthz`
+2. Verify KafClaw channel outbound URL targets bridge endpoints
+3. Probe credentials:
+   - `curl -s http://127.0.0.1:18888/slack/probe`
+   - `curl -s http://127.0.0.1:18888/teams/probe`
+4. Verify inbound tokens and provider auth settings (signing secret, bearer, app credentials)
+5. Inspect timeline delivery reason taxonomy for retry state:
+   - `transient:rate_limited`
+   - `transient:upstream_5xx`
+   - `transient:network`
+   - `terminal:unauthorized`
+   - `terminal:invalid_target_or_payload`
+   - `terminal:max_retries_exceeded`
+   - `terminal:send_failed`

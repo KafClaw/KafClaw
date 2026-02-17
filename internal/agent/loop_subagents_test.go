@@ -54,6 +54,35 @@ func TestLoopCurrentSessionKey(t *testing.T) {
 	}
 }
 
+func TestLoopCurrentSessionKeyIsolationAcrossChannels(t *testing.T) {
+	loop := NewLoop(LoopOptions{Workspace: t.TempDir(), WorkRepo: t.TempDir()})
+	loop.activeChatID = "shared-room"
+
+	loop.activeChannel = "whatsapp"
+	wa := loop.currentSessionKey()
+	if wa != "whatsapp:shared-room" {
+		t.Fatalf("unexpected whatsapp key: %s", wa)
+	}
+
+	loop.activeChannel = "slack"
+	slack := loop.currentSessionKey()
+	if slack != "slack:shared-room" {
+		t.Fatalf("unexpected slack key: %s", slack)
+	}
+	if slack == wa {
+		t.Fatalf("expected channel-isolated keys, got same key %q", slack)
+	}
+
+	loop.activeChannel = "msteams"
+	teams := loop.currentSessionKey()
+	if teams != "msteams:shared-room" {
+		t.Fatalf("unexpected teams key: %s", teams)
+	}
+	if teams == wa || teams == slack {
+		t.Fatalf("expected unique keys per channel, got whatsapp=%q slack=%q teams=%q", wa, slack, teams)
+	}
+}
+
 func TestLoopSubagentPolicy(t *testing.T) {
 	loop := NewLoop(LoopOptions{
 		Workspace:             t.TempDir(),

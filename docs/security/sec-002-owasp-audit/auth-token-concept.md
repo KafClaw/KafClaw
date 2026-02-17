@@ -23,7 +23,7 @@ KafClaw's current authentication model has fundamental weaknesses:
 
 1. **JWT-based authentication** with short-lived access tokens and rotating refresh tokens
 2. **Scope-based authorization** -- tokens carry specific permissions
-3. **Per-bot identity integration** -- tokens are bound to bot identities (see BOT-IDENTITY-PROPOSAL.md)
+3. **Per-bot identity integration** -- tokens are bound to bot identities (see bot-identity-proposal.md)
 4. **Multiple auth methods** -- support API keys (backward compat), JWT tokens (new), and mTLS (future)
 5. **Channel-aware** -- different auth requirements for web, CLI, WhatsApp, API clients
 6. **Zero-trust internals** -- internal service calls also authenticated

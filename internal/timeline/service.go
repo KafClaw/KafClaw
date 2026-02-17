@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"fmt"
+	"strings"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -652,10 +653,20 @@ func (s *TimelineService) UpdateTaskStatus(taskID, status, contentOut, errorText
 
 // UpdateTaskDelivery updates delivery_status, increments delivery_attempts, and sets delivery_next_at.
 func (s *TimelineService) UpdateTaskDelivery(taskID, deliveryStatus string, nextAt *time.Time) error {
+	return s.UpdateTaskDeliveryWithReason(taskID, deliveryStatus, nextAt, "")
+}
+
+// UpdateTaskDeliveryWithReason updates delivery fields and stores a reason code in error_text when provided.
+func (s *TimelineService) UpdateTaskDeliveryWithReason(taskID, deliveryStatus string, nextAt *time.Time, reason string) error {
 	query := `UPDATE tasks SET delivery_status = ?, delivery_attempts = delivery_attempts + 1, delivery_next_at = ?, updated_at = datetime('now') WHERE task_id = ?`
 	var nextAtVal interface{}
 	if nextAt != nil {
 		nextAtVal = *nextAt
+	}
+	if strings.TrimSpace(reason) != "" {
+		query = `UPDATE tasks SET delivery_status = ?, delivery_attempts = delivery_attempts + 1, delivery_next_at = ?, error_text = ?, updated_at = datetime('now') WHERE task_id = ?`
+		_, err := s.db.Exec(query, deliveryStatus, nextAtVal, strings.TrimSpace(reason), taskID)
+		return err
 	}
 	_, err := s.db.Exec(query, deliveryStatus, nextAtVal, taskID)
 	return err

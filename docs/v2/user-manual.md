@@ -10,7 +10,7 @@ A comprehensive guide to installing, configuring, and using KafClaw — a person
 2. [Quick Start](#2-quick-start)
 3. [CLI Reference](#3-cli-reference)
 4. [Web Dashboard](#4-web-dashboard)
-5. [WhatsApp Integration](#5-whatsapp-integration)
+5. [WhatsApp, Slack, and Teams Integration](#5-whatsapp-slack-and-teams-integration)
 6. [Memory System](#6-memory-system)
 7. [Day2Day Task Tracker](#7-day2day-task-tracker)
 8. [Soul Files and Workspace](#8-soul-files-and-workspace)
@@ -167,7 +167,7 @@ Subagent runtime notes:
 
 ### 3.4 `status`
 
-Show system status: version, config, API keys, WhatsApp connectivity.
+Show system status: version, config, API keys, channel enablement, Slack/Teams per-account capability details, isolation scope details, account configuration diagnostics, pairing queue, and unsafe group policy warnings.
 
 ```bash
 kafclaw status
@@ -190,6 +190,8 @@ kafclaw doctor
 kafclaw doctor --fix
 kafclaw doctor --generate-gateway-token
 ```
+
+Includes Slack/Teams account configuration diagnostics checks.
 
 ### 3.7 `config`
 
@@ -287,7 +289,7 @@ Header status indicators: mode badge, memory LED, sidecar/connection status.
 
 ---
 
-## 5. WhatsApp Integration
+## 5. WhatsApp, Slack, and Teams Integration
 
 > See also: [FR-001 WhatsApp Auth Flow](../requirements/FR-001-whatsapp-auth-flow.md), [FR-008 WhatsApp Silent Inbound](../requirements/FR-008-whatsapp-silent-inbound.md), [whatsapp-setup.md](./whatsapp-setup.md) for full details
 
@@ -311,6 +313,43 @@ Three-tier JID system (default-deny):
 ### Silent Mode
 
 Default on. When enabled, outbound WhatsApp messages are suppressed (logged as `suppressed`). Force-send override available per web user.
+
+### Slack and Teams bridge
+
+Slack and Teams run through the channel bridge (`cmd/channelbridge`) and pair with KafClaw via inbound/outbound HTTP.
+
+Required bridge inputs:
+
+- Slack: bot token, optional app token (socket mode), signing secret, inbound token
+- Teams: app id/password, inbound bearer, inbound token, OpenID config/JWKS
+
+Core behavior:
+
+- Unknown sender in DM policy `pairing` gets a pairing code.
+- Approve pairing from CLI:
+  - `kafclaw pairing approve slack <code>`
+  - `kafclaw pairing approve msteams <code>`
+- Group policy supports `allowlist`, `open`, `disabled`, plus mention gating in groups/channels.
+
+Multi-account and isolation:
+
+- Slack and Teams support named accounts (`channels.<provider>.accounts[]`).
+- Message routing is account-aware (`account_id`).
+- Session isolation mode is configurable per provider/account:
+  - `channel`, `account`, `room` (default), `thread`, `user`
+- Default behavior isolates by provider + account + room so user A and user B do not leak sessions across different chats/accounts.
+
+Reply behavior:
+
+- Outbound supports `reply_mode=off|first|all`.
+- `off`: never thread reply.
+- `first`: only first reply in a thread context.
+- `all`: thread reply whenever thread id is present.
+
+Known limits:
+
+- Slack normalization/chunking is functional but not full OpenClaw variant parity.
+- Teams runs on custom Go Bot Framework HTTP/JWT flow (no direct Microsoft Agents Hosting runtime parity in Go).
 
 ---
 
@@ -498,6 +537,35 @@ Options: wait until tomorrow (resets daily), increase `daily_token_limit` via da
 ### Messages not being delivered
 
 Check if silent mode is enabled in the dashboard Settings panel. Disable it, or enable `force_send` for specific web users.
+
+For Slack/Teams also check:
+
+- Bridge process is running and reachable from KafClaw outbound URL.
+- Inbound token matches between bridge and `channels.<provider>.inboundToken`.
+- Provider auth is valid:
+  - Slack signing secret/token
+  - Teams bearer + app credentials/JWKS validation
+- `kafclaw status` for per-account capabilities/diagnostics and policy warnings.
+
+### Slack request rejected (401/403)
+
+Most common causes:
+
+- `SLACK_SIGNING_SECRET` mismatch
+- stale request timestamp
+- invalid Slack bot token/app token
+
+Use bridge `/slack/probe` and `kafclaw status` to verify credentials and account diagnostics.
+
+### Teams request rejected (401/403)
+
+Most common causes:
+
+- invalid `MSTEAMS_INBOUND_BEARER`
+- invalid Bot Framework JWT claims (`aud`, `iss`, `exp`, `nbf`)
+- untrusted `serviceUrl` host
+
+Use bridge `/teams/probe` to inspect token claims, permission coverage, and graph capability checks.
 
 ### "Max iterations reached"
 
