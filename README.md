@@ -176,6 +176,9 @@ make run-full
 
 # Run tests
 go test ./...
+make test-smoke              # critical-path smoke tests
+make test-critical           # enforce 100% critical-logic coverage gate
+make test-fuzz               # fuzz critical guard logic
 
 # Kafka diagnostics
 ./kafclaw kshark --broker localhost:9092 --test-connection

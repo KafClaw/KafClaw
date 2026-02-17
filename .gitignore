@@ -40,3 +40,7 @@ electron/dist/
 # Local planning / scratch
 /task.md
 /.tmp/
+
+# Keep Node version pins tracked
+!.nvmrc
+!.node-version
