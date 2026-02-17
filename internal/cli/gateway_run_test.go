@@ -6,12 +6,60 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sync"
 	"syscall"
 	"testing"
 	"time"
 )
 
+var (
+	gatewayTestSignalMu sync.Mutex
+	gatewayTestSignalCh chan<- os.Signal
+)
+
+func stubGatewaySignals(t *testing.T) {
+	t.Helper()
+	origNotify := gatewaySignalNotify
+	origStop := gatewaySignalStop
+	gatewaySignalNotify = func(c chan<- os.Signal, _ ...os.Signal) {
+		gatewayTestSignalMu.Lock()
+		gatewayTestSignalCh = c
+		gatewayTestSignalMu.Unlock()
+	}
+	gatewaySignalStop = func(c chan<- os.Signal) {
+		gatewayTestSignalMu.Lock()
+		if gatewayTestSignalCh == c {
+			gatewayTestSignalCh = nil
+		}
+		gatewayTestSignalMu.Unlock()
+	}
+	t.Cleanup(func() {
+		gatewaySignalNotify = origNotify
+		gatewaySignalStop = origStop
+		gatewayTestSignalMu.Lock()
+		gatewayTestSignalCh = nil
+		gatewayTestSignalMu.Unlock()
+	})
+}
+
+func sendGatewaySignal(t *testing.T, sig os.Signal) {
+	t.Helper()
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		gatewayTestSignalMu.Lock()
+		ch := gatewayTestSignalCh
+		gatewayTestSignalMu.Unlock()
+		if ch != nil {
+			ch <- sig
+			return
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	t.Fatalf("timed out waiting for gateway signal channel")
+}
+
 func TestRunGatewayBootAndShutdown(t *testing.T) {
+	stubGatewaySignals(t)
 	// Isolate all HOME-based writes used by config/timeline/gateway startup.
 	tmpHome := t.TempDir()
 	origHome := os.Getenv("HOME")
@@ -41,13 +89,7 @@ func TestRunGatewayBootAndShutdown(t *testing.T) {
 
 	// Let startup progress through initialization, handlers, and server boot.
 	time.Sleep(800 * time.Millisecond)
-	proc, err := os.FindProcess(os.Getpid())
-	if err != nil {
-		t.Fatalf("find process: %v", err)
-	}
-	if err := proc.Signal(syscall.SIGTERM); err != nil {
-		t.Fatalf("send SIGTERM: %v", err)
-	}
+	sendGatewaySignal(t, syscall.SIGTERM)
 
 	select {
 	case <-done:
@@ -57,6 +99,7 @@ func TestRunGatewayBootAndShutdown(t *testing.T) {
 }
 
 func TestRunGatewayServesDashboardEndpoints(t *testing.T) {
+	stubGatewaySignals(t)
 	tmpHome := t.TempDir()
 	origHome := os.Getenv("HOME")
 	origHost := os.Getenv("KAFCLAW_GATEWAY_HOST")
@@ -185,13 +228,7 @@ func TestRunGatewayServesDashboardEndpoints(t *testing.T) {
 	call(http.MethodGet, "/approvals", "")
 	call(http.MethodGet, "/", "")
 
-	proc, err := os.FindProcess(os.Getpid())
-	if err != nil {
-		t.Fatalf("find process: %v", err)
-	}
-	if err := proc.Signal(syscall.SIGTERM); err != nil {
-		t.Fatalf("send SIGTERM: %v", err)
-	}
+	sendGatewaySignal(t, syscall.SIGTERM)
 
 	select {
 	case <-done:
@@ -201,6 +238,7 @@ func TestRunGatewayServesDashboardEndpoints(t *testing.T) {
 }
 
 func TestRunGatewayOrchestratorModeBranches(t *testing.T) {
+	stubGatewaySignals(t)
 	tmpHome := t.TempDir()
 	origHome := os.Getenv("HOME")
 	origHost := os.Getenv("KAFCLAW_GATEWAY_HOST")
@@ -276,13 +314,7 @@ func TestRunGatewayOrchestratorModeBranches(t *testing.T) {
 
 	do(http.MethodPost, apiBase+"/chat?message=hello+there&session=s1", "", "")
 
-	proc, err := os.FindProcess(os.Getpid())
-	if err != nil {
-		t.Fatalf("find process: %v", err)
-	}
-	if err := proc.Signal(syscall.SIGTERM); err != nil {
-		t.Fatalf("send SIGTERM: %v", err)
-	}
+	sendGatewaySignal(t, syscall.SIGTERM)
 
 	select {
 	case <-done:

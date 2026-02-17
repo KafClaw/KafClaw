@@ -50,6 +50,9 @@ var gatewayCmd = &cobra.Command{
 	Run:   runGateway,
 }
 
+var gatewaySignalNotify = signal.Notify
+var gatewaySignalStop = signal.Stop
+
 func runGateway(cmd *cobra.Command, args []string) {
 	runGatewayMain(cmd, args)
 }
@@ -422,7 +425,8 @@ func runGatewayMain(cmd *cobra.Command, args []string) {
 
 	// Handle signals
 	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+	gatewaySignalNotify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+	defer gatewaySignalStop(sigChan)
 
 	// Start Auto-Indexer
 	if autoIndexer != nil {
