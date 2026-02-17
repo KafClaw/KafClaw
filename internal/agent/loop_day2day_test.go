@@ -262,9 +262,9 @@ func TestProcessDirectAndStop(t *testing.T) {
 		t.Fatalf("unexpected direct response: %q", resp)
 	}
 
-	loop.running = true
+	loop.running.Store(true)
 	loop.Stop()
-	if loop.running {
+	if loop.running.Load() {
 		t.Fatal("expected loop stopped")
 	}
 }
