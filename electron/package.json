@@ -19,12 +19,12 @@
     "dist:win": "npm run build && electron-builder --win"
   },
   "dependencies": {
+    "pinia": "^2.1.0",
     "vue": "^3.4.0",
-    "vue-router": "^4.3.0",
-    "pinia": "^2.1.0"
+    "vue-router": "^4.3.0"
   },
   "devDependencies": {
-    "@vitejs/plugin-vue": "^5.0.0",
+    "@vitejs/plugin-vue": "^6.0.4",
     "concurrently": "^8.2.0",
     "electron": "^35.7.5",
     "electron-builder": "^24.9.0",
