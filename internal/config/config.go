@@ -13,6 +13,7 @@ type Config struct {
 	Providers    ProvidersConfig      `json:"providers"`
 	Gateway      GatewayConfig        `json:"gateway"`
 	Tools        ToolsConfig          `json:"tools"`
+	Skills       SkillsConfig         `json:"skills"`
 	Group        GroupConfig          `json:"group"`
 	Orchestrator OrchestratorConfig   `json:"orchestrator"`
 	Scheduler    SchedulerConfig      `json:"scheduler"`
@@ -248,6 +249,33 @@ type ToolsConfig struct {
 	Subagents SubagentsToolConfig `json:"subagents"`
 }
 
+// SkillsConfig contains skill-system settings.
+type SkillsConfig struct {
+	Enabled               bool                        `json:"enabled" envconfig:"ENABLED"`
+	AllowSystemRepoSkills bool                        `json:"allowSystemRepoSkills"`
+	AllowWorkspaceSkills  bool                        `json:"allowWorkspaceSkills"`
+	ExternalInstalls      bool                        `json:"externalInstalls"`
+	NodeManager           string                      `json:"nodeManager" envconfig:"NODE_MANAGER"`
+	Scope                 string                      `json:"scope" envconfig:"SCOPE"`
+	RuntimeIsolation      string                      `json:"runtimeIsolation" envconfig:"RUNTIME_ISOLATION"`
+	LinkPolicy            SkillLinkPolicyConfig       `json:"linkPolicy"`
+	Entries               map[string]SkillEntryConfig `json:"entries,omitempty"`
+}
+
+// SkillLinkPolicyConfig controls which links are permitted in skills/installers.
+type SkillLinkPolicyConfig struct {
+	Mode             string   `json:"mode"`
+	AllowDomains     []string `json:"allowDomains,omitempty"`
+	DenyDomains      []string `json:"denyDomains,omitempty"`
+	AllowHTTP        bool     `json:"allowHttp"`
+	MaxLinksPerSkill int      `json:"maxLinksPerSkill"`
+}
+
+// SkillEntryConfig holds per-skill toggles.
+type SkillEntryConfig struct {
+	Enabled bool `json:"enabled"`
+}
+
 // AgentsConfig mirrors OpenClaw-style defaults block for future compatibility.
 type AgentsConfig struct {
 	Defaults AgentDefaultsConfig `json:"defaults"`
@@ -396,6 +424,21 @@ func DefaultConfig() *Config {
 				MaxSpawnDepth:       1,
 				MaxChildrenPerAgent: 5,
 				ArchiveAfterMinutes: 60,
+			},
+		},
+		Skills: SkillsConfig{
+			Enabled:               false,
+			AllowSystemRepoSkills: true,
+			AllowWorkspaceSkills:  false,
+			ExternalInstalls:      false,
+			NodeManager:           "npm",
+			Scope:                 "selected",
+			RuntimeIsolation:      "auto",
+			LinkPolicy: SkillLinkPolicyConfig{
+				Mode:             "allowlist",
+				AllowDomains:     []string{"clawhub.ai"},
+				AllowHTTP:        false,
+				MaxLinksPerSkill: 20,
 			},
 		},
 		Group: GroupConfig{
