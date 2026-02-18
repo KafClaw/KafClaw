@@ -154,4 +154,3 @@ Use trace views in dashboard to inspect these lifecycle events.
 - [Operations Guide](./operations-guide/)
 - [Admin Guide](./admin-guide/)
 - [Security Risks](../architecture-security/security-risks/)
-title: Operations and Maintenance

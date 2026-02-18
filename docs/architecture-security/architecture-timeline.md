@@ -143,4 +143,3 @@ Memory-specific views:
 The original design referenced Qdrant (QMD) as an external vector database. KafClaw v2 replaced this with SQLite-vec — an embedded vector store requiring zero external dependencies. Cosine similarity computed in Go is sub-millisecond at under 10,000 chunks.
 
 The ER1 integration and observer/reflector pattern were added in v2 to support long-term personal memory and conversation compression. See [FR-021 Memory v2 Implementation Plan](../requirements/FR-021-memory-v2-implementation-plan/) for the step-by-step implementation.
-title: Architecture: Timeline and Memory

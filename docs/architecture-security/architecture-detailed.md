@@ -786,4 +786,3 @@ ContextBuilder.BuildSystemPrompt()
 2. Route in `router/index.ts`
 3. Nav link in `App.vue`
 4. Pinia store if needed
-title: KafClaw System Architecture — Detailed Reference

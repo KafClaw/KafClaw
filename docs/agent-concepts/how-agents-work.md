@@ -58,4 +58,3 @@ At gateway startup:
 - if memory service is enabled, soul files are indexed in background
 
 This makes headless and container setups self-healing for missing baseline files.
-title: How Agents Work

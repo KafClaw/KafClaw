@@ -54,4 +54,3 @@ This document defines security boundaries for subagent orchestration (`sessions_
 - Keep strict child tool allow/deny policies for production.
 - Monitor timeline for repeated `subagent` failures/timeouts.
 - Prefer `cleanup=delete` only when downstream delivery guarantees are acceptable for your deployment.
-title: Subagents Threat Model

@@ -87,4 +87,3 @@ An unauthorized sender could trigger expensive LLM calls.
 5. **Review policy decisions.** Use the dashboard trace viewer to audit tool access decisions.
 6. **Keep WhatsApp allowlist minimal.** Only approve known contacts.
 7. **Back up regularly.** Back up `~/.kafclaw/timeline.db` and `~/.kafclaw/whatsapp.db`.
-title: KafClaw Security Risks

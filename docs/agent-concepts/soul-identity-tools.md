@@ -70,4 +70,3 @@ Use for owner/user profile, preferences, timezone, and project context.
 
 `TOOLS.md` describes tools, but actual capabilities in runtime come from tool registration in Go code.
 If docs and runtime diverge, runtime registration is source of truth.
-title: Soul and Identity Files

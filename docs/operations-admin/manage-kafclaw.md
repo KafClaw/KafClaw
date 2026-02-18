@@ -312,4 +312,3 @@ Validation endpoint:
 1. `./kafclaw status` for account diagnostics
 2. Check `pairing pending`
 3. If using bridge, check `GET /status` on channel bridge
-title: KafClaw Management Guide

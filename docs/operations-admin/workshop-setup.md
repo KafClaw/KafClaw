@@ -180,4 +180,3 @@ make workshop-ps     # Container status
 | Work repo empty | Set `WORK_REPO_GIT_URL` in `.env` or pre-populate the mounted directory |
 | Soul files missing | Agent auto-scaffolds defaults on startup. Customize `examples/workshop/*/workspace/SOUL.md` |
 | KafScale images not found | Set `KAFSCALE_REGISTRY` in `.env` to your registry (e.g., `192.168.0.131:5100/kafscale`) |
-title: Workshop Setup — 4-Agent Group Deployment

@@ -5,8 +5,6 @@ title: WhatsApp Setup (Default Deny)
 
 # WhatsApp Setup (Default Deny)
 
-> See also: [FR-001 WhatsApp Auth Flow](../requirements/FR-001-whatsapp-auth-flow/)
-
 ## Overview
 
 WhatsApp access is **default-deny**. Only explicitly whitelisted senders can reach the bot. Unknown senders are placed in a pending queue for admin review.
@@ -91,4 +89,3 @@ Compared with OpenClaw, currently limited:
 | `~/.kafclaw/whatsapp.db` | Session/device link persistence |
 | `~/.kafclaw/whatsapp-qr.png` | QR code for initial device linking |
 | `~/.kafclaw/timeline.db` | Allowlist, denylist, pending lists, pairing token |
-title: WhatsApp Setup (Default Deny)

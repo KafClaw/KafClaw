@@ -587,4 +587,3 @@ If Slack/Teams messages are not processing:
    - `terminal:invalid_target_or_payload`
    - `terminal:max_retries_exceeded`
    - `terminal:send_failed`
-title: KafClaw Operations Guide

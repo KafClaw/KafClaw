@@ -115,4 +115,3 @@ flowchart LR
 - **Graceful degradation** — Memory, group, orchestrator, ER1 are all optional.
 - **Secure defaults** — Binds 127.0.0.1, tier-restricted tools, deny-pattern filtering.
 - **Single SQLite database** — All persistent state in `~/.kafclaw/timeline.db`.
-title: KafClaw Architecture — Overview

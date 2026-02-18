@@ -97,4 +97,3 @@ Test restore regularly on a clean host.
 ```
 
 Use these as part of daily operations and after any security-relevant change.
-title: Security for Operators
