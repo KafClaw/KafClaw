@@ -62,6 +62,8 @@ var PathPatterns = []string{
 	`\\\.\.`, // \..
 }
 
+var destructiveRMRootRegex = regexp.MustCompile(`(^|[^a-z])rm\s+-r[f]?\s+[/~]`)
+
 // ExecTool executes shell commands.
 type ExecTool struct {
 	Timeout             time.Duration
@@ -219,6 +221,9 @@ func (t *ExecTool) guardCommand(command, workingDir string) error {
 	}
 
 	// Check deny patterns
+	if destructiveRMRootRegex.MatchString(normalized) {
+		return fmt.Errorf(blockedAttackMessage)
+	}
 	for _, re := range t.denyRegexes {
 		if re.MatchString(normalized) {
 			return fmt.Errorf(blockedAttackMessage)
