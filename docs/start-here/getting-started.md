@@ -1,5 +1,5 @@
 ---
-nav_exclude: true
+parent: Start Here
 ---
 
 # Getting Started
@@ -258,9 +258,9 @@ Join and verify:
 
 ## Next
 
-- [Manage KafClaw](./manage-kafclaw.md)
-- [Operations and Maintenance](./maintenance.md)
-- [How Agents Work](./concepts/how-agents-work.md)
-- [Soul and Identity Files](./concepts/soul-identity-tools.md)
-- [User Manual](./v2/user-manual.md)
-- [Admin Guide](./v2/admin-guide.md)
+- [Manage KafClaw](../operations-admin/manage-kafclaw.md)
+- [Operations and Maintenance](../operations-admin/maintenance.md)
+- [How Agents Work](../agent-concepts/how-agents-work.md)
+- [Soul and Identity Files](../agent-concepts/soul-identity-tools.md)
+- [User Manual](./user-manual.md)
+- [Admin Guide](../operations-admin/admin-guide.md)

@@ -1,5 +1,5 @@
 ---
-nav_exclude: true
+parent: Operations and Admin
 ---
 
 # KafClaw Management Guide

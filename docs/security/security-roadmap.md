@@ -511,10 +511,10 @@ Based on commit timestamps and release cadence:
 
 | Document | Location |
 |---------|----------|
-| Security risks assessment | `docs/v2/security-risks.md` |
+| Security risks assessment | `docs/architecture-security/security-risks.md` |
 | Architecture (security model section) | `kafclaw/ARCHITECTURE.md` §9 |
-| Admin guide (gateway auth) | `docs/v2/admin-guide.md` |
-| WhatsApp authorization model | `docs/v2/whatsapp-setup.md` |
+| Admin guide (gateway auth) | `docs/operations-admin/admin-guide.md` |
+| WhatsApp authorization model | `docs/integrations/whatsapp-setup.md` |
 | **This roadmap** | `docs/security/security-roadmap.md` |
 
 ### Research Sources

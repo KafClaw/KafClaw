@@ -1,5 +1,5 @@
 ---
-parent: v2 Docs
+parent: Integrations
 ---
 
 # WhatsApp Onboarding — Buddy Access

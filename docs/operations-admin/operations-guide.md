@@ -1,5 +1,5 @@
 ---
-parent: v2 Docs
+parent: Operations and Admin
 ---
 
 # KafClaw Operations Guide

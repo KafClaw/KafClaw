@@ -1,5 +1,5 @@
 ---
-parent: v2 Docs
+parent: Architecture and Security
 ---
 
 # KafClaw Architecture — Overview

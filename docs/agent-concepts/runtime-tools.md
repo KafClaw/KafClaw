@@ -1,5 +1,5 @@
 ---
-nav_exclude: true
+parent: Agent Concepts
 ---
 
 # Runtime Tools and Capabilities
@@ -40,5 +40,5 @@ If registration changes, group-visible capabilities change automatically.
 
 For operational policy and hardening, see:
 
-- `docs/v2/security-risks.md`
-- `docs/v2/admin-guide.md`
+- `docs/architecture-security/security-risks.md`
+- `docs/operations-admin/admin-guide.md`

@@ -1,5 +1,5 @@
 ---
-nav_exclude: true
+parent: Operations and Admin
 ---
 
 # Operations and Maintenance
@@ -150,6 +150,6 @@ Use trace views in dashboard to inspect these lifecycle events.
 
 ## Deep References
 
-- [Operations Guide](./v2/operations-guide.md)
-- [Admin Guide](./v2/admin-guide.md)
-- [Security Risks](./v2/security-risks.md)
+- [Operations Guide](./operations-guide.md)
+- [Admin Guide](./admin-guide.md)
+- [Security Risks](../architecture-security/security-risks.md)

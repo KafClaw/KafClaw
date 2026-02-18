@@ -1,5 +1,5 @@
 ---
-nav_exclude: true
+parent: Agent Concepts
 ---
 
 # Soul and Identity Files
