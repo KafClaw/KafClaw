@@ -6,6 +6,7 @@ has_children: true
 
 # Architecture and Security
 
+- [Security for Operators](./security-for-ops.md)
 - [Architecture Overview](./architecture.md)
 - [Detailed Architecture](./architecture-detailed.md)
 - [Timeline and Memory Architecture](./architecture-timeline.md)

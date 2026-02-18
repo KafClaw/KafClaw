@@ -54,6 +54,7 @@ KafClaw is a Go-based agent runtime with three practical deployment modes:
 ## Architecture and Security
 
 - [Architecture and Security](./architecture-security/index.md)
+- [Security for Operators](./architecture-security/security-for-ops.md)
 - [Architecture Overview](./architecture-security/architecture.md)
 - [Detailed Architecture](./architecture-security/architecture-detailed.md)
 - [Timeline Architecture](./architecture-security/architecture-timeline.md)
