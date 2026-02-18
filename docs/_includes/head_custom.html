@@ -1,0 +1,32 @@
+{% assign seo_title = page.title | default: site.title %}
+{% assign seo_description = page.description | default: page.excerpt | default: site.description | strip_html | normalize_whitespace %}
+{% assign seo_image = page.image | default: site.logo | default: "/assets/kafclaw.png" %}
+
+<link rel="icon" type="image/png" href="{{ seo_image | relative_url }}">
+<link rel="apple-touch-icon" href="{{ seo_image | relative_url }}">
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "{% if page.url == '/' %}WebSite{% else %}TechArticle{% endif %}",
+  "name": "{{ seo_title | escape }}",
+  "headline": "{{ seo_title | escape }}",
+  "description": "{{ seo_description | escape }}",
+  "url": "{{ page.url | absolute_url }}",
+  "inLanguage": "en-US",
+  "publisher": {
+    "@type": "Organization",
+    "name": "Scalytics",
+    "url": "https://www.scalytics.io",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "{{ '/assets/kafclaw.png' | absolute_url }}"
+    }
+  },
+  "isPartOf": {
+    "@type": "WebSite",
+    "name": "{{ site.title | escape }}",
+    "url": "{{ '/' | absolute_url }}"
+  }
+}
+</script>

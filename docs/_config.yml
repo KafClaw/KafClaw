@@ -1,8 +1,17 @@
 title: KafClaw Docs
 description: KafClaw product, operations, and administration documentation.
+url: https://kafclaw.scalytics.io
+baseurl: ""
+logo: /assets/kafclaw.png
+author: KafClaw
+twitter:
+  card: summary_large_image
+  username: kafclaw
 remote_theme: just-the-docs/just-the-docs
 plugins:
   - jekyll-remote-theme
+  - jekyll-seo-tag
+  - jekyll-include-cache
 markdown: kramdown
 kramdown:
   input: GFM
@@ -12,6 +21,7 @@ defaults:
       type: "pages"
     values:
       layout: "default"
+      image: /assets/kafclaw.png
   - scope:
       path: "index.md"
     values:
