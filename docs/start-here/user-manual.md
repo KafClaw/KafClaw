@@ -1,6 +1,7 @@
 ---
 title: User Manual
-nav_order: 3
+parent: Getting Started
+nav_order: 1
 ---
 
 # KafClaw User Manual
