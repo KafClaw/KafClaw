@@ -42,12 +42,15 @@
     if (!btn) return;
 
     setIcon(btn, activeTheme());
-    btn.addEventListener("click", function () {
+    function handleToggle() {
       var now = activeTheme();
       var next = now === "dark" ? "light" : "dark";
       applyTheme(next);
       setIcon(btn, next);
-    });
+    }
+
+    btn.onclick = handleToggle;
+    btn.addEventListener("click", handleToggle);
   }
 
   if (document.readyState === "loading") {

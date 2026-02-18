@@ -2,12 +2,12 @@
 {% assign seo_description = page.description | default: page.excerpt | default: site.description | strip_html | normalize_whitespace %}
 {% assign seo_image = page.image | default: site.logo | default: "/assets/kafclaw.png" %}
 
-<script src="{{ '/assets/js/theme-init.js' | relative_url }}"></script>
+<script src="{{ '/assets/js/theme-init.js' | relative_url }}?v={{ site.time | date: '%s' }}"></script>
 
 <link rel="icon" type="image/png" href="{{ seo_image | relative_url }}">
 <link rel="apple-touch-icon" href="{{ seo_image | relative_url }}">
 
-<script src="{{ '/assets/js/theme-toggle.js' | relative_url }}" defer></script>
+<script src="{{ '/assets/js/theme-toggle.js' | relative_url }}?v={{ site.time | date: '%s' }}" defer></script>
 
 <script type="application/ld+json">
 {
