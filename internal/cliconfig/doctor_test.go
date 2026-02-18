@@ -435,3 +435,34 @@ func TestDoctorSkillsSecretPermissionsFailAndFix(t *testing.T) {
 		t.Fatalf("expected tomb key mode 600 after fix, got %o", tombSt.Mode().Perm())
 	}
 }
+
+func TestEndpointLooksRemote(t *testing.T) {
+	cases := []struct {
+		endpoint string
+		remote   bool
+	}{
+		{endpoint: "", remote: false},
+		{endpoint: "http://127.0.0.1:8080", remote: false},
+		{endpoint: "http://localhost:9000", remote: false},
+		{endpoint: "https://example.com/api", remote: true},
+		{endpoint: "definitely-not-a-url", remote: true},
+	}
+	for _, tc := range cases {
+		got := endpointLooksRemote(tc.endpoint)
+		if got != tc.remote {
+			t.Fatalf("endpointLooksRemote(%q)=%v, want %v", tc.endpoint, got, tc.remote)
+		}
+	}
+}
+
+func TestTrimEnvQuotes(t *testing.T) {
+	if got := trimEnvQuotes(`"abc"`); got != "abc" {
+		t.Fatalf("expected double quotes trimmed, got %q", got)
+	}
+	if got := trimEnvQuotes(`'abc'`); got != "abc" {
+		t.Fatalf("expected single quotes trimmed, got %q", got)
+	}
+	if got := trimEnvQuotes("abc"); got != "abc" {
+		t.Fatalf("expected bare value unchanged, got %q", got)
+	}
+}

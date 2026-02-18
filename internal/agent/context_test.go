@@ -181,3 +181,56 @@ func TestContextCognitivePromptHintAndSystemRepoPath(t *testing.T) {
 		t.Fatalf("expected fallback path %q, got %q", fallback, got)
 	}
 }
+
+func TestBuildSkillsSummaryLoadsSystemRepoSkills(t *testing.T) {
+	tmpDir := t.TempDir()
+	cfgDir := filepath.Join(tmpDir, ".kafclaw")
+	if err := os.MkdirAll(cfgDir, 0o755); err != nil {
+		t.Fatalf("mkdir config dir: %v", err)
+	}
+	cfgJSON := `{
+	  "skills": {
+	    "enabled": true,
+	    "allowSystemRepoSkills": true,
+	    "scope": "all"
+	  }
+	}`
+	if err := os.WriteFile(filepath.Join(cfgDir, "config.json"), []byte(cfgJSON), 0o600); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	systemRepo := filepath.Join(tmpDir, "system-repo")
+	skillDir := filepath.Join(systemRepo, "skills", "demo")
+	if err := os.MkdirAll(skillDir, 0o755); err != nil {
+		t.Fatalf("mkdir skill dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(skillDir, "SKILL.md"), []byte("demo skill instructions"), 0o644); err != nil {
+		t.Fatalf("write skill markdown: %v", err)
+	}
+	day2dayDir := filepath.Join(systemRepo, "operations", "day2day")
+	if err := os.MkdirAll(day2dayDir, 0o755); err != nil {
+		t.Fatalf("mkdir day2day dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(day2dayDir, "README.md"), []byte("daily guidance"), 0o644); err != nil {
+		t.Fatalf("write day2day markdown: %v", err)
+	}
+
+	origHome := os.Getenv("HOME")
+	defer os.Setenv("HOME", origHome)
+	_ = os.Setenv("HOME", tmpDir)
+
+	registry := tools.NewRegistry()
+	registry.Register(tools.NewReadFileTool())
+	builder := NewContextBuilder(tmpDir, "", systemRepo, registry)
+	summary := builder.buildSkillsSummary()
+
+	if !strings.Contains(summary, "System repo skills:") {
+		t.Fatalf("expected system repo section in summary, got: %s", summary)
+	}
+	if !strings.Contains(summary, "demo skill instructions") {
+		t.Fatalf("expected skill markdown in summary, got: %s", summary)
+	}
+	if !strings.Contains(summary, "Day2Day Guidance") || !strings.Contains(summary, "daily guidance") {
+		t.Fatalf("expected day2day guidance in summary, got: %s", summary)
+	}
+}

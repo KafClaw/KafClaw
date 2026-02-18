@@ -5,6 +5,7 @@ import (
 	"crypto/cipher"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -124,5 +125,110 @@ func TestLoadEnvFileCandidatesLoadsSecretsFromTomb(t *testing.T) {
 	LoadEnvFileCandidates()
 	if got := os.Getenv("OPENAI_API_KEY"); got != "already_set" {
 		t.Fatalf("expected existing env key preserved, got %q", got)
+	}
+}
+
+func TestResolveLocalTombPathWithExplicitAndTilde(t *testing.T) {
+	tmp := t.TempDir()
+	origHome := os.Getenv("HOME")
+	origKafclawHome := os.Getenv("KAFCLAW_HOME")
+	origTomb := os.Getenv("KAFCLAW_OAUTH_TOMB_FILE")
+	defer os.Setenv("HOME", origHome)
+	defer os.Setenv("KAFCLAW_HOME", origKafclawHome)
+	defer os.Setenv("KAFCLAW_OAUTH_TOMB_FILE", origTomb)
+
+	home := filepath.Join(tmp, "home")
+	_ = os.Setenv("HOME", home)
+	_ = os.Setenv("KAFCLAW_HOME", filepath.Join(tmp, "cfg-home"))
+	_ = os.Setenv("KAFCLAW_OAUTH_TOMB_FILE", "~/secrets/custom.rr")
+
+	got, err := resolveLocalTombPath()
+	if err != nil {
+		t.Fatalf("resolveLocalTombPath error: %v", err)
+	}
+	want := filepath.Join(tmp, "cfg-home", "secrets", "custom.rr")
+	if got != want {
+		t.Fatalf("expected %q, got %q", want, got)
+	}
+}
+
+func TestResolveLocalTombPathDefaultHome(t *testing.T) {
+	tmp := t.TempDir()
+	origHome := os.Getenv("HOME")
+	origKafclawHome := os.Getenv("KAFCLAW_HOME")
+	origTomb := os.Getenv("KAFCLAW_OAUTH_TOMB_FILE")
+	defer os.Setenv("HOME", origHome)
+	defer os.Setenv("KAFCLAW_HOME", origKafclawHome)
+	defer os.Setenv("KAFCLAW_OAUTH_TOMB_FILE", origTomb)
+
+	home := filepath.Join(tmp, "home")
+	_ = os.Setenv("HOME", home)
+	_ = os.Unsetenv("KAFCLAW_HOME")
+	_ = os.Unsetenv("KAFCLAW_OAUTH_TOMB_FILE")
+
+	got, err := resolveLocalTombPath()
+	if err != nil {
+		t.Fatalf("resolveLocalTombPath error: %v", err)
+	}
+	want := filepath.Join(home, ".config", "kafclaw", localTombFileName)
+	if got != want {
+		t.Fatalf("expected %q, got %q", want, got)
+	}
+}
+
+func TestResolveEnvHomeDirAndExpandTildePath(t *testing.T) {
+	tmp := t.TempDir()
+	origHome := os.Getenv("HOME")
+	origKafclawHome := os.Getenv("KAFCLAW_HOME")
+	defer os.Setenv("HOME", origHome)
+	defer os.Setenv("KAFCLAW_HOME", origKafclawHome)
+
+	home := filepath.Join(tmp, "home")
+	_ = os.Setenv("HOME", home)
+	_ = os.Setenv("KAFCLAW_HOME", "~/custom")
+
+	got, err := resolveEnvHomeDir()
+	if err != nil {
+		t.Fatalf("resolveEnvHomeDir error: %v", err)
+	}
+	want := filepath.Join(home, "custom")
+	if got != want {
+		t.Fatalf("expected %q, got %q", want, got)
+	}
+
+	if out := expandTildePath("~", home); out != home {
+		t.Fatalf("expected %q for bare tilde, got %q", home, out)
+	}
+	if out := expandTildePath("~/a/b", home); out != filepath.Join(home, "a", "b") {
+		t.Fatalf("unexpected expanded subpath: %q", out)
+	}
+	if out := expandTildePath("/abs/path", home); out != "/abs/path" {
+		t.Fatalf("expected absolute path unchanged, got %q", out)
+	}
+}
+
+func TestDecodeLocalTombDocCompatibilityAndValidation(t *testing.T) {
+	key := []byte("0123456789abcdef0123456789abcdef")
+	encoded := base64.RawStdEncoding.EncodeToString(key)
+
+	doc, err := decodeLocalTombDoc([]byte(encoded))
+	if err != nil {
+		t.Fatalf("decodeLocalTombDoc raw key error: %v", err)
+	}
+	if doc.Version != "v1" || doc.MasterKey != encoded {
+		t.Fatalf("unexpected compatibility decode result: %+v", doc)
+	}
+
+	_, err = decodeLocalTombDoc([]byte("   "))
+	if !errors.Is(err, os.ErrInvalid) {
+		t.Fatalf("expected os.ErrInvalid for blank doc, got %v", err)
+	}
+}
+
+func TestDecodeMasterKeyRejectsInvalidLength(t *testing.T) {
+	short := base64.RawStdEncoding.EncodeToString([]byte("short-key"))
+	_, err := decodeMasterKey(short)
+	if !errors.Is(err, os.ErrInvalid) {
+		t.Fatalf("expected os.ErrInvalid for short key, got %v", err)
 	}
 }

@@ -241,3 +241,14 @@ func TestSetUnsetEmptyPathGuards(t *testing.T) {
 		t.Fatal("expected unsetAtPath empty path error")
 	}
 }
+
+func TestSaveFileConfigMapMarshalError(t *testing.T) {
+	tmpDir := t.TempDir()
+	cfgPath := filepath.Join(tmpDir, ".kafclaw", "config.json")
+	bad := map[string]any{
+		"bad": func() {},
+	}
+	if err := saveFileConfigMap(cfgPath, bad); err == nil {
+		t.Fatal("expected saveFileConfigMap to fail on non-JSON-serializable values")
+	}
+}
