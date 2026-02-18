@@ -27,10 +27,54 @@ KafClaw uses a fixed workspace for all bot state:
 
 ## Rules
 
-1. Workspace is always `~/.kafclaw/workspace`. Not configurable per project.
-2. Switching work repo does not change workspace.
-3. All state remains in the workspace regardless of work repo selection.
-4. System repo contains only identity and skills data, no runtime state.
+1. Single-agent default workspace is `~/.kafclaw/workspace`.
+2. Multi-agent deployments should set explicit per-agent workspace paths in config.
+3. Switching work repo does not change workspace.
+4. All state remains in the workspace regardless of work repo selection.
+5. System repo contains only identity and skills data, no runtime state.
+
+## Multi-Agent Workspace Isolation
+
+For multi-agent deployments, use separate workspace paths per agent in `kafclaw.json` (or your generated runtime config) so runtime state does not bleed across agents.
+
+Example:
+
+```json
+{
+  "id": "worker-monitor",
+  "workspace": "/home/clawdia/workspace-monitor",
+  "model": {
+    "primary": "google-gemini-cli/gemini-2.5-flash",
+    "fallbacks": [
+      "anthropic/claude-haiku-4-5",
+      "google-gemini-cli/gemini-3-flash-preview"
+    ]
+  },
+  "identity": {
+    "name": "Sentinel",
+    "theme": "Infrastructure monitor - uptime checks, log analysis, alerting, system health",
+    "emoji": "📡",
+    "avatar": "avatars/sentinel.png"
+  },
+  "tools": {
+    "profile": "minimal",
+    "allow": [
+      "web_fetch",
+      "read",
+      "write",
+      "exec",
+      "bash"
+    ]
+  }
+}
+```
+
+Operational guidance:
+
+1. One agent, one workspace directory.
+2. Never share a workspace between production agents.
+3. Back up each workspace independently.
+4. Keep agent identity files and runtime state scoped to that agent's workspace.
 
 ## Path Summary
 
