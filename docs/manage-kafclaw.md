@@ -262,7 +262,32 @@ Core runtime files:
 - WhatsApp QR image: `~/.kafclaw/whatsapp-qr.png`
 - Subagent state: `~/.kafclaw/subagents/`
 
-## 11. Incident Shortcuts
+## 11. Client Auth Token Distribution
+
+This section applies to **direct HTTP clients** that call KafClaw API endpoints.
+For Slack/Teams/WhatsApp users, authentication is handled by provider bridge + pairing/allowlist controls, not by manually passing the gateway bearer token.
+
+When `KAFCLAW_GATEWAY_AUTH_TOKEN` (or `gateway.authToken`) is set, direct clients do not auto-receive tokens.
+Operators must distribute tokens out-of-band (secure chat, secret manager, deployment env injection, etc.).
+
+Operator token sources:
+
+- `~/.kafclaw/config.json` (`gateway.authToken`)
+- `~/.config/kafclaw/env` (if managed there)
+- `./kafclaw doctor --generate-gateway-token` (rotate/create)
+
+Client request header:
+
+```http
+Authorization: Bearer <token>
+```
+
+Validation endpoint:
+
+- `POST /api/v1/auth/verify` checks a provided bearer token
+- it validates tokens; it does not mint or return a token
+
+## 12. Incident Shortcuts
 
 ### Gateway will not start
 

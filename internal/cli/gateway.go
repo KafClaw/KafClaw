@@ -567,20 +567,20 @@ func runGatewayMain(cmd *cobra.Command, args []string) {
 
 	// Start Local HTTP Server for Local Network access
 	// Start Local HTTP Server for Local Network access (API)
-		go func() {
-			mux := http.NewServeMux()
-			mux.HandleFunc("/chat", func(w http.ResponseWriter, r *http.Request) {
-				if cfg.Gateway.AuthToken != "" {
-					token := strings.TrimSpace(strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer "))
-					if token != cfg.Gateway.AuthToken {
-						http.Error(w, "unauthorized", http.StatusUnauthorized)
-						return
-					}
-				}
-				if r.Method != http.MethodPost {
-					http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	go func() {
+		mux := http.NewServeMux()
+		mux.HandleFunc("/chat", func(w http.ResponseWriter, r *http.Request) {
+			if cfg.Gateway.AuthToken != "" {
+				token := strings.TrimSpace(strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer "))
+				if token != cfg.Gateway.AuthToken {
+					http.Error(w, "unauthorized", http.StatusUnauthorized)
 					return
 				}
+			}
+			if r.Method != http.MethodPost {
+				http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+				return
+			}
 			msg := r.URL.Query().Get("message")
 			if msg == "" {
 				http.Error(w, "Missing message parameter", http.StatusBadRequest)

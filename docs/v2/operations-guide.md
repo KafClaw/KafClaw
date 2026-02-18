@@ -370,6 +370,12 @@ Delivery worker polls every 5 seconds, retries up to 5 times with exponential ba
 |--------|------|-------------|
 | POST | `/chat?message=...&session=...` | Process message via agent loop |
 
+Auth note:
+
+- For direct HTTP clients: if `gateway.authToken` is configured, clients must send `Authorization: Bearer <token>` on `/chat`.
+- For Slack/Teams/WhatsApp provider users: auth is enforced through provider bridge + channel access controls (not manual gateway bearer tokens).
+- Direct clients obtain this token out-of-band from the operator; the API does not issue tokens.
+
 ### Port 18791 — Dashboard API
 
 **Status and Auth:**
@@ -378,6 +384,8 @@ Delivery worker polls every 5 seconds, retries up to 5 times with exponential ba
 |--------|------|-------------|
 | GET | `/api/v1/status` | Health, version, uptime, mode |
 | POST | `/api/v1/auth/verify` | Bearer token validation |
+
+`/api/v1/auth/verify` validates a supplied token and auth requirement state; it does not return or mint a token.
 
 **Timeline and Traces:**
 
