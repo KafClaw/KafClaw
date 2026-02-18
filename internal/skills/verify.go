@@ -479,7 +479,14 @@ func unpackZIP(data []byte) ([]sourceFile, error) {
 		if totalRead > maxArchiveTotalBytes {
 			return nil, fmt.Errorf("archive extracted size exceeds max total (%d bytes)", maxArchiveTotalBytes)
 		}
-		name, err := sanitizeArchiveEntryPath(f.Name)
+		rawName := strings.ReplaceAll(strings.TrimSpace(f.Name), "\\", "/")
+		if strings.Contains(rawName, "..") {
+			return nil, fmt.Errorf("unsafe archive path: %s", f.Name)
+		}
+		if strings.HasPrefix(rawName, "/") {
+			return nil, fmt.Errorf("unsafe archive path: %s", f.Name)
+		}
+		name, err := sanitizeArchiveEntryPath(rawName)
 		if err != nil {
 			return nil, fmt.Errorf("unsafe archive path: %s", f.Name)
 		}
@@ -533,7 +540,14 @@ func unpackTarGZ(data []byte) ([]sourceFile, error) {
 			if totalRead > maxArchiveTotalBytes {
 				return nil, fmt.Errorf("archive extracted size exceeds max total (%d bytes)", maxArchiveTotalBytes)
 			}
-			name, err := sanitizeArchiveEntryPath(hdr.Name)
+			rawName := strings.ReplaceAll(strings.TrimSpace(hdr.Name), "\\", "/")
+			if strings.Contains(rawName, "..") {
+				return nil, fmt.Errorf("unsafe archive path: %s", hdr.Name)
+			}
+			if strings.HasPrefix(rawName, "/") {
+				return nil, fmt.Errorf("unsafe archive path: %s", hdr.Name)
+			}
+			name, err := sanitizeArchiveEntryPath(rawName)
 			if err != nil {
 				return nil, fmt.Errorf("unsafe archive path: %s", hdr.Name)
 			}
