@@ -1,0 +1,40 @@
+<style>
+  .kc-topnav {
+    margin: 0 0 1rem;
+    padding: 0.7rem 0.9rem;
+    border: 1px solid #d4dcec;
+    border-radius: 10px;
+    background: #f7faff;
+    font-size: 0.92rem;
+  }
+  .kc-topnav .back {
+    border: 1px solid #c4d3ef;
+    border-radius: 7px;
+    background: #ffffff;
+    color: #17408f;
+    font-weight: 600;
+    padding: 0.2rem 0.55rem;
+    cursor: pointer;
+    margin-right: 0.6rem;
+  }
+  .kc-topnav a {
+    text-decoration: none;
+    font-weight: 600;
+    color: #17408f;
+    margin-right: 0.6rem;
+  }
+  .kc-topnav .sep {
+    color: #7a889f;
+    margin-right: 0.6rem;
+  }
+</style>
+<div class="kc-topnav">
+  <button type="button" class="back" onclick="if (window.history.length > 1) { window.history.back(); } else { window.location.href='{{ '/' | relative_url }}'; }">Back</button>
+  <a href="{{ '/' | relative_url }}">Home</a><span class="sep">|</span>
+  <a href="{{ '/getting-started' | relative_url }}">Get Started</a><span class="sep">|</span>
+  <a href="{{ '/manage-kafclaw' | relative_url }}">Manage</a><span class="sep">|</span>
+  <a href="{{ '/v2' | relative_url }}">v2 Docs</a><span class="sep">|</span>
+  <a href="{{ '/v2/architecture' | relative_url }}">Architecture</a><span class="sep">|</span>
+  <a href="{{ '/v2/admin-guide' | relative_url }}">Admin</a><span class="sep">|</span>
+  <a href="{{ '/v2/operations-guide' | relative_url }}">Operations</a>
+</div>

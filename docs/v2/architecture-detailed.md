@@ -1,5 +1,7 @@
 # KafClaw System Architecture — Detailed Reference
 
+{% include topnav.html %}
+
 > For the quick overview, see [architecture.md](./architecture.md).
 > See also: [FR-009 System Architecture](../requirements/FR-009-system-architecture.md), [FR-013 Package Design](../requirements/FR-013-package-design.md), [FR-018 Interface Contracts](../requirements/FR-018-interface-contracts.md)
 
@@ -27,20 +29,55 @@
 
 KafClaw is a personal AI assistant framework written in Go with an Electron desktop frontend. It connects messaging channels (WhatsApp, local network, web UI) to LLM providers through an asynchronous message bus, with a tool registry for filesystem/shell/web operations, a 6-layer semantic memory system, policy-based authorization, multi-agent collaboration via Kafka, and a cron-based job scheduler.
 
-```
-WhatsApp --+
-CLI -------+                                    +-- Filesystem Tools
-Web UI ----+-- Message Bus -- Agent Loop -- LLM +-- Shell Execution
-Scheduler -+       |              |              +-- Web Search
-                   |              |              +-- Memory (remember/recall)
-                   |         Context Builder
-                   |         +-- Soul Files (AGENTS.md, SOUL.md, ...)
-                   |         +-- Working Memory (per-user scratchpad)
-                   |         +-- Observations (compressed history)
-                   |         +-- RAG Injection (vector search)
-                   |         +-- Tool + Skill definitions
-                   |
-               Timeline DB (SQLite)
+<div style="overflow:auto;border:1px solid #d4dcec;border-radius:10px;padding:10px;background:#fbfdff;">
+  <svg viewBox="0 0 1120 340" role="img" aria-label="KafClaw detailed architecture overview diagram" style="min-width:900px;max-width:100%;height:auto;">
+    <defs>
+      <marker id="arrowB" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto">
+        <polygon points="0 0, 9 3.5, 0 7" fill="#2e5cab"></polygon>
+      </marker>
+    </defs>
+    <rect x="400" y="28" width="320" height="70" rx="10" fill="#eaf1ff" stroke="#9bb5e6"></rect>
+    <text x="560" y="56" text-anchor="middle" font-size="17" font-weight="700" fill="#1f3f84">Message Bus</text>
+    <text x="560" y="76" text-anchor="middle" font-size="12" fill="#355d9c">decouples channels from agent loop</text>
+
+    <rect x="400" y="120" width="320" height="72" rx="10" fill="#ffffff" stroke="#d4dcec"></rect>
+    <text x="560" y="148" text-anchor="middle" font-size="16" font-weight="700" fill="#24344d">Agent Loop + Context Builder</text>
+    <text x="560" y="168" text-anchor="middle" font-size="12" fill="#4e5c73">soul files • memory • skills • tool calls</text>
+
+    <rect x="90" y="44" width="230" height="148" rx="10" fill="#ffffff" stroke="#d4dcec"></rect>
+    <text x="205" y="68" text-anchor="middle" font-size="14" font-weight="700" fill="#24344d">Ingress Channels</text>
+    <text x="205" y="92" text-anchor="middle" font-size="12" fill="#4e5c73">WhatsApp / CLI / Web</text>
+    <text x="205" y="112" text-anchor="middle" font-size="12" fill="#4e5c73">Slack / Teams bridge</text>
+    <text x="205" y="132" text-anchor="middle" font-size="12" fill="#4e5c73">Scheduler jobs</text>
+    <text x="205" y="152" text-anchor="middle" font-size="12" fill="#4e5c73">Group traces/tasks</text>
+
+    <rect x="800" y="44" width="230" height="148" rx="10" fill="#ffffff" stroke="#d4dcec"></rect>
+    <text x="915" y="68" text-anchor="middle" font-size="14" font-weight="700" fill="#24344d">Execution Plane</text>
+    <text x="915" y="92" text-anchor="middle" font-size="12" fill="#4e5c73">Provider (LLM)</text>
+    <text x="915" y="112" text-anchor="middle" font-size="12" fill="#4e5c73">Tools (fs/shell/web)</text>
+    <text x="915" y="132" text-anchor="middle" font-size="12" fill="#4e5c73">Memory (RAG/observer)</text>
+    <text x="915" y="152" text-anchor="middle" font-size="12" fill="#4e5c73">Group + Orchestrator</text>
+
+    <rect x="320" y="226" width="480" height="82" rx="10" fill="#f4f8ff" stroke="#c8d6f1"></rect>
+    <text x="560" y="249" text-anchor="middle" font-size="14" font-weight="700" fill="#214483">Timeline DB (SQLite)</text>
+    <text x="560" y="269" text-anchor="middle" font-size="12" fill="#4e5c73">events • traces • tasks • approvals • memory chunks</text>
+    <text x="560" y="287" text-anchor="middle" font-size="12" fill="#4e5c73">settings • roster • topic metadata</text>
+
+    <line x1="320" y1="92" x2="400" y2="62" stroke="#2e5cab" stroke-width="2.2" marker-end="url(#arrowB)"></line>
+    <line x1="720" y1="62" x2="800" y2="92" stroke="#2e5cab" stroke-width="2.2" marker-end="url(#arrowB)"></line>
+    <line x1="560" y1="98" x2="560" y2="120" stroke="#2e5cab" stroke-width="2.2" marker-end="url(#arrowB)"></line>
+    <line x1="560" y1="192" x2="560" y2="226" stroke="#2e5cab" stroke-width="2.2" marker-end="url(#arrowB)"></line>
+  </svg>
+</div>
+
+Mermaid source (GitHub code view renders this; GitHub Pages may require a Mermaid JS include depending on your theme setup):
+
+```mermaid
+flowchart LR
+  IN["Ingress Channels<br/>WhatsApp / CLI / Web / Slack / Teams / Scheduler"] --> MB["Message Bus"]
+  MB --> AG["Agent Loop + Context Builder"]
+  AG --> EX["Execution Plane<br/>Provider + Tools + Memory + Group"]
+  AG --> DB["Timeline DB (SQLite)<br/>events + traces + tasks + approvals + memory"]
 ```
 
 ### Design Principles

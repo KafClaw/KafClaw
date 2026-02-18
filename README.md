@@ -1,7 +1,7 @@
 # KafClaw
-[![CI (Smoke+Fuzz+Go)](https://github.com/scalytics/KafClaw/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/scalytics/KafClaw/actions/workflows/ci.yml)
-[![Release](https://github.com/scalytics/KafClaw/actions/workflows/release.yml/badge.svg?branch=main)](https://github.com/scalytics/KafClaw/actions/workflows/release.yml)
-[![Pages](https://github.com/scalytics/KafClaw/actions/workflows/pages.yml/badge.svg?branch=main)](https://github.com/scalytics/KafClaw/actions/workflows/pages.yml)
+[![CI (Smoke+Fuzz+Go)](https://github.com/KafClaw/KafClaw/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/KafClaw/KafClaw/actions/workflows/ci.yml)
+[![Release](https://github.com/KafClaw/KafClaw/actions/workflows/release.yml/badge.svg?branch=main)](https://github.com/KafClaw/KafClaw/actions/workflows/release.yml)
+[![Pages](https://github.com/KafClaw/KafClaw/actions/workflows/pages.yml/badge.svg?branch=main)](https://github.com/KafClaw/KafClaw/actions/workflows/pages.yml)
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/KafClaw/KafClaw)](https://goreportcard.com/report/github.com/KafClaw/KafClaw)
 [![License](https://img.shields.io/github/license/KafClaw/KafClaw)](LICENSE)
