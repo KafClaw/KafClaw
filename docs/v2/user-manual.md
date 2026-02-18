@@ -124,6 +124,7 @@ kafclaw gateway
 
 - Ports: 18790 (API), 18791 (dashboard)
 - Runs until Ctrl+C. Handles graceful shutdown of all subsystems.
+- If `gateway.authToken` is set, dashboard API routes require bearer auth (except `/api/v1/status` and CORS preflight), and `POST /chat` on port `18790` also requires bearer auth.
 
 ### 3.2 `agent`
 
@@ -217,8 +218,13 @@ kafclaw configure --clear-subagents-allow-agents --non-interactive
 Kafka diagnostics helper.
 
 ```bash
-kafclaw kshark --broker localhost:9092 --test-connection
+kafclaw kshark --auto --yes
+kafclaw kshark --props ./client.properties --topic group.mygroup.requests --group mygroup-workers --yes
 ```
+
+Use either:
+- `--auto` (derive Kafka settings from current KafClaw group config), or
+- `--props` (explicit Kafka client properties file).
 
 ### 3.10 `whatsapp-setup`
 
@@ -246,9 +252,19 @@ Group collaboration management (requires Kafka).
 
 ```bash
 kafclaw group status
-kafclaw group join
+kafclaw group join mygroup
 kafclaw group leave
 kafclaw group members
+```
+
+### 3.13 `pairing`
+
+Manage pending Slack/Teams sender pairings.
+
+```bash
+kafclaw pairing pending
+kafclaw pairing approve slack ABC123
+kafclaw pairing deny msteams XYZ999
 ```
 
 ---

@@ -128,11 +128,48 @@ Operational notes:
 | `Host` | `127.0.0.1` | `KAFCLAW_GATEWAY_HOST` | Bind address |
 | `Port` | `18790` | `KAFCLAW_GATEWAY_PORT` | API port |
 | `DashboardPort` | `18791` | `KAFCLAW_GATEWAY_DASHBOARD_PORT` | Dashboard port |
-| `AuthToken` | *(empty)* | `KAFCLAW_GATEWAY_AUTH_TOKEN` | Required for headless mode |
+| `AuthToken` | *(empty)* | `KAFCLAW_GATEWAY_AUTH_TOKEN` | Dashboard API bearer token (except `/api/v1/status`) |
 | `TLSCert` | *(empty)* | — | Optional TLS certificate path |
 | `TLSKey` | *(empty)* | — | Optional TLS private key path |
 
-**LAN access:** The default `Host: 127.0.0.1` only accepts local connections. To expose the gateway on your network, set `Host` to `0.0.0.0` (all interfaces) or a specific LAN IP, and set `AuthToken` to secure it. Use `make run-headless` for the recommended configuration. The gateway serves plain HTTP — do not use `https://` in the browser unless TLS is configured.
+**LAN access:** The default `Host: 127.0.0.1` only accepts local connections. To expose the gateway on your network, set `Host` to `0.0.0.0` (all interfaces) or a specific LAN IP, and set `AuthToken`. Use `make run-headless` for the recommended configuration. The gateway serves plain HTTP — do not use `https://` in the browser unless TLS is configured.
+
+**Auth scope:** `AuthToken` is enforced on dashboard API routes on port `18791` (excluding `/api/v1/status` and CORS preflight), and on API server `POST /chat` on port `18790`.
+
+### Group Configuration
+
+| Field | Default | Env Var | Description |
+|-------|---------|---------|-------------|
+| `Enabled` | `false` | `KAFCLAW_GROUP_ENABLED` | Enable Kafka group collaboration |
+| `GroupName` | *(empty)* | `KAFCLAW_GROUP_GROUP_NAME` | Group topic namespace |
+| `KafkaBrokers` | *(empty)* | `KAFCLAW_GROUP_KAFKA_BROKERS` | Broker list (`host:port,...`) |
+| `ConsumerGroup` | *(auto)* | `KAFCLAW_GROUP_KAFKA_CONSUMER_GROUP` | Kafka consumer group id |
+| `AgentID` | *(hostname-derived)* | `KAFCLAW_GROUP_AGENT_ID` | Agent identity used in group protocol |
+| `LFSProxyURL` | `http://localhost:8080` | `KAFCLAW_GROUP_KAFSCALE_LFS_PROXY_URL` | KafScale LFS/proxy endpoint |
+| `LFSProxyAPIKey` | *(empty)* | `KAFCLAW_GROUP_KAFSCALE_LFS_PROXY_API_KEY` | Proxy auth key |
+| `PollIntervalMs` | `2000` | `KAFCLAW_GROUP_POLL_INTERVAL_MS` | Poll cadence for group operations |
+| `OnboardMode` | `open` | `KAFCLAW_GROUP_ONBOARD_MODE` | Group onboarding mode (`open` or `gated`) |
+| `MaxDelegationDepth` | `3` | `KAFCLAW_GROUP_MAX_DELEGATION_DEPTH` | Delegation depth guardrail |
+
+### Orchestrator Configuration
+
+| Field | Default | Env Var | Description |
+|-------|---------|---------|-------------|
+| `Enabled` | `false` | `KAFCLAW_ORCHESTRATOR_ENABLED` | Enable orchestrator layer |
+| `Role` | `worker` | `KAFCLAW_ORCHESTRATOR_ROLE` | `orchestrator`, `worker`, or `observer` |
+| `ZoneID` | *(empty)* | `KAFCLAW_ORCHESTRATOR_ZONE_ID` | Zone assignment |
+| `ParentID` | *(empty)* | `KAFCLAW_ORCHESTRATOR_PARENT_ID` | Parent agent for hierarchy |
+| `Endpoint` | *(empty)* | `KAFCLAW_ORCHESTRATOR_ENDPOINT` | This agent's reachable API endpoint |
+
+### Scheduler Configuration
+
+| Field | Default | Env Var | Description |
+|-------|---------|---------|-------------|
+| `Enabled` | `false` | `KAFCLAW_SCHEDULER_ENABLED` | Enable scheduler loop |
+| `TickInterval` | `60s` | `KAFCLAW_SCHEDULER_TICK_INTERVAL` | Tick cadence |
+| `MaxConcLLM` | `3` | `KAFCLAW_SCHEDULER_MAX_CONC_LLM` | Concurrency for LLM category jobs |
+| `MaxConcShell` | `1` | `KAFCLAW_SCHEDULER_MAX_CONC_SHELL` | Concurrency for shell category jobs |
+| `MaxConcDefault` | `5` | `KAFCLAW_SCHEDULER_MAX_CONC_DEFAULT` | Concurrency for default category jobs |
 
 ### Tools Configuration
 

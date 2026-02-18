@@ -1,6 +1,6 @@
 # Getting Started
 
-This guide gets KafClaw from zero to a working setup.
+This guide gets KafClaw from zero to a working setup, with focus on onboarding and workspace identity files.
 
 ## 1. Prerequisites
 
@@ -26,6 +26,17 @@ Run onboarding wizard:
 ./kafclaw onboard
 ```
 
+Onboarding does three things:
+
+1. Creates or updates `~/.kafclaw/config.json`
+2. Applies runtime profile and provider settings
+3. Scaffolds workspace identity files:
+   - `AGENTS.md`
+   - `SOUL.md`
+   - `USER.md`
+   - `TOOLS.md`
+   - `IDENTITY.md`
+
 You will be asked for:
 
 - runtime mode: `local`, `local-kafka`, or `remote`
@@ -47,11 +58,63 @@ Local + Kafka:
 ./kafclaw onboard --non-interactive --profile local-kafka --kafka-brokers localhost:9092 --group-name kafclaw --agent-id agent-local --role worker --llm skip
 ```
 
+Kafka auth via KafScale proxy key (SASL/PLAIN over SSL auto-derived by `kshark --auto`):
+
+```bash
+./kafclaw config set group.lfsProxyUrl "https://your-kafscale-endpoint"
+./kafclaw config set group.lfsProxyApiKey "<kafscale-api-key>"
+```
+
 Remote + Ollama/vLLM:
 
 ```bash
 ./kafclaw onboard --non-interactive --profile remote --llm openai-compatible --llm-api-base http://localhost:11434/v1 --llm-model llama3.1:8b
 ```
+
+### LLM Provider Setup (Interactive)
+
+Yes, token setup is supported interactively via onboarding.
+
+Run:
+
+```bash
+./kafclaw onboard
+```
+
+Then choose one of:
+
+- `cli-token`:
+  - prompts for API token (interactive)
+  - uses OpenAI-compatible provider path
+  - defaults API base to `https://openrouter.ai/api/v1`
+- `openai-compatible`:
+  - prompts for API base (required)
+  - prompts for API token (optional)
+  - useful for Ollama/vLLM/self-hosted gateways
+- `skip`:
+  - keeps current provider settings
+
+To reconfigure provider/token later, run onboarding again (interactive) or use:
+
+```bash
+./kafclaw config set providers.openai.apiKey "<token>"
+./kafclaw config set providers.openai.apiBase "https://openrouter.ai/api/v1"
+./kafclaw config set model.name "anthropic/claude-sonnet-4-5"
+```
+
+### Mode behavior (as configured by onboarding)
+
+| Mode | Gateway bind | Group | Orchestrator | Auth token |
+|------|--------------|-------|--------------|------------|
+| `local` | `127.0.0.1` | disabled | disabled | none |
+| `local-kafka` | `127.0.0.1` | enabled | enabled | none |
+| `remote` | `0.0.0.0` | disabled | disabled | required (auto-generated if missing) |
+
+### Existing workspace files
+
+- Default behavior: existing files are kept
+- Use `--force` to overwrite existing config and identity templates
+- Gateway also auto-scaffolds missing identity files at startup if workspace is incomplete
 
 ## 4. Verify
 
@@ -102,6 +165,7 @@ This can create service user, install unit files, and write runtime env file.
 - Main config: `~/.kafclaw/config.json`
 - Runtime env: `~/.config/kafclaw/env`
 - State DB: `~/.kafclaw/timeline.db`
+- Workspace identity files: `<workspace>/{AGENTS.md,SOUL.md,USER.md,TOOLS.md,IDENTITY.md}`
 
 ## 8. Subagents (Phase 2)
 
@@ -167,8 +231,32 @@ Clear allowlist (back to current-agent-only default):
 ./kafclaw configure --clear-subagents-allow-agents --non-interactive
 ```
 
+## 10. Kafka Broker Connection Examples
+
+Direct config path:
+
+```bash
+./kafclaw config set group.enabled true
+./kafclaw config set group.groupName "kafclaw"
+./kafclaw config set group.kafkaBrokers "broker1:9092,broker2:9092"
+./kafclaw config set group.consumerGroup "kafclaw-workers"
+./kafclaw config set group.agentId "agent-local"
+```
+
+Join and verify:
+
+```bash
+./kafclaw group join kafclaw
+./kafclaw group status
+./kafclaw group members
+./kafclaw kshark --auto --yes
+```
+
 ## Next
 
+- [Manage KafClaw](./manage-kafclaw.md)
 - [Operations and Maintenance](./maintenance.md)
+- [How Agents Work](./concepts/how-agents-work.md)
+- [Soul and Identity Files](./concepts/soul-identity-tools.md)
 - [User Manual](./v2/user-manual.md)
 - [Admin Guide](./v2/admin-guide.md)

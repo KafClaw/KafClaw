@@ -6,7 +6,11 @@ Primary v2 reference set for KafClaw.
 
 - [Docs Home](../index.md)
 - [Getting Started](../getting-started.md)
+- [Manage KafClaw](../manage-kafclaw.md)
 - [Operations and Maintenance](../maintenance.md)
+- [How Agents Work](../concepts/how-agents-work.md)
+- [Soul and Identity Files](../concepts/soul-identity-tools.md)
+- [Runtime Tools and Capabilities](../concepts/runtime-tools.md)
 
 ## Guides
 

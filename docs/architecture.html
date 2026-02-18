@@ -1,0 +1,180 @@
+---
+layout: default
+title: KafClaw Architecture
+---
+
+<style>
+  :root {
+    --bg: #f5f7fb;
+    --panel: #ffffff;
+    --ink: #172338;
+    --muted: #4e5c73;
+    --line: #d7dfea;
+    --primary: #0f5fff;
+    --accent: #17b890;
+  }
+  .kc-arch-wrap {
+    margin: 0 auto;
+    max-width: 1100px;
+    color: var(--ink);
+    font-family: "Avenir Next", "Segoe UI", "Helvetica Neue", sans-serif;
+  }
+  .kc-arch-hero {
+    background: linear-gradient(125deg, #0f5fff 0%, #1342a6 55%, #0f2a6b 100%);
+    color: #fff;
+    border-radius: 14px;
+    padding: 28px;
+    box-shadow: 0 14px 36px rgba(17, 43, 101, 0.28);
+  }
+  .kc-arch-hero h1 {
+    margin: 0 0 8px;
+    font-size: 2rem;
+    line-height: 1.2;
+  }
+  .kc-arch-hero p {
+    margin: 0;
+    font-size: 1.05rem;
+    opacity: 0.95;
+  }
+  .kc-grid {
+    display: grid;
+    gap: 16px;
+    margin-top: 20px;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+  }
+  .kc-card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 16px;
+    box-shadow: 0 8px 22px rgba(26, 43, 80, 0.08);
+  }
+  .kc-card h2 {
+    margin: 0 0 10px;
+    font-size: 1.05rem;
+  }
+  .kc-card p,
+  .kc-card li {
+    color: var(--muted);
+  }
+  .kc-kafka { grid-column: span 12; }
+  .kc-agent { grid-column: span 6; }
+  .kc-support { grid-column: span 4; }
+  .kc-flow { grid-column: span 12; }
+  .kc-chip {
+    display: inline-block;
+    margin: 3px 6px 3px 0;
+    padding: 4px 10px;
+    border-radius: 999px;
+    border: 1px solid #bdd0ff;
+    background: #eef3ff;
+    color: #163a86;
+    font-size: 0.82rem;
+    font-weight: 600;
+  }
+  .kc-flow svg {
+    width: 100%;
+    height: auto;
+    display: block;
+  }
+  .kc-note {
+    margin-top: 12px;
+    padding: 10px 12px;
+    border-left: 4px solid var(--accent);
+    background: #e9faf5;
+    color: #17584a;
+    border-radius: 8px;
+  }
+  @media (max-width: 900px) {
+    .kc-agent, .kc-support { grid-column: span 12; }
+  }
+</style>
+
+<div class="kc-arch-wrap">
+  <div class="kc-arch-hero">
+    <h1>KafClaw Architecture</h1>
+    <p>Kafka-native coordination for local assistants, peer groups, and hierarchical multi-agent systems.</p>
+  </div>
+
+  <div class="kc-grid">
+    <section class="kc-card kc-kafka">
+      <h2>Kafka Backbone</h2>
+      <p>All collaboration flows through typed envelopes over Kafka topics, enabling traceability and reliable routing across agents.</p>
+      <span class="kc-chip">announce</span>
+      <span class="kc-chip">request</span>
+      <span class="kc-chip">response</span>
+      <span class="kc-chip">trace</span>
+      <span class="kc-chip">memory</span>
+      <span class="kc-chip">audit</span>
+      <span class="kc-chip">orchestrator</span>
+      <span class="kc-chip">skill channels</span>
+    </section>
+
+    <section class="kc-card kc-agent">
+      <h2>Full Agent Runtime (Go)</h2>
+      <ul>
+        <li>Agent loop with provider abstraction</li>
+        <li>Tool framework (filesystem, shell, memory, web)</li>
+        <li>Policy engine for safe execution</li>
+        <li>Timeline DB (SQLite) for events and traces</li>
+      </ul>
+    </section>
+
+    <section class="kc-card kc-agent">
+      <h2>Lightweight Agents (Any Language)</h2>
+      <ul>
+        <li>Use only Kafka + JSON envelope schema</li>
+        <li>Join group topics and skill channels</li>
+        <li>Participate without SDK lock-in</li>
+        <li>Suitable for scripts, services, and bridges</li>
+      </ul>
+    </section>
+
+    <section class="kc-card kc-support">
+      <h2>Channels</h2>
+      <p>WhatsApp, Telegram, CLI, and Web UI connect users and operators to the agent network.</p>
+    </section>
+
+    <section class="kc-card kc-support">
+      <h2>Shared Memory</h2>
+      <p>Persistent memory and ephemeral context allow agents to reuse and route knowledge over time.</p>
+    </section>
+
+    <section class="kc-card kc-support">
+      <h2>Orchestration</h2>
+      <p>Hierarchy + zones define who can see what and how delegation is safely performed.</p>
+    </section>
+
+    <section class="kc-card kc-flow">
+      <h2>System Flow</h2>
+      <svg viewBox="0 0 1080 320" role="img" aria-label="KafClaw architecture flow diagram">
+        <defs>
+          <marker id="arrow" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+            <polygon points="0,0 10,4 0,8" fill="#335ea8"></polygon>
+          </marker>
+        </defs>
+        <rect x="390" y="20" width="300" height="70" rx="10" fill="#eaf1ff" stroke="#8ea9df"></rect>
+        <text x="540" y="48" text-anchor="middle" font-size="18" font-weight="700" fill="#173b87">Apache Kafka</text>
+        <text x="540" y="69" text-anchor="middle" font-size="12" fill="#335ea8">control • tasks • memory • orchestrator • skills</text>
+
+        <rect x="110" y="140" width="270" height="120" rx="10" fill="#ffffff" stroke="#cfd9ea"></rect>
+        <text x="245" y="168" text-anchor="middle" font-size="16" font-weight="700" fill="#1e2c43">Agent A (Full Runtime)</text>
+        <text x="245" y="192" text-anchor="middle" font-size="12" fill="#465a77">Loop • Tools • Timeline • Policy</text>
+        <text x="245" y="212" text-anchor="middle" font-size="12" fill="#465a77">Memory • Provider • Channels</text>
+
+        <rect x="700" y="140" width="270" height="120" rx="10" fill="#ffffff" stroke="#cfd9ea"></rect>
+        <text x="835" y="168" text-anchor="middle" font-size="16" font-weight="700" fill="#1e2c43">Agent B (Any Language)</text>
+        <text x="835" y="192" text-anchor="middle" font-size="12" fill="#465a77">Kafka Producer / Consumer</text>
+        <text x="835" y="212" text-anchor="middle" font-size="12" fill="#465a77">JSON Envelopes + Skill Topics</text>
+
+        <line x1="245" y1="140" x2="455" y2="90" stroke="#335ea8" stroke-width="2.5" marker-end="url(#arrow)"></line>
+        <line x1="835" y1="140" x2="625" y2="90" stroke="#335ea8" stroke-width="2.5" marker-end="url(#arrow)"></line>
+        <line x1="500" y1="260" x2="580" y2="260" stroke="#17b890" stroke-width="3"></line>
+        <text x="540" y="282" text-anchor="middle" font-size="12" fill="#26705e">request/response + trace + memory exchange</text>
+      </svg>
+      <div class="kc-note">
+        KafClaw supports both full-featured Go agents and lightweight non-Go agents in the same collaboration fabric.
+      </div>
+    </section>
+  </div>
+</div>

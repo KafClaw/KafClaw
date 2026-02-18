@@ -87,6 +87,11 @@ Probe endpoints:
 - `GET /slack/probe` validates Slack token with `auth.test`
 - `GET /teams/probe` validates Teams bot token flow and returns decoded bot/graph claims plus diagnostics (audience, expiry, scopes/roles), permission coverage, tenant/app identity checks, and live Graph capability checks (`users`, `teams`, `channels`, `organization`)
 
+Outbound endpoints:
+
+- `POST /slack/outbound`
+- `POST /teams/outbound`
+
 Socket mode ingress:
 
 - If `SLACK_APP_TOKEN` is set, the bridge also consumes Slack Events API, slash commands, and interactions via Socket Mode.

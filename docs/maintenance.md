@@ -25,7 +25,8 @@ For env hygiene and permissions:
   - group/orchestrator: on
 - `remote`
   - bind: typically `0.0.0.0` or specific LAN IP
-  - auth token: required
+  - dashboard auth token: strongly recommended
+  - with auth token configured, both dashboard API and `POST /chat` require bearer auth
 
 If you intentionally run remote, do not force loopback defaults.
 
@@ -106,7 +107,8 @@ Then restart runtime/service.
   - check `gateway.host`
   - check firewall ports `18790`, `18791`
 - Remote mode blocked:
-  - ensure auth token exists
+  - ensure dashboard auth token exists
+  - verify token is sent to both dashboard API and `/chat` calls
 - Kafka group issues:
   - verify brokers and group config
   - use `kafclaw kshark` for diagnostics

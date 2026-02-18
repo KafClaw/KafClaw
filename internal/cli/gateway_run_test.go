@@ -323,6 +323,79 @@ func TestRunGatewayOrchestratorModeBranches(t *testing.T) {
 	}
 }
 
+func TestRunGatewayChatAuthEnforcedWhenTokenConfigured(t *testing.T) {
+	stubGatewaySignals(t)
+	tmpHome := t.TempDir()
+	origHome := os.Getenv("HOME")
+	origHost := os.Getenv("KAFCLAW_GATEWAY_HOST")
+	origPort := os.Getenv("KAFCLAW_GATEWAY_PORT")
+	origDash := os.Getenv("KAFCLAW_GATEWAY_DASHBOARD_PORT")
+	origAuth := os.Getenv("KAFCLAW_GATEWAY_AUTH_TOKEN")
+	t.Cleanup(func() {
+		_ = os.Setenv("HOME", origHome)
+		_ = os.Setenv("KAFCLAW_GATEWAY_HOST", origHost)
+		_ = os.Setenv("KAFCLAW_GATEWAY_PORT", origPort)
+		_ = os.Setenv("KAFCLAW_GATEWAY_DASHBOARD_PORT", origDash)
+		_ = os.Setenv("KAFCLAW_GATEWAY_AUTH_TOKEN", origAuth)
+	})
+
+	_ = os.Setenv("HOME", tmpHome)
+	_ = os.Setenv("KAFCLAW_GATEWAY_HOST", "127.0.0.1")
+	_ = os.Setenv("KAFCLAW_GATEWAY_PORT", freePort(t))
+	_ = os.Setenv("KAFCLAW_GATEWAY_DASHBOARD_PORT", freePort(t))
+	_ = os.Setenv("KAFCLAW_GATEWAY_AUTH_TOKEN", "token123")
+
+	if err := os.MkdirAll(filepath.Join(tmpHome, ".kafclaw"), 0755); err != nil {
+		t.Fatalf("mkdir home .kafclaw: %v", err)
+	}
+
+	done := make(chan struct{})
+	go func() {
+		runGateway(nil, nil)
+		close(done)
+	}()
+
+	dashBase := "http://127.0.0.1:" + os.Getenv("KAFCLAW_GATEWAY_DASHBOARD_PORT")
+	apiBase := "http://127.0.0.1:" + os.Getenv("KAFCLAW_GATEWAY_PORT")
+	waitForHTTP(t, dashBase+"/api/v1/status")
+	waitForHTTP(t, apiBase+"/chat")
+
+	client := &http.Client{Timeout: 3 * time.Second}
+	doChat := func(token string) int {
+		t.Helper()
+		req, err := http.NewRequest(http.MethodPost, apiBase+"/chat?message=hello&session=s1", bytes.NewBuffer(nil))
+		if err != nil {
+			t.Fatalf("new /chat request: %v", err)
+		}
+		if token != "" {
+			req.Header.Set("Authorization", "Bearer "+token)
+		}
+		resp, err := client.Do(req)
+		if err != nil {
+			t.Fatalf("do /chat request: %v", err)
+		}
+		defer resp.Body.Close()
+		return resp.StatusCode
+	}
+
+	if code := doChat(""); code != http.StatusUnauthorized {
+		t.Fatalf("expected 401 without token, got %d", code)
+	}
+	if code := doChat("wrong"); code != http.StatusUnauthorized {
+		t.Fatalf("expected 401 with wrong token, got %d", code)
+	}
+	if code := doChat("token123"); code == http.StatusUnauthorized {
+		t.Fatalf("expected non-401 with correct token, got %d", code)
+	}
+
+	sendGatewaySignal(t, syscall.SIGTERM)
+	select {
+	case <-done:
+	case <-time.After(8 * time.Second):
+		t.Fatal("gateway did not shut down after auth test")
+	}
+}
+
 func freePort(t *testing.T) string {
 	t.Helper()
 	ln, err := net.Listen("tcp", "127.0.0.1:0")

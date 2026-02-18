@@ -556,7 +556,8 @@ Destructive deletion, VCS deletion, disk destruction, device redirection, permis
 ### 9.3 Network Security
 
 - Default bind: 127.0.0.1
-- Headless: 0.0.0.0 with mandatory auth token
+- Headless: 0.0.0.0 with dashboard API auth token (`/api/v1/status` excluded)
+- `POST /chat` on port `18790` also enforces bearer auth when `KAFCLAW_GATEWAY_AUTH_TOKEN` is configured
 - TLS: optional cert/key
 - Electron: sandbox, context isolation, no node integration in renderer
 
@@ -576,7 +577,7 @@ Destructive deletion, VCS deletion, disk destruction, device redirection, permis
 |------|---------|-------------|
 | Standalone | `make run` | Local binary, no Kafka, localhost only (binds 127.0.0.1) |
 | Full | `make run-full` | + Kafka + orchestrator (binds 127.0.0.1) |
-| Headless | `make run-headless` | Binds 0.0.0.0, requires `KAFCLAW_GATEWAY_AUTH_TOKEN` |
+| Headless | `make run-headless` | Binds 0.0.0.0, dashboard API + `/chat` protected by `KAFCLAW_GATEWAY_AUTH_TOKEN` |
 | Remote | `make electron-start-remote` | Electron UI connects to headless server |
 | Docker | `make docker-up` | Container deployment |
 
@@ -588,7 +589,7 @@ To expose the gateway on your LAN (e.g., running on a Jetson Nano, accessing fro
 
 ```bash
 export KAFCLAW_GATEWAY_AUTH_TOKEN=mysecrettoken
-make run-headless    # binds 0.0.0.0, requires auth token
+make run-headless    # binds 0.0.0.0, dashboard API auth enabled
 ```
 
 Then access from another machine: `http://<server-ip>:18791/` (note: **http**, not https — the gateway serves plain HTTP unless TLS is configured via `tlsCert`/`tlsKey`).

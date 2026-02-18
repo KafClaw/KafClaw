@@ -570,6 +570,13 @@ func runGatewayMain(cmd *cobra.Command, args []string) {
 	go func() {
 		mux := http.NewServeMux()
 		mux.HandleFunc("/chat", func(w http.ResponseWriter, r *http.Request) {
+			if cfg.Gateway.AuthToken != "" {
+				token := strings.TrimSpace(strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer "))
+				if token != cfg.Gateway.AuthToken {
+					http.Error(w, "unauthorized", http.StatusUnauthorized)
+					return
+				}
+			}
 			if r.Method != http.MethodPost {
 				http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 				return
