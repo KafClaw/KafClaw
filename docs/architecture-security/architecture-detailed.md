@@ -6,7 +6,6 @@ title: KafClaw System Architecture — Detailed Reference
 # KafClaw System Architecture — Detailed Reference
 
 > For the quick overview, see [architecture.md](./architecture/).
-> See also: FR-009 System Architecture, FR-013 Package Design, FR-018 Interface Contracts
 
 ---
 
@@ -466,8 +465,6 @@ Multi-agent hierarchies:
 
 ## 6. Memory Architecture
 
-> See also: FR-019 Memory Architecture, FR-021 Memory v2 Implementation Plan
-
 ### 6.1 Layer Overview
 
 | Layer | Source Prefix | TTL | Description |
@@ -611,7 +608,7 @@ Destructive deletion, VCS deletion, disk destruction, device redirection, permis
 
 ## 10. Deployment Modes
 
-> See also: [operations-guide.md](./operations-guide.md#3-deployment) for full deployment instructions, FR-024 Standalone Mode
+> See also: [operations-guide.md](./operations-guide.md#3-deployment) for full deployment instructions
 
 | Mode | Command | Description |
 |------|---------|-------------|

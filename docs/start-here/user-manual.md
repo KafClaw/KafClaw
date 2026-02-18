@@ -113,8 +113,6 @@ Once the gateway is running:
 
 ## 3. CLI Reference
 
-> See also: FR-003 CLI Runtime Modes
-
 KafClaw provides the following CLI commands. Run `kafclaw --help` for the full list.
 Core startup commands: `onboard`, `doctor`, `status`, `gateway`, `agent`, `config`.
 
@@ -311,7 +309,7 @@ Header status indicators: mode badge, memory LED, sidecar/connection status.
 
 ## 5. WhatsApp, Slack, and Teams Integration
 
-> See also: FR-001 WhatsApp Auth Flow, FR-008 WhatsApp Silent Inbound, [whatsapp-setup.md](./whatsapp-setup/) for full details
+> See also: [whatsapp-setup.md](./whatsapp-setup/) for full details
 
 KafClaw uses `whatsmeow` for native Go WhatsApp connectivity. No Node.js bridge required.
 
@@ -375,7 +373,7 @@ Known limits:
 
 ## 6. Memory System
 
-> See also: FR-019 Memory Architecture, [architecture-timeline.md](./architecture-timeline/) for the full memory architecture
+> See also: [architecture-timeline.md](./architecture-timeline/) for the full memory architecture
 
 ### Overview
 
@@ -427,8 +425,6 @@ On every message, KafClaw searches semantic memory:
 
 ## 7. Day2Day Task Tracker
 
-> See also: FR-015 Day2Day Tracker
-
 Built-in daily task management. Commands work via any channel (CLI, WhatsApp, Web UI).
 
 ### Commands
@@ -466,8 +462,6 @@ Format: `- [ ]` for open, `- [x]` for completed. Includes progress log, consolid
 ---
 
 ## 8. Soul Files and Workspace
-
-> See also: FR-025 Workspace Policy, FR-023 Skill System
 
 ### Workspace Structure
 

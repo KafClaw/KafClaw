@@ -5,8 +5,6 @@ title: Workspace Policy
 
 # Workspace Policy
 
-> See also: FR-025 Workspace Policy
-
 ## Fixed Workspace Path
 
 KafClaw uses a fixed workspace for all bot state:

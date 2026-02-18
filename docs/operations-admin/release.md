@@ -5,8 +5,6 @@ title: Release Process
 
 # Release Process
 
-> See also: FR-017 Build/Test Strategy
-
 ## Versioning
 
 KafClaw uses semantic versioning (`MAJOR.MINOR.PATCH`). The version is defined in `internal/cli/root.go` and can be overridden at build time:

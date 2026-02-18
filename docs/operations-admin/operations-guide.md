@@ -25,8 +25,6 @@ Build, deploy, monitor, and operate KafClaw.
 
 ## 1. Architecture Overview
 
-> See also: FR-009 System Architecture, [architecture-detailed.md](./architecture-detailed/) for the full reference
-
 ### Data Flow
 
 ```
@@ -71,7 +69,7 @@ WhatsApp/CLI/Web/Scheduler --> Message Bus --> Agent Loop --> LLM Provider
 
 ## 2. Build and Release
 
-> See also: FR-017 Build/Test Strategy, [release.md](./release/) for versioning details
+> See also: [release.md](./release/) for versioning details
 
 ### Prerequisites
 

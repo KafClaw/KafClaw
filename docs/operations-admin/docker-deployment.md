@@ -5,8 +5,6 @@ title: Docker Compose Deployment
 
 # Docker Compose Deployment
 
-> See also: FR-024 Standalone Mode for deployment mode details
-
 ## Build Image
 
 From the KafClaw source directory:
