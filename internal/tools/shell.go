@@ -202,6 +202,8 @@ func (t *ExecTool) Execute(ctx context.Context, params map[string]any) (string, 
 }
 
 func (t *ExecTool) guardCommand(command, workingDir string) error {
+	normalized := strings.ToLower(command)
+
 	// Strict allow-list mode
 	if t.StrictAllowList {
 		allowed := false
@@ -218,7 +220,7 @@ func (t *ExecTool) guardCommand(command, workingDir string) error {
 
 	// Check deny patterns
 	for _, re := range t.denyRegexes {
-		if re.MatchString(command) {
+		if re.MatchString(normalized) {
 			return fmt.Errorf(blockedAttackMessage)
 		}
 	}
