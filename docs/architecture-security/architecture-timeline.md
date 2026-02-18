@@ -1,6 +1,6 @@
 ---
 parent: Architecture and Security
-title: Architecture: Timeline and Memory
+title: "Architecture: Timeline and Memory"
 ---
 
 # Architecture: Timeline and Memory

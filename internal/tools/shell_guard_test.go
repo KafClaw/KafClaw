@@ -27,6 +27,9 @@ func TestGuardCommandDenyAndTraversalBranches(t *testing.T) {
 	if err := tool.guardCommand("rm -rf /", workspace); err == nil {
 		t.Fatal("expected deny-pattern command blocked")
 	}
+	if err := tool.guardCommand("Rm -rf /", workspace); err == nil {
+		t.Fatal("expected mixed-case deny-pattern command blocked")
+	}
 	if err := tool.guardCommand("cat ../../../etc/passwd", workspace); err == nil {
 		t.Fatal("expected traversal command blocked")
 	}
