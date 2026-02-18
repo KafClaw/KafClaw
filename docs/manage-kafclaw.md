@@ -1,5 +1,7 @@
 # KafClaw Management Guide
 
+{% include topnav.html %}
+
 Operator-focused guide for managing KafClaw from CLI and runtime endpoints.
 
 ## 1. Core Command Surface

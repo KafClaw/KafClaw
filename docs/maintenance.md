@@ -1,5 +1,7 @@
 # Operations and Maintenance
 
+{% include topnav.html %}
+
 Operational runbook for keeping KafClaw healthy in dev and production-like setups.
 
 ## Daily Checks

@@ -4,6 +4,8 @@
   <img src="./assets/kafclaw.png" alt="KafClaw Logo" width="320" />
 </p>
 
+{% include topnav.html %}
+
 KafClaw is a Go-based agent runtime with three practical deployment modes:
 
 - `local`: personal assistant on one machine

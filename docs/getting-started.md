@@ -1,5 +1,7 @@
 # Getting Started
 
+{% include topnav.html %}
+
 This guide gets KafClaw from zero to a working setup, with focus on onboarding and workspace identity files.
 
 ## 1. Prerequisites
