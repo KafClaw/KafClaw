@@ -1,11 +1,21 @@
 title: KafClaw Docs
 description: KafClaw product, operations, and administration documentation.
-remote_theme: just-the-docs/just-the-docs
+theme: just-the-docs
 plugins:
-  - jekyll-remote-theme
+  - jekyll-include-cache
 markdown: kramdown
 kramdown:
   input: GFM
+defaults:
+  - scope:
+      path: ""
+      type: "pages"
+    values:
+      layout: "default"
+  - scope:
+      path: "index.md"
+    values:
+      layout: "home"
 search_enabled: true
 heading_anchors: true
 back_to_top: true

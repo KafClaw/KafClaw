@@ -2270,7 +2270,7 @@ func TestRetryAndJWTUtilityHelpers(t *testing.T) {
 }
 
 func TestDocsParitySnapshotUpdated(t *testing.T) {
-	path := filepath.Join("..", "..", "docs", "v2", "slack-teams-bridge.md")
+	path := filepath.Join("..", "..", "docs", "integrations", "slack-teams-bridge.md")
 	body, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("read docs: %v", err)

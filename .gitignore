@@ -41,6 +41,14 @@ electron/dist/
 /_tasks/
 /.tmp/
 
+# Jekyll local build artifacts
+docs/.jekyll-cache/
+docs/.jekyll-metadata
+docs/.sass-cache/
+docs/.bundle/
+docs/_site/
+docs/vendor/bundle/
+
 # Keep Node version pins tracked
 !.nvmrc
 !.node-version
