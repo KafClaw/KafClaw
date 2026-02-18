@@ -124,9 +124,12 @@ func TestSlackSendUsesOutboundBridge(t *testing.T) {
 	defer srv.Close()
 
 	ch := NewSlackChannel(config.SlackConfig{
-		Enabled:     true,
-		OutboundURL: srv.URL,
-		BotToken:    "xoxb-test",
+		Enabled:          true,
+		OutboundURL:      srv.URL,
+		BotToken:         "xoxb-test",
+		NativeStreaming:  true,
+		StreamMode:       "append",
+		StreamChunkChars: 180,
 	}, bus.NewMessageBus(), nil)
 
 	err := ch.Send(context.Background(), &bus.OutboundMessage{
@@ -151,6 +154,64 @@ func TestSlackSendUsesOutboundBridge(t *testing.T) {
 	}
 	if _, ok := got["card"]; !ok {
 		t.Fatalf("expected card in payload: %#v", got)
+	}
+	if got["native_streaming"] != true {
+		t.Fatalf("expected native_streaming=true, got %#v", got["native_streaming"])
+	}
+	if got["stream_mode"] != "append" {
+		t.Fatalf("expected stream_mode=append, got %#v", got["stream_mode"])
+	}
+	if got["stream_chunk_chars"] != float64(180) {
+		t.Fatalf("expected stream_chunk_chars=180, got %#v", got["stream_chunk_chars"])
+	}
+}
+
+func TestSlackSendUsesAccountStreamingOverrides(t *testing.T) {
+	var got map[string]any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer r.Body.Close()
+		_ = json.NewDecoder(r.Body).Decode(&got)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	disableStreaming := false
+	ch := NewSlackChannel(config.SlackConfig{
+		Enabled:          true,
+		OutboundURL:      "http://base.invalid",
+		NativeStreaming:  true,
+		StreamMode:       "replace",
+		StreamChunkChars: 320,
+		Accounts: []config.SlackAccountConfig{
+			{
+				ID:               "acct1",
+				OutboundURL:      srv.URL,
+				NativeStreaming:  &disableStreaming,
+				StreamMode:       "status_final",
+				StreamChunkChars: 64,
+			},
+		},
+	}, bus.NewMessageBus(), nil)
+
+	err := ch.Send(context.Background(), &bus.OutboundMessage{
+		Channel: "slack",
+		ChatID:  "acct://acct1|C123",
+		Content: "hello",
+	})
+	if err != nil {
+		t.Fatalf("send: %v", err)
+	}
+	if got["account_id"] != "acct1" {
+		t.Fatalf("expected account_id acct1, got %#v", got["account_id"])
+	}
+	if got["native_streaming"] != false {
+		t.Fatalf("expected native_streaming=false override, got %#v", got["native_streaming"])
+	}
+	if got["stream_mode"] != "status_final" {
+		t.Fatalf("expected stream_mode=status_final, got %#v", got["stream_mode"])
+	}
+	if got["stream_chunk_chars"] != float64(64) {
+		t.Fatalf("expected stream_chunk_chars=64, got %#v", got["stream_chunk_chars"])
 	}
 }
 

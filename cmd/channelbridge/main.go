@@ -39,23 +39,32 @@ type config struct {
 	KafclawSlackInboundToken   string
 	KafclawMSTeamsInboundToken string
 
-	SlackBotToken      string
-	SlackAppToken      string
-	SlackAccountID     string
-	SlackReplyMode     string
-	SlackBotUserID     string
-	SlackSigningSecret string
-	SlackAPIBase       string
+	SlackBotToken            string
+	SlackAppToken            string
+	SlackAccountID           string
+	SlackReplyMode           string
+	SlackReplyModeByChatType map[string]string
+	SlackHistoryLimit        int
+	SlackDMHistoryLimit      int
+	SlackNativeStreaming     bool
+	SlackStreamMode          string
+	SlackStreamChunkChars    int
+	SlackBotUserID           string
+	SlackSigningSecret       string
+	SlackAPIBase             string
 
-	MSTeamsAppID         string
-	MSTeamsAppPassword   string
-	MSTeamsAccountID     string
-	MSTeamsReplyMode     string
-	MSTeamsTenantID      string
-	MSTeamsInboundBearer string
-	MSTeamsOpenIDConfig  string
-	MSTeamsAPIBase       string
-	MSTeamsGraphBase     string
+	MSTeamsAppID           string
+	MSTeamsAppPassword     string
+	MSTeamsAccountID       string
+	MSTeamsReplyMode       string
+	MSTeamsHistoryLimit    int
+	MSTeamsDMHistoryLimit  int
+	MSTeamsMediaAllowHosts []string
+	MSTeamsTenantID        string
+	MSTeamsInboundBearer   string
+	MSTeamsOpenIDConfig    string
+	MSTeamsAPIBase         string
+	MSTeamsGraphBase       string
 
 	StatePath string
 }
@@ -111,8 +120,13 @@ type teamsJWTVerifier struct {
 	mu         sync.Mutex
 	issuer     string
 	jwksURI    string
-	keysByKid  map[string]*rsa.PublicKey
+	keysByKid  map[string]jwtKeyMeta
 	cacheUntil time.Time
+}
+
+type jwtKeyMeta struct {
+	publicKey    *rsa.PublicKey
+	endorsements []string
 }
 
 type tokenCache struct {
@@ -192,18 +206,34 @@ func loadConfig() config {
 		KafclawSlackInboundToken:   strings.TrimSpace(os.Getenv("KAFCLAW_SLACK_INBOUND_TOKEN")),
 		KafclawMSTeamsInboundToken: strings.TrimSpace(os.Getenv("KAFCLAW_MSTEAMS_INBOUND_TOKEN")),
 
-		SlackBotToken:      strings.TrimSpace(os.Getenv("SLACK_BOT_TOKEN")),
-		SlackAppToken:      strings.TrimSpace(os.Getenv("SLACK_APP_TOKEN")),
-		SlackAccountID:     strings.TrimSpace(getEnvDefault("SLACK_ACCOUNT_ID", "default")),
-		SlackReplyMode:     strings.TrimSpace(getEnvDefault("SLACK_REPLY_MODE", "all")),
-		SlackBotUserID:     strings.TrimSpace(os.Getenv("SLACK_BOT_USER_ID")),
-		SlackSigningSecret: strings.TrimSpace(os.Getenv("SLACK_SIGNING_SECRET")),
-		SlackAPIBase:       strings.TrimSpace(getEnvDefault("SLACK_API_BASE", "https://slack.com/api")),
+		SlackBotToken:            strings.TrimSpace(os.Getenv("SLACK_BOT_TOKEN")),
+		SlackAppToken:            strings.TrimSpace(os.Getenv("SLACK_APP_TOKEN")),
+		SlackAccountID:           strings.TrimSpace(getEnvDefault("SLACK_ACCOUNT_ID", "default")),
+		SlackReplyMode:           strings.TrimSpace(getEnvDefault("SLACK_REPLY_MODE", "all")),
+		SlackReplyModeByChatType: parseReplyModeByChatType(os.Getenv("SLACK_REPLY_MODE_BY_CHAT_TYPE")),
+		SlackHistoryLimit:        parseIntDefault("SLACK_HISTORY_LIMIT", 50),
+		SlackDMHistoryLimit:      parseIntDefault("SLACK_DM_HISTORY_LIMIT", 20),
+		SlackNativeStreaming:     parseBoolDefault("SLACK_NATIVE_STREAMING", false),
+		SlackStreamMode:          strings.TrimSpace(getEnvDefault("SLACK_STREAM_MODE", "replace")),
+		SlackStreamChunkChars:    parseIntDefault("SLACK_STREAM_CHUNK_CHARS", 320),
+		SlackBotUserID:           strings.TrimSpace(os.Getenv("SLACK_BOT_USER_ID")),
+		SlackSigningSecret:       strings.TrimSpace(os.Getenv("SLACK_SIGNING_SECRET")),
+		SlackAPIBase:             strings.TrimSpace(getEnvDefault("SLACK_API_BASE", "https://slack.com/api")),
 
-		MSTeamsAppID:         strings.TrimSpace(os.Getenv("MSTEAMS_APP_ID")),
-		MSTeamsAppPassword:   strings.TrimSpace(os.Getenv("MSTEAMS_APP_PASSWORD")),
-		MSTeamsAccountID:     strings.TrimSpace(getEnvDefault("MSTEAMS_ACCOUNT_ID", "default")),
-		MSTeamsReplyMode:     strings.TrimSpace(getEnvDefault("MSTEAMS_REPLY_MODE", "all")),
+		MSTeamsAppID:          strings.TrimSpace(os.Getenv("MSTEAMS_APP_ID")),
+		MSTeamsAppPassword:    strings.TrimSpace(os.Getenv("MSTEAMS_APP_PASSWORD")),
+		MSTeamsAccountID:      strings.TrimSpace(getEnvDefault("MSTEAMS_ACCOUNT_ID", "default")),
+		MSTeamsReplyMode:      strings.TrimSpace(getEnvDefault("MSTEAMS_REPLY_MODE", "all")),
+		MSTeamsHistoryLimit:   parseIntDefault("MSTEAMS_HISTORY_LIMIT", 50),
+		MSTeamsDMHistoryLimit: parseIntDefault("MSTEAMS_DM_HISTORY_LIMIT", 20),
+		MSTeamsMediaAllowHosts: parseCSVDefault(os.Getenv("MSTEAMS_MEDIA_ALLOW_HOSTS"), []string{
+			"*.teams.microsoft.com",
+			"*.botframework.com",
+			"*.trafficmanager.net",
+			"graph.microsoft.com",
+			"*.sharepoint.com",
+			"*.onedrive.com",
+		}),
 		MSTeamsTenantID:      strings.TrimSpace(getEnvDefault("MSTEAMS_TENANT_ID", "botframework.com")),
 		MSTeamsInboundBearer: strings.TrimSpace(os.Getenv("MSTEAMS_INBOUND_BEARER")),
 		MSTeamsOpenIDConfig:  strings.TrimSpace(getEnvDefault("MSTEAMS_OPENID_CONFIG", "https://login.botframework.com/v1/.well-known/openidconfiguration")),
@@ -220,6 +250,71 @@ func getEnvDefault(k, d string) string {
 		return d
 	}
 	return v
+}
+
+func parseBoolDefault(key string, fallback bool) bool {
+	raw := strings.TrimSpace(os.Getenv(key))
+	if raw == "" {
+		return fallback
+	}
+	v, err := strconv.ParseBool(raw)
+	if err != nil {
+		return fallback
+	}
+	return v
+}
+
+func parseIntDefault(key string, fallback int) int {
+	raw := strings.TrimSpace(os.Getenv(key))
+	if raw == "" {
+		return fallback
+	}
+	v, err := strconv.Atoi(raw)
+	if err != nil || v <= 0 {
+		return fallback
+	}
+	return v
+}
+
+func parseCSVDefault(raw string, fallback []string) []string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return append([]string(nil), fallback...)
+	}
+	out := make([]string, 0, 8)
+	for _, part := range strings.Split(raw, ",") {
+		v := strings.ToLower(strings.TrimSpace(part))
+		if v != "" {
+			out = append(out, v)
+		}
+	}
+	if len(out) == 0 {
+		return append([]string(nil), fallback...)
+	}
+	return out
+}
+
+func parseReplyModeByChatType(raw string) map[string]string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil
+	}
+	out := map[string]string{}
+	for _, pair := range strings.Split(raw, ",") {
+		kv := strings.SplitN(strings.TrimSpace(pair), "=", 2)
+		if len(kv) != 2 {
+			continue
+		}
+		key := strings.ToLower(strings.TrimSpace(kv[0]))
+		if key != "direct" && key != "group" && key != "channel" {
+			continue
+		}
+		out[key] = normalizeReplyMode(kv[1])
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }
 
 func (b *bridge) handleStatus(w http.ResponseWriter, _ *http.Request) {
@@ -486,6 +581,14 @@ func normalizeSlackInboundEvent(event map[string]any, botUserID string) (slackIn
 		if changed != nil {
 			msg = changed
 		}
+	} else if subtype == "message_replied" {
+		replied, _ := event["message"].(map[string]any)
+		if replied != nil {
+			msg = replied
+		}
+	}
+	if strings.TrimSpace(asString(msg["bot_id"])) != "" || strings.TrimSpace(asString(msg["subtype"])) == "bot_message" {
+		return slackInbound{}, false
 	}
 
 	channelID := strings.TrimSpace(firstNonEmpty(asString(event["channel"]), asString(msg["channel"])))
@@ -519,6 +622,10 @@ func normalizeSlackInboundEvent(event map[string]any, botUserID string) (slackIn
 		asString(event["ts"]),
 		asString(event["event_ts"]),
 	))
+	// Slack emits top-level messages with thread_ts==ts; keep these unthreaded.
+	if threadID != "" && messageID != "" && threadID == messageID {
+		threadID = ""
+	}
 	channelType := strings.ToLower(strings.TrimSpace(asString(event["channel_type"])))
 	if channelType == "" && strings.HasPrefix(strings.ToUpper(channelID), "D") {
 		channelType = "im"
@@ -549,14 +656,16 @@ func (b *bridge) forwardSlackInbound(senderID, channelID, threadID, messageID, t
 		return nil
 	}
 	err := b.postInbound("/api/v1/channels/slack/inbound", b.cfg.KafclawSlackInboundToken, map[string]any{
-		"account_id":    strings.TrimSpace(b.cfg.SlackAccountID),
-		"sender_id":     senderID,
-		"chat_id":       channelID,
-		"thread_id":     strings.TrimSpace(threadID),
-		"message_id":    strings.TrimSpace(messageID),
-		"text":          text,
-		"is_group":      isGroup,
-		"was_mentioned": wasMentioned,
+		"account_id":       strings.TrimSpace(b.cfg.SlackAccountID),
+		"sender_id":        senderID,
+		"chat_id":          channelID,
+		"thread_id":        strings.TrimSpace(threadID),
+		"message_id":       strings.TrimSpace(messageID),
+		"text":             text,
+		"is_group":         isGroup,
+		"was_mentioned":    wasMentioned,
+		"history_limit":    b.cfg.SlackHistoryLimit,
+		"dm_history_limit": b.cfg.SlackDMHistoryLimit,
 	})
 	if err != nil {
 		b.noteInboundForward(false, err)
@@ -677,6 +786,9 @@ func (b *bridge) handleSlackOutbound(w http.ResponseWriter, r *http.Request) {
 		ChatID            string         `json:"chat_id"`
 		ThreadID          string         `json:"thread_id"`
 		ReplyMode         string         `json:"reply_mode"`
+		NativeStreaming   *bool          `json:"native_streaming"`
+		StreamMode        string         `json:"stream_mode"`
+		StreamChunkChars  int            `json:"stream_chunk_chars"`
 		Content           string         `json:"content"`
 		MediaURLs         []string       `json:"media_urls"`
 		Card              map[string]any `json:"card"`
@@ -702,13 +814,19 @@ func (b *bridge) handleSlackOutbound(w http.ResponseWriter, r *http.Request) {
 	if accountID == "" {
 		accountID = "default"
 	}
-	threadID := b.resolveReplyThread("slack", accountID, req.ChatID, req.ThreadID, req.ReplyMode, b.cfg.SlackReplyMode)
 	channelID, err := b.resolveSlackChannelID(req.ChatID)
 	if err != nil {
 		b.noteOutbound(false, true, err)
 		http.Error(w, err.Error(), http.StatusBadGateway)
 		return
 	}
+	defaultReplyMode := b.cfg.SlackReplyMode
+	if strings.TrimSpace(req.ReplyMode) == "" {
+		if override := resolveSlackReplyModeByChatType(channelID, b.cfg.SlackReplyModeByChatType); override != "" {
+			defaultReplyMode = override
+		}
+	}
+	threadID := b.resolveReplyThread("slack", accountID, req.ChatID, req.ThreadID, req.ReplyMode, defaultReplyMode)
 	if act := strings.TrimSpace(strings.ToLower(req.Action)); act != "" {
 		result, err := b.slackHandleAction(act, channelID, strings.TrimSpace(threadID), req.Content, req.ActionParams)
 		if err != nil {
@@ -727,14 +845,37 @@ func (b *bridge) handleSlackOutbound(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	if len(req.Card) > 0 {
+	streamMode := normalizeSlackStreamMode(firstNonEmpty(req.StreamMode, b.cfg.SlackStreamMode))
+	nativeStreaming := b.cfg.SlackNativeStreaming
+	if req.NativeStreaming != nil {
+		nativeStreaming = *req.NativeStreaming
+	}
+	streamChunkChars := req.StreamChunkChars
+	if streamChunkChars <= 0 {
+		streamChunkChars = b.cfg.SlackStreamChunkChars
+	}
+	canStream := nativeStreaming &&
+		streamMode != "status_final" &&
+		len(req.MediaURLs) == 0 &&
+		len(req.Card) == 0 &&
+		strings.TrimSpace(req.Content) != ""
+	if canStream {
+		if err := b.slackPostStreamedMessage(channelID, threadID, req.Content, streamChunkChars); err != nil {
+			log.Printf("slack native streaming failed, falling back to postMessage: %v", err)
+			if err := b.slackPostMessage(channelID, threadID, req.Content); err != nil {
+				b.noteOutbound(false, true, err)
+				http.Error(w, err.Error(), http.StatusBadGateway)
+				return
+			}
+		}
+	} else if len(req.Card) > 0 {
 		if err := b.slackPostCard(channelID, threadID, req.Content, req.Card); err != nil {
 			b.noteOutbound(false, true, err)
 			http.Error(w, err.Error(), http.StatusBadGateway)
 			return
 		}
 	} else if strings.TrimSpace(req.Content) != "" {
-		if err := b.slackPostMessage(channelID, threadID, req.Content); err != nil {
+		if err := b.slackPostMessageChunked(channelID, threadID, req.Content); err != nil {
 			b.noteOutbound(false, true, err)
 			http.Error(w, err.Error(), http.StatusBadGateway)
 			return
@@ -1015,6 +1156,171 @@ func (b *bridge) slackPostMessage(channelID, threadID, text string) error {
 	})
 }
 
+func (b *bridge) slackPostMessageChunked(channelID, threadID, text string) error {
+	chunks := splitSlackMarkdownChunks(text, 3500)
+	if len(chunks) == 0 {
+		return nil
+	}
+	for _, chunk := range chunks {
+		if err := b.slackPostMessage(channelID, threadID, chunk); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (b *bridge) slackPostStreamedMessage(channelID, threadID, text string, chunkChars int) error {
+	threadID = strings.TrimSpace(threadID)
+	if threadID == "" {
+		return errors.New("missing thread id for slack native streaming")
+	}
+	chunks := splitSlackStreamChunks(text, chunkChars)
+	if len(chunks) == 0 {
+		return errors.New("empty stream chunks")
+	}
+	streamTS, err := b.slackStartStream(channelID, threadID, chunks[0])
+	if err != nil {
+		return err
+	}
+	for i := 1; i < len(chunks); i++ {
+		if err := b.slackAppendStream(channelID, streamTS, chunks[i]); err != nil {
+			return err
+		}
+	}
+	return b.slackStopStream(channelID, streamTS)
+}
+
+func splitSlackStreamChunks(text string, chunkChars int) []string {
+	text = strings.TrimSpace(text)
+	if text == "" {
+		return nil
+	}
+	if chunkChars <= 0 {
+		chunkChars = 320
+	}
+	words := strings.Fields(text)
+	if len(words) == 0 {
+		return []string{text}
+	}
+	chunks := make([]string, 0, len(words)/8+1)
+	var current strings.Builder
+	for _, w := range words {
+		if current.Len() == 0 {
+			current.WriteString(w)
+			continue
+		}
+		if current.Len()+1+len(w) > chunkChars {
+			chunks = append(chunks, current.String())
+			current.Reset()
+			current.WriteString(w)
+			continue
+		}
+		current.WriteByte(' ')
+		current.WriteString(w)
+	}
+	if current.Len() > 0 {
+		chunks = append(chunks, current.String())
+	}
+	if len(chunks) == 0 {
+		return []string{text}
+	}
+	return chunks
+}
+
+func (b *bridge) slackStartStream(channelID, threadID, text string) (string, error) {
+	var out struct {
+		OK    bool   `json:"ok"`
+		Error string `json:"error"`
+		TS    string `json:"ts"`
+	}
+	err := b.slackAPIPostForm("chat.startStream", url.Values{
+		"channel":       {strings.TrimSpace(channelID)},
+		"thread_ts":     {strings.TrimSpace(threadID)},
+		"markdown_text": {strings.TrimSpace(text)},
+	}, &out)
+	if err != nil {
+		return "", err
+	}
+	ts := strings.TrimSpace(out.TS)
+	if ts == "" {
+		return "", errors.New("chat.startStream missing ts")
+	}
+	return ts, nil
+}
+
+func (b *bridge) slackAppendStream(channelID, ts, text string) error {
+	var out struct {
+		OK    bool   `json:"ok"`
+		Error string `json:"error"`
+	}
+	return b.slackAPIPostForm("chat.appendStream", url.Values{
+		"channel":       {strings.TrimSpace(channelID)},
+		"ts":            {strings.TrimSpace(ts)},
+		"markdown_text": {strings.TrimSpace(text)},
+	}, &out)
+}
+
+func (b *bridge) slackStopStream(channelID, ts string) error {
+	var out struct {
+		OK    bool   `json:"ok"`
+		Error string `json:"error"`
+	}
+	return b.slackAPIPostForm("chat.stopStream", url.Values{
+		"channel": {strings.TrimSpace(channelID)},
+		"ts":      {strings.TrimSpace(ts)},
+	}, &out)
+}
+
+func (b *bridge) slackAPIPostForm(method string, form url.Values, out any) error {
+	token := strings.TrimSpace(b.cfg.SlackBotToken)
+	if token == "" {
+		return errors.New("missing SLACK_BOT_TOKEN")
+	}
+	base := strings.TrimSpace(b.cfg.SlackAPIBase)
+	if base == "" {
+		base = "https://slack.com/api"
+	}
+	endpoint := strings.TrimRight(base, "/") + "/" + strings.TrimSpace(method)
+	return withRetry(3, 200*time.Millisecond, func() (bool, error) {
+		req, err := http.NewRequest(http.MethodPost, endpoint, strings.NewReader(form.Encode()))
+		if err != nil {
+			return false, err
+		}
+		req.Header.Set("Authorization", "Bearer "+token)
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		resp, err := b.client.Do(req)
+		if err != nil {
+			return true, err
+		}
+		defer resp.Body.Close()
+		body, _ := io.ReadAll(resp.Body)
+		if out != nil {
+			_ = json.Unmarshal(body, out)
+		}
+
+		var parsed struct {
+			OK    bool   `json:"ok"`
+			Error string `json:"error"`
+		}
+		_ = json.Unmarshal(body, &parsed)
+		if parsed.OK {
+			return false, nil
+		}
+		if d := parseRetryAfter(resp.Header.Get("Retry-After")); d > 0 {
+			time.Sleep(d)
+		}
+		retryable := resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode >= 500
+		errMsg := strings.TrimSpace(parsed.Error)
+		if errMsg == "" {
+			errMsg = strings.TrimSpace(string(body))
+		}
+		if errMsg == "" {
+			errMsg = "slack api call failed"
+		}
+		return retryable, fmt.Errorf("%s: %s", strings.TrimSpace(method), errMsg)
+	})
+}
+
 func (b *bridge) slackPostCard(channelID, threadID, text string, card map[string]any) error {
 	api, err := b.slackClient()
 	if err != nil {
@@ -1025,10 +1331,36 @@ func (b *bridge) slackPostCard(channelID, threadID, text string, card map[string
 		blob, _ := json.Marshal(rawBlocks)
 		_ = json.Unmarshal(blob, &blocks)
 	}
+	attachments := make([]slack.Attachment, 0)
+	if rawAttachments, ok := card["attachments"]; ok && rawAttachments != nil {
+		blob, _ := json.Marshal(rawAttachments)
+		_ = json.Unmarshal(blob, &attachments)
+	}
+	if len(blocks.BlockSet) == 0 {
+		if rawSections, ok := card["sections"].([]any); ok {
+			for _, sec := range rawSections {
+				line := strings.TrimSpace(asString(sec))
+				if line == "" {
+					continue
+				}
+				blocks.BlockSet = append(blocks.BlockSet, slack.NewSectionBlock(
+					slack.NewTextBlockObject("mrkdwn", line, false, false),
+					nil,
+					nil,
+				))
+			}
+		}
+	}
+	if strings.TrimSpace(text) == "" {
+		text = strings.TrimSpace(firstNonEmpty(asString(card["text"]), asString(card["title"]), asString(card["body"])))
+	}
 	return withRetry(3, 200*time.Millisecond, func() (bool, error) {
 		opts := []slack.MsgOption{slack.MsgOptionText(strings.TrimSpace(text), false)}
 		if len(blocks.BlockSet) > 0 {
 			opts = append(opts, slack.MsgOptionBlocks(blocks.BlockSet...))
+		}
+		if len(attachments) > 0 {
+			opts = append(opts, slack.MsgOptionAttachments(attachments...))
 		}
 		if ts := strings.TrimSpace(threadID); ts != "" {
 			opts = append(opts, slack.MsgOptionTS(ts))
@@ -1169,6 +1501,10 @@ func (b *bridge) slackRetryDecision(err error) (bool, error) {
 		}
 		return true, err
 	}
+	msg := strings.ToLower(strings.TrimSpace(err.Error()))
+	if strings.Contains(msg, " 429 ") || strings.Contains(msg, "429 too many requests") || strings.Contains(msg, "rate_limited") {
+		return true, err
+	}
 	return false, err
 }
 
@@ -1243,7 +1579,7 @@ func verifyBearer(r *http.Request, expected string) bool {
 	return got == expected
 }
 
-func (b *bridge) verifyTeamsJWTRequest(r *http.Request, serviceURL string) error {
+func (b *bridge) verifyTeamsJWTRequest(r *http.Request, serviceURL, channelID string) error {
 	if b.jwt == nil || strings.TrimSpace(b.cfg.MSTeamsAppID) == "" {
 		return nil
 	}
@@ -1251,7 +1587,7 @@ func (b *bridge) verifyTeamsJWTRequest(r *http.Request, serviceURL string) error
 	if auth == "" {
 		return errors.New("missing authorization header")
 	}
-	return b.jwt.Verify(auth, time.Now(), strings.TrimSpace(serviceURL))
+	return b.jwt.Verify(auth, time.Now(), strings.TrimSpace(serviceURL), strings.TrimSpace(channelID))
 }
 
 func (b *bridge) handleTeamsMessages(w http.ResponseWriter, r *http.Request) {
@@ -1274,7 +1610,7 @@ func (b *bridge) handleTeamsMessages(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid json", http.StatusBadRequest)
 		return
 	}
-	if err := b.verifyTeamsJWTRequest(r, strings.TrimSpace(asString(activity["serviceUrl"]))); err != nil {
+	if err := b.verifyTeamsJWTRequest(r, strings.TrimSpace(asString(activity["serviceUrl"])), strings.TrimSpace(asString(activity["channelId"]))); err != nil {
 		b.noteInboundAuthRejected()
 		http.Error(w, "invalid teams jwt", http.StatusUnauthorized)
 		return
@@ -1283,13 +1619,13 @@ func (b *bridge) handleTeamsMessages(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewEncoder(w).Encode(map[string]any{"ok": true})
 		return
 	}
-	inbound := normalizeTeamsInbound(activity)
+	inbound := normalizeTeamsInbound(activity, b.cfg.MSTeamsMediaAllowHosts)
 	if inbound.senderID == "" || inbound.chatID == "" {
 		_ = json.NewEncoder(w).Encode(map[string]any{"ok": true})
 		return
 	}
-	if b.handleTeamsPollVote(inbound.chatID, inbound.senderID, activity) {
-		_ = json.NewEncoder(w).Encode(map[string]any{"ok": true, "poll_vote_recorded": true})
+	if recorded, details := b.handleTeamsPollVote(inbound.chatID, inbound.senderID, activity); recorded {
+		_ = json.NewEncoder(w).Encode(map[string]any{"ok": true, "poll_vote_recorded": true, "poll": details})
 		return
 	}
 	if inbound.messageID != "" && b.seenInboundEvent("teams:msg:"+inbound.chatID+":"+inbound.messageID, time.Now()) {
@@ -1320,6 +1656,9 @@ func (b *bridge) handleTeamsMessages(w http.ResponseWriter, r *http.Request) {
 		"conversation_type":  inbound.conversationType,
 		"group_id":           inbound.teamID,
 		"channel_id":         inbound.channelID,
+		"media_urls":         inbound.mediaURLs,
+		"history_limit":      b.cfg.MSTeamsHistoryLimit,
+		"dm_history_limit":   b.cfg.MSTeamsDMHistoryLimit,
 		"tenant_id":          inbound.tenantID,
 		"service_url":        inbound.serviceURL,
 		"service_url_domain": inbound.serviceDomain,
@@ -1349,11 +1688,12 @@ type teamsInbound struct {
 	teamID           string
 	channelID        string
 	tenantID         string
+	mediaURLs        []string
 	isGroup          bool
 	wasMentioned     bool
 }
 
-func normalizeTeamsInbound(activity map[string]any) teamsInbound {
+func normalizeTeamsInbound(activity map[string]any, mediaAllowHosts []string) teamsInbound {
 	from, _ := activity["from"].(map[string]any)
 	conv, _ := activity["conversation"].(map[string]any)
 	recipient, _ := activity["recipient"].(map[string]any)
@@ -1362,21 +1702,27 @@ func normalizeTeamsInbound(activity map[string]any) teamsInbound {
 	channel, _ := channelData["channel"].(map[string]any)
 	tenant, _ := channelData["tenant"].(map[string]any)
 
+	text := strings.TrimSpace(cleanTeamsMentionText(extractTeamsInboundText(activity)))
+	mediaURLs := extractTeamsInboundMediaURLs(activity, mediaAllowHosts)
 	out := teamsInbound{
 		senderID:         strings.TrimSpace(asString(from["id"])),
 		userID:           strings.TrimSpace(asString(from["aadObjectId"])),
 		chatID:           strings.TrimSpace(asString(conv["id"])),
 		threadID:         strings.TrimSpace(asString(activity["replyToId"])),
 		messageID:        strings.TrimSpace(asString(activity["id"])),
-		text:             strings.TrimSpace(cleanTeamsMentionText(asString(activity["text"]))),
+		text:             text,
 		serviceURL:       strings.TrimSpace(asString(activity["serviceUrl"])),
 		conversationType: strings.ToLower(strings.TrimSpace(asString(conv["conversationType"]))),
 		teamID:           strings.TrimSpace(asString(team["id"])),
 		channelID:        strings.TrimSpace(asString(channel["id"])),
 		tenantID:         strings.TrimSpace(asString(tenant["id"])),
+		mediaURLs:        mediaURLs,
 	}
 	if out.userID == "" {
 		out.userID = out.senderID
+	}
+	if out.senderID == "" {
+		out.senderID = out.userID
 	}
 	if out.conversationType == "" && out.channelID != "" {
 		out.conversationType = "channel"
@@ -1401,6 +1747,121 @@ func normalizeTeamsInbound(activity map[string]any) teamsInbound {
 	botName := strings.TrimSpace(asString(recipient["name"]))
 	out.wasMentioned = teamsWasMentioned(activity, botID, botName)
 	return out
+}
+
+func extractTeamsInboundText(activity map[string]any) string {
+	text := strings.TrimSpace(asString(activity["text"]))
+	if text != "" {
+		return text
+	}
+	if summary := strings.TrimSpace(asString(activity["summary"])); summary != "" {
+		return summary
+	}
+	val, _ := activity["value"].(map[string]any)
+	if val != nil {
+		if t := strings.TrimSpace(asString(val["text"])); t != "" {
+			return t
+		}
+	}
+	if atts, ok := activity["attachments"].([]any); ok {
+		for _, raw := range atts {
+			att, _ := raw.(map[string]any)
+			if att == nil {
+				continue
+			}
+			if t := strings.TrimSpace(asString(att["content"])); t != "" {
+				return t
+			}
+			if content, ok := att["content"].(map[string]any); ok {
+				if t := strings.TrimSpace(firstNonEmpty(asString(content["text"]), asString(content["title"]), asString(content["body"]))); t != "" {
+					return t
+				}
+			}
+		}
+	}
+	return ""
+}
+
+func extractTeamsInboundMediaURLs(activity map[string]any, allowHosts []string) []string {
+	atts, ok := activity["attachments"].([]any)
+	if !ok || len(atts) == 0 {
+		return nil
+	}
+	media := make([]string, 0, len(atts))
+	seen := map[string]struct{}{}
+	for _, raw := range atts {
+		att, _ := raw.(map[string]any)
+		if att == nil {
+			continue
+		}
+		candidates := make([]string, 0, 4)
+		if urlVal := strings.TrimSpace(asString(att["contentUrl"])); urlVal != "" {
+			candidates = append(candidates, urlVal)
+		}
+		contentType := strings.ToLower(strings.TrimSpace(asString(att["contentType"])))
+		content, _ := att["content"].(map[string]any)
+		if contentType == "application/vnd.microsoft.teams.file.download.info" && content != nil {
+			for _, k := range []string{"downloadUrl", "url", "webUrl", "shareUrl"} {
+				if v := strings.TrimSpace(asString(content[k])); v != "" {
+					candidates = append(candidates, v)
+				}
+			}
+		} else if content != nil {
+			for _, k := range []string{"contentUrl", "url", "webUrl"} {
+				if v := strings.TrimSpace(asString(content[k])); v != "" {
+					candidates = append(candidates, v)
+				}
+			}
+		}
+		for _, urlVal := range candidates {
+			if !isURLAllowed(urlVal, allowHosts) {
+				continue
+			}
+			if _, ok := seen[urlVal]; ok {
+				continue
+			}
+			seen[urlVal] = struct{}{}
+			media = append(media, urlVal)
+		}
+	}
+	if len(media) == 0 {
+		return nil
+	}
+	return media
+}
+
+func isURLAllowed(rawURL string, allowHosts []string) bool {
+	u, err := url.Parse(strings.TrimSpace(rawURL))
+	if err != nil {
+		return false
+	}
+	host := strings.ToLower(strings.TrimSpace(u.Hostname()))
+	if host == "" {
+		return false
+	}
+	if len(allowHosts) == 0 {
+		return true
+	}
+	for _, entry := range allowHosts {
+		entry = strings.ToLower(strings.TrimSpace(entry))
+		if entry == "" {
+			continue
+		}
+		if entry == "*" {
+			return true
+		}
+		if strings.HasPrefix(entry, "*.") {
+			suffix := strings.TrimPrefix(entry, "*.")
+			if host == suffix || strings.HasSuffix(host, "."+suffix) {
+				return true
+			}
+			continue
+		}
+		if host == entry {
+			return true
+		}
+	}
+	return false
 }
 
 func teamsWasMentioned(activity map[string]any, botID, botName string) bool {
@@ -1539,16 +2000,12 @@ func (b *bridge) handleTeamsOutbound(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadGateway)
 		return
 	}
-	mediaURL := ""
-	if len(req.MediaURLs) > 0 {
-		mediaURL = req.MediaURLs[0]
-	}
 	pollCard := req.Card
 	if strings.TrimSpace(req.PollQuestion) != "" {
-		pollCard = buildTeamsPollCard(strings.TrimSpace(req.PollQuestion), req.PollOptions, req.PollMaxSelections)
-		b.recordTeamsPoll(strings.TrimSpace(req.ChatID), strings.TrimSpace(req.PollQuestion), req.PollOptions, req.PollMaxSelections)
+		pollID := b.recordTeamsPoll(strings.TrimSpace(req.ChatID), strings.TrimSpace(req.PollQuestion), req.PollOptions, req.PollMaxSelections)
+		pollCard = buildTeamsPollCard(strings.TrimSpace(req.PollQuestion), req.PollOptions, req.PollMaxSelections, pollID)
 	}
-	if err := b.teamsSend(ref, token, threadID, req.Content, mediaURL, pollCard); err != nil {
+	if err := b.teamsSend(ref, token, threadID, req.Content, req.MediaURLs, pollCard); err != nil {
 		b.noteOutbound(false, false, err)
 		http.Error(w, err.Error(), http.StatusBadGateway)
 		return
@@ -2014,7 +2471,7 @@ func normalizeTeamsTarget(v string) string {
 	}
 }
 
-func buildTeamsPollCard(question string, options []string, maxSel int) map[string]any {
+func buildTeamsPollCard(question string, options []string, maxSel int, pollID string) map[string]any {
 	if maxSel <= 0 {
 		maxSel = 1
 	}
@@ -2034,14 +2491,21 @@ func buildTeamsPollCard(question string, options []string, maxSel int) map[strin
 			{"type": "Input.ChoiceSet", "id": "poll_choice", "isMultiSelect": maxSel > 1, "choices": choices},
 		},
 		"actions": []map[string]any{
-			{"type": "Action.Submit", "title": "Vote"},
+			{"type": "Action.Submit", "title": "Vote", "data": map[string]any{"poll_id": strings.TrimSpace(pollID)}},
 		},
 	}
 }
 
-func (b *bridge) recordTeamsPoll(chatID, question string, options []string, maxSel int) {
+func (b *bridge) recordTeamsPoll(chatID, question string, options []string, maxSel int) string {
 	if strings.TrimSpace(chatID) == "" || strings.TrimSpace(question) == "" {
-		return
+		return ""
+	}
+	if maxSel <= 0 {
+		maxSel = 1
+	}
+	allowed := make([]string, 0, len(options))
+	for i := range options {
+		allowed = append(allowed, fmt.Sprintf("opt_%d", i+1))
 	}
 	b.pollMu.Lock()
 	if b.teamsPolls == nil {
@@ -2052,54 +2516,115 @@ func (b *bridge) recordTeamsPoll(chatID, question string, options []string, maxS
 		"chat_id":            strings.TrimSpace(chatID),
 		"question":           question,
 		"options":            options,
+		"allowed_values":     allowed,
 		"max_selections":     maxSel,
 		"created_at_rfc3339": time.Now().UTC().Format(time.RFC3339),
 	}
 	b.pollMu.Unlock()
 	_ = b.saveState()
+	return key
 }
 
-func (b *bridge) handleTeamsPollVote(chatID, senderID string, activity map[string]any) bool {
+func (b *bridge) handleTeamsPollVote(chatID, senderID string, activity map[string]any) (bool, map[string]any) {
 	val, _ := activity["value"].(map[string]any)
 	if val == nil {
-		return false
+		return false, nil
 	}
-	raw := strings.TrimSpace(asString(val["poll_choice"]))
-	if raw == "" {
-		choices, ok := val["choices"].([]any)
-		if ok && len(choices) > 0 {
-			raw = strings.TrimSpace(asString(choices[0]))
-		}
+	pollID := strings.TrimSpace(asString(val["poll_id"]))
+	selections := normalizePollSelections(val["poll_choice"])
+	if len(selections) == 0 {
+		selections = normalizePollSelections(val["choices"])
 	}
-	if raw == "" {
-		return false
+	if len(selections) == 0 {
+		return false, nil
 	}
 	chatID = strings.TrimSpace(chatID)
 	senderID = strings.TrimSpace(senderID)
 	if chatID == "" || senderID == "" {
-		return false
+		return false, nil
 	}
 	b.pollMu.Lock()
 	defer b.pollMu.Unlock()
+	keys := make([]string, 0, len(b.teamsPolls))
+	if pollID != "" {
+		keys = append(keys, pollID)
+	} else {
+		for k := range b.teamsPolls {
+			keys = append(keys, k)
+		}
+	}
 	for k, p := range b.teamsPolls {
+		if len(keys) == 1 && keys[0] != "" && k != keys[0] {
+			continue
+		}
 		c, _ := p["chat_id"].(string)
 		if strings.TrimSpace(c) != chatID {
 			continue
 		}
+		maxSel := intFromAny(p["max_selections"], 1)
+		allowedSet := make(map[string]struct{})
+		if allowed, ok := p["allowed_values"].([]string); ok {
+			for _, v := range allowed {
+				name := strings.TrimSpace(v)
+				if name != "" {
+					allowedSet[name] = struct{}{}
+				}
+			}
+		}
+		if allowed, ok := p["allowed_values"].([]any); ok {
+			for _, v := range allowed {
+				name := strings.TrimSpace(asString(v))
+				if name != "" {
+					allowedSet[name] = struct{}{}
+				}
+			}
+		}
+		filtered := make([]string, 0, len(selections))
+		for _, sel := range selections {
+			if len(allowedSet) > 0 {
+				if _, ok := allowedSet[sel]; !ok {
+					continue
+				}
+			}
+			filtered = append(filtered, sel)
+			if len(filtered) >= maxSel {
+				break
+			}
+		}
+		if len(filtered) == 0 {
+			return false, nil
+		}
+
 		votes, _ := p["votes"].(map[string]any)
 		if votes == nil {
 			votes = map[string]any{}
 		}
-		votes[senderID] = raw
+		votes[senderID] = filtered
 		p["votes"] = votes
+		results := make(map[string]int)
+		totalVotes := 0
+		for _, rawVote := range votes {
+			for _, one := range normalizePollSelections(rawVote) {
+				results[one]++
+				totalVotes++
+			}
+		}
+		p["results"] = results
+		p["total_votes"] = totalVotes
 		p["updated_at_rfc3339"] = time.Now().UTC().Format(time.RFC3339)
 		b.teamsPolls[k] = p
 		go func() {
 			_ = b.saveState()
 		}()
-		return true
+		return true, map[string]any{
+			"poll_id":      k,
+			"selections":   filtered,
+			"results":      results,
+			"total_votes":  totalVotes,
+			"max_selected": maxSel,
+		}
 	}
-	return false
+	return false, nil
 }
 
 func (b *bridge) getTeamsAccessToken() (string, error) {
@@ -2180,21 +2705,25 @@ func (b *bridge) getTeamsTokenForScope(scope string, graph bool) (string, error)
 	return token, nil
 }
 
-func (b *bridge) teamsSend(ref teamsConversationRef, accessToken, replyToID, text, mediaURL string, card map[string]any) error {
+func (b *bridge) teamsSend(ref teamsConversationRef, accessToken, replyToID, text string, mediaURLs []string, card map[string]any) error {
 	return withRetry(3, 300*time.Millisecond, func() (bool, error) {
 		payload := map[string]any{"type": "message", "text": text}
 		if rid := strings.TrimSpace(replyToID); rid != "" {
 			payload["replyToId"] = rid
 		}
-		attachments := make([]map[string]any, 0, 2)
-		if strings.TrimSpace(mediaURL) != "" {
-			name := path.Base(strings.TrimSpace(mediaURL))
+		attachments := make([]map[string]any, 0, len(mediaURLs)+1)
+		for _, mediaURL := range mediaURLs {
+			mediaURL = strings.TrimSpace(mediaURL)
+			if mediaURL == "" {
+				continue
+			}
+			name := path.Base(mediaURL)
 			if name == "." || name == "/" || name == "" {
 				name = "attachment"
 			}
 			attachments = append(attachments, map[string]any{
 				"contentType": "application/octet-stream",
-				"contentUrl":  strings.TrimSpace(mediaURL),
+				"contentUrl":  mediaURL,
 				"name":        name,
 			})
 		}
@@ -2383,11 +2912,11 @@ func newTeamsJWTVerifier(client *http.Client, cfgURL, appID string) *teamsJWTVer
 		client:    client,
 		cfgURL:    strings.TrimSpace(cfgURL),
 		appID:     strings.TrimSpace(appID),
-		keysByKid: map[string]*rsa.PublicKey{},
+		keysByKid: map[string]jwtKeyMeta{},
 	}
 }
 
-func (v *teamsJWTVerifier) Verify(authHeader string, now time.Time, serviceURL string) error {
+func (v *teamsJWTVerifier) Verify(authHeader string, now time.Time, serviceURL, channelID string) error {
 	token := strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(authHeader), "Bearer "))
 	if token == "" {
 		return errors.New("missing bearer token")
@@ -2424,11 +2953,11 @@ func (v *teamsJWTVerifier) Verify(authHeader string, now time.Time, serviceURL s
 	if err := json.Unmarshal(claimsBytes, &claims); err != nil {
 		return fmt.Errorf("parse jwt claims: %w", err)
 	}
-	if err := v.validateClaims(claims, now, serviceURL); err != nil {
+	if err := v.validateClaims(claims, now, serviceURL, channelID); err != nil {
 		return err
 	}
 
-	key, err := v.resolveKey(kid, now)
+	keyMeta, err := v.resolveKey(kid, now)
 	if err != nil {
 		return err
 	}
@@ -2438,19 +2967,35 @@ func (v *teamsJWTVerifier) Verify(authHeader string, now time.Time, serviceURL s
 	}
 	signingInput := parts[0] + "." + parts[1]
 	sum := sha256.Sum256([]byte(signingInput))
-	if err := rsa.VerifyPKCS1v15(key, crypto.SHA256, sum[:], sig); err != nil {
+	if err := rsa.VerifyPKCS1v15(keyMeta.publicKey, crypto.SHA256, sum[:], sig); err != nil {
 		return fmt.Errorf("verify jwt signature: %w", err)
+	}
+	if err := validateJWTEndorsements(keyMeta.endorsements, channelID); err != nil {
+		return err
 	}
 	return nil
 }
 
-func (v *teamsJWTVerifier) validateClaims(claims map[string]any, now time.Time, serviceURL string) error {
+func (v *teamsJWTVerifier) validateClaims(claims map[string]any, now time.Time, serviceURL, channelID string) error {
 	appID := strings.TrimSpace(v.appID)
 	if appID == "" {
 		return nil
 	}
 	if !matchesJWTAudience(claims["aud"], appID) {
 		return fmt.Errorf("jwt audience mismatch")
+	}
+	if appClaim := strings.TrimSpace(anyToString(claims["appid"])); appClaim != "" && appClaim != appID {
+		return fmt.Errorf("jwt appid mismatch")
+	}
+	if azpClaim := strings.TrimSpace(anyToString(claims["azp"])); azpClaim != "" && azpClaim != appID {
+		return fmt.Errorf("jwt azp mismatch")
+	}
+	channelID = strings.ToLower(strings.TrimSpace(channelID))
+	if channelID != "" {
+		claimCh := strings.ToLower(strings.TrimSpace(firstNonEmpty(anyToString(claims["channelid"]), anyToString(claims["channelId"]))))
+		if claimCh != "" && claimCh != channelID {
+			return fmt.Errorf("jwt channel mismatch")
+		}
 	}
 	iss := strings.TrimSpace(anyToString(claims["iss"]))
 	if iss == "" {
@@ -2505,7 +3050,14 @@ func matchesJWTAudience(aud any, appID string) bool {
 }
 
 func isTrustedTeamsServiceURL(rawURL string) bool {
-	host := hostOnly(rawURL)
+	u, err := url.Parse(strings.TrimSpace(rawURL))
+	if err != nil {
+		return false
+	}
+	if !strings.EqualFold(strings.TrimSpace(u.Scheme), "https") {
+		return false
+	}
+	host := strings.ToLower(strings.TrimSpace(u.Hostname()))
 	if host == "" {
 		return false
 	}
@@ -2590,19 +3142,19 @@ func sameServiceURL(a, b string) bool {
 	return ha != "" && ha == hb
 }
 
-func (v *teamsJWTVerifier) resolveKey(kid string, now time.Time) (*rsa.PublicKey, error) {
+func (v *teamsJWTVerifier) resolveKey(kid string, now time.Time) (jwtKeyMeta, error) {
 	v.mu.Lock()
 	defer v.mu.Unlock()
-	if key := v.keysByKid[kid]; key != nil && now.Before(v.cacheUntil) {
+	if key, ok := v.keysByKid[kid]; ok && key.publicKey != nil && now.Before(v.cacheUntil) {
 		return key, nil
 	}
 	if err := v.refreshLocked(now); err != nil {
-		return nil, err
+		return jwtKeyMeta{}, err
 	}
-	if key := v.keysByKid[kid]; key != nil {
+	if key, ok := v.keysByKid[kid]; ok && key.publicKey != nil {
 		return key, nil
 	}
-	return nil, errors.New("jwt kid not found in jwks")
+	return jwtKeyMeta{}, errors.New("jwt kid not found in jwks")
 }
 
 func (v *teamsJWTVerifier) currentIssuer(now time.Time) string {
@@ -2652,7 +3204,7 @@ func (v *teamsJWTVerifier) refreshLocked(now time.Time) error {
 	return nil
 }
 
-func fetchJWKS(client *http.Client, uri string) (map[string]*rsa.PublicKey, error) {
+func fetchJWKS(client *http.Client, uri string) (map[string]jwtKeyMeta, error) {
 	req, err := http.NewRequest(http.MethodGet, strings.TrimSpace(uri), nil)
 	if err != nil {
 		return nil, err
@@ -2667,16 +3219,17 @@ func fetchJWKS(client *http.Client, uri string) (map[string]*rsa.PublicKey, erro
 	}
 	var doc struct {
 		Keys []struct {
-			Kid string `json:"kid"`
-			Kty string `json:"kty"`
-			N   string `json:"n"`
-			E   string `json:"e"`
+			Kid          string   `json:"kid"`
+			Kty          string   `json:"kty"`
+			N            string   `json:"n"`
+			E            string   `json:"e"`
+			Endorsements []string `json:"endorsements"`
 		} `json:"keys"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&doc); err != nil {
 		return nil, err
 	}
-	out := map[string]*rsa.PublicKey{}
+	out := map[string]jwtKeyMeta{}
 	for _, k := range doc.Keys {
 		if strings.TrimSpace(k.Kty) != "RSA" || strings.TrimSpace(k.Kid) == "" {
 			continue
@@ -2685,12 +3238,32 @@ func fetchJWKS(client *http.Client, uri string) (map[string]*rsa.PublicKey, erro
 		if err != nil {
 			continue
 		}
-		out[strings.TrimSpace(k.Kid)] = pub
+		endorsements := make([]string, 0, len(k.Endorsements))
+		for _, e := range k.Endorsements {
+			e = strings.ToLower(strings.TrimSpace(e))
+			if e != "" {
+				endorsements = append(endorsements, e)
+			}
+		}
+		out[strings.TrimSpace(k.Kid)] = jwtKeyMeta{publicKey: pub, endorsements: endorsements}
 	}
 	if len(out) == 0 {
 		return nil, errors.New("no usable jwks rsa keys")
 	}
 	return out, nil
+}
+
+func validateJWTEndorsements(endorsements []string, channelID string) error {
+	channelID = strings.ToLower(strings.TrimSpace(channelID))
+	if channelID == "" || len(endorsements) == 0 {
+		return nil
+	}
+	for _, e := range endorsements {
+		if strings.EqualFold(strings.TrimSpace(e), channelID) {
+			return nil
+		}
+	}
+	return fmt.Errorf("jwt key endorsement mismatch for channel %s", channelID)
 }
 
 func (b *bridge) downloadMedia(mediaURL string) ([]byte, string, error) {
@@ -2807,6 +3380,63 @@ func anyToUnix(v any) int64 {
 	}
 }
 
+func intFromAny(v any, fallback int) int {
+	switch t := v.(type) {
+	case int:
+		if t > 0 {
+			return t
+		}
+	case int64:
+		if t > 0 {
+			return int(t)
+		}
+	case float64:
+		if t > 0 {
+			return int(t)
+		}
+	case json.Number:
+		if i, err := t.Int64(); err == nil && i > 0 {
+			return int(i)
+		}
+	}
+	return fallback
+}
+
+func normalizePollSelections(v any) []string {
+	collect := func(parts []string) []string {
+		out := make([]string, 0, len(parts))
+		seen := map[string]struct{}{}
+		for _, p := range parts {
+			for _, token := range strings.Split(strings.TrimSpace(p), ",") {
+				token = strings.TrimSpace(token)
+				if token == "" {
+					continue
+				}
+				if _, ok := seen[token]; ok {
+					continue
+				}
+				seen[token] = struct{}{}
+				out = append(out, token)
+			}
+		}
+		return out
+	}
+	switch t := v.(type) {
+	case string:
+		return collect([]string{t})
+	case []string:
+		return collect(t)
+	case []any:
+		parts := make([]string, 0, len(t))
+		for _, item := range t {
+			parts = append(parts, asString(item))
+		}
+		return collect(parts)
+	default:
+		return nil
+	}
+}
+
 func decodeJWTPayloadMap(token string) map[string]any {
 	parts := strings.Split(strings.TrimSpace(token), ".")
 	if len(parts) < 2 {
@@ -2849,6 +3479,101 @@ func normalizeReplyMode(v string) string {
 	default:
 		return "all"
 	}
+}
+
+func normalizeSlackStreamMode(v string) string {
+	switch strings.ToLower(strings.TrimSpace(v)) {
+	case "append":
+		return "append"
+	case "status_final":
+		return "status_final"
+	default:
+		return "replace"
+	}
+}
+
+func resolveSlackReplyModeByChatType(channelID string, cfg map[string]string) string {
+	if len(cfg) == 0 {
+		return ""
+	}
+	channelID = strings.TrimSpace(strings.ToUpper(channelID))
+	chatType := "channel"
+	switch {
+	case strings.HasPrefix(channelID, "D"):
+		chatType = "direct"
+	case strings.HasPrefix(channelID, "G"):
+		chatType = "group"
+	case strings.HasPrefix(channelID, "C"):
+		chatType = "channel"
+	}
+	if v, ok := cfg[chatType]; ok {
+		return normalizeReplyMode(v)
+	}
+	return ""
+}
+
+func splitSlackMarkdownChunks(text string, maxChars int) []string {
+	text = strings.TrimSpace(strings.ReplaceAll(text, "\r\n", "\n"))
+	if text == "" {
+		return nil
+	}
+	if maxChars <= 0 {
+		maxChars = 3500
+	}
+	if len(text) <= maxChars {
+		return []string{text}
+	}
+
+	segments := strings.Split(text, "\n\n")
+	chunks := make([]string, 0, len(segments)/2+1)
+	current := ""
+	for _, seg := range segments {
+		seg = strings.TrimSpace(seg)
+		if seg == "" {
+			continue
+		}
+		if len(seg) > maxChars {
+			for _, over := range splitSlackStreamChunks(seg, maxChars) {
+				if strings.TrimSpace(over) != "" {
+					if current != "" {
+						chunks = append(chunks, closeFenceIfNeeded(current))
+						current = ""
+					}
+					chunks = append(chunks, closeFenceIfNeeded(over))
+				}
+			}
+			continue
+		}
+		if current == "" {
+			current = seg
+			continue
+		}
+		next := current + "\n\n" + seg
+		if len(next) <= maxChars {
+			current = next
+			continue
+		}
+		chunks = append(chunks, closeFenceIfNeeded(current))
+		current = seg
+	}
+	if strings.TrimSpace(current) != "" {
+		chunks = append(chunks, closeFenceIfNeeded(current))
+	}
+	if len(chunks) == 0 {
+		return []string{text}
+	}
+	return chunks
+}
+
+func closeFenceIfNeeded(text string) string {
+	text = strings.TrimSpace(text)
+	if text == "" {
+		return text
+	}
+	if strings.Count(text, "```")%2 != 0 {
+		return text + "\n```"
+	}
+	return text
 }
 
 func (b *bridge) resolveReplyThread(channel, accountID, chatID, requestedThreadID, requestedMode, defaultMode string) string {

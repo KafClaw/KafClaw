@@ -10,7 +10,7 @@ NPM_MIN_VERSION := 11
 HOST_GOMODCACHE := $(shell go env GOMODCACHE)
 HOST_GOCACHE := $(shell go env GOCACHE)
 
-.PHONY: help check bootstrap build run rerun test test-smoke test-critical test-fuzz code-ql test-classification test-subagents-e2e install \
+.PHONY: help check bootstrap build run rerun test vet race commit-check test-smoke test-critical test-fuzz code-ql test-classification test-subagents-e2e install \
 	release release-major release-minor release-patch dist-go \
 	docker-build docker-up docker-down docker-logs \
 	run-standalone run-full run-headless \
@@ -102,6 +102,12 @@ check: ## Validate build prerequisites (Go, git, Node.js/npm)
 test: ## Run all tests
 	go test ./...
 
+vet: ## Run go vet across all packages
+	go vet ./...
+
+race: ## Run race-enabled tests across all packages
+	go test -race ./...
+
 test-smoke: ## Run fast critical-path smoke tests (bug-finding first)
 	bash scripts/test_smoke.sh
 
@@ -111,8 +117,11 @@ test-critical: ## Enforce 100% coverage on critical logic
 test-fuzz: ## Run fuzz tests for critical guard logic
 	bash scripts/test_fuzz.sh
 
-code-ql: ## Run local CodeQL (Go + JS/TS) and emit SARIF under .tmp/codeql/
+code-ql: ## Run local CodeQL (Go + JS/TS + Actions) and emit SARIF under .tmp/codeql/
 	bash scripts/codeql_local.sh
+
+commit-check: check vet race test-fuzz code-ql ## Run pre-commit quality gates (vet, race, fuzz, CodeQL)
+	@echo "commit-check completed."
 
 test-classification: ## Run internal/external message classification E2E test (verbose)
 	go test -v -run "TestInternalExternalClassificationE2E|TestMessageTypeAccessorDefaults|TestPolicyTierGatingByMessageType" ./internal/agent/

@@ -700,16 +700,18 @@ func runGatewayMain(cmd *cobra.Command, args []string) {
 		})
 
 		type channelInboundRequest struct {
-			AccountID    string `json:"account_id"`
-			SenderID     string `json:"sender_id"`
-			ChatID       string `json:"chat_id"`
-			ThreadID     string `json:"thread_id"`
-			MessageID    string `json:"message_id"`
-			Text         string `json:"text"`
-			IsGroup      bool   `json:"is_group"`
-			WasMentioned bool   `json:"was_mentioned"`
-			GroupID      string `json:"group_id"`
-			ChannelID    string `json:"channel_id"`
+			AccountID      string `json:"account_id"`
+			SenderID       string `json:"sender_id"`
+			ChatID         string `json:"chat_id"`
+			ThreadID       string `json:"thread_id"`
+			MessageID      string `json:"message_id"`
+			Text           string `json:"text"`
+			IsGroup        bool   `json:"is_group"`
+			WasMentioned   bool   `json:"was_mentioned"`
+			GroupID        string `json:"group_id"`
+			ChannelID      string `json:"channel_id"`
+			HistoryLimit   int    `json:"history_limit"`
+			DMHistoryLimit int    `json:"dm_history_limit"`
 		}
 
 		verifyChannelToken := func(r *http.Request, expected string) bool {
@@ -782,7 +784,7 @@ func runGatewayMain(cmd *cobra.Command, args []string) {
 				http.Error(w, "sender_id and chat_id required", http.StatusBadRequest)
 				return
 			}
-			if err := slack.HandleInboundWithAccount(
+			if err := slack.HandleInboundWithAccountAndHints(
 				body.AccountID,
 				body.SenderID,
 				body.ChatID,
@@ -791,6 +793,8 @@ func runGatewayMain(cmd *cobra.Command, args []string) {
 				body.Text,
 				body.IsGroup,
 				body.WasMentioned,
+				body.HistoryLimit,
+				body.DMHistoryLimit,
 			); err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
@@ -824,7 +828,7 @@ func runGatewayMain(cmd *cobra.Command, args []string) {
 				http.Error(w, "sender_id and chat_id required", http.StatusBadRequest)
 				return
 			}
-			if err := msteams.HandleInboundWithContext(
+			if err := msteams.HandleInboundWithContextAndHints(
 				body.AccountID,
 				body.SenderID,
 				body.ChatID,
@@ -835,6 +839,8 @@ func runGatewayMain(cmd *cobra.Command, args []string) {
 				body.WasMentioned,
 				body.GroupID,
 				body.ChannelID,
+				body.HistoryLimit,
+				body.DMHistoryLimit,
 			); err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return

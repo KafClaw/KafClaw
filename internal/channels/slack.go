@@ -68,6 +68,9 @@ func (c *SlackChannel) Send(ctx context.Context, msg *bus.OutboundMessage) error
 		"account_id":          accountID,
 		"chat_id":             strings.TrimSpace(chatID),
 		"thread_id":           strings.TrimSpace(msg.ThreadID),
+		"native_streaming":    slackNativeStreamingOrDefault(ac.NativeStreaming, c.config.NativeStreaming),
+		"stream_mode":         strings.TrimSpace(ac.StreamMode),
+		"stream_chunk_chars":  ac.StreamChunkChars,
 		"content":             msg.Content,
 		"media_urls":          msg.MediaURLs,
 		"card":                msg.Card,
@@ -98,10 +101,14 @@ func (c *SlackChannel) Send(ctx context.Context, msg *bus.OutboundMessage) error
 }
 
 func (c *SlackChannel) HandleInbound(senderID, chatID, threadID, messageID, text string, isGroup, wasMentioned bool) error {
-	return c.HandleInboundWithAccount("default", senderID, chatID, threadID, messageID, text, isGroup, wasMentioned)
+	return c.HandleInboundWithAccountAndHints("default", senderID, chatID, threadID, messageID, text, isGroup, wasMentioned, 0, 0)
 }
 
 func (c *SlackChannel) HandleInboundWithAccount(accountID, senderID, chatID, threadID, messageID, text string, isGroup, wasMentioned bool) error {
+	return c.HandleInboundWithAccountAndHints(accountID, senderID, chatID, threadID, messageID, text, isGroup, wasMentioned, 0, 0)
+}
+
+func (c *SlackChannel) HandleInboundWithAccountAndHints(accountID, senderID, chatID, threadID, messageID, text string, isGroup, wasMentioned bool, historyLimit, dmHistoryLimit int) error {
 	ac := c.slackAccountConfig(accountID)
 	decision := EvaluateAccess(AccessContext{
 		SenderID:     senderID,
@@ -135,6 +142,18 @@ func (c *SlackChannel) HandleInboundWithAccount(accountID, senderID, chatID, thr
 		return nil
 	}
 	scopedChatID := withAccountChat(accountID, chatID)
+	metadata := map[string]any{
+		bus.MetaKeyMessageType: bus.MessageTypeExternal,
+		// Isolation boundary is channel + account + conversation/chat room.
+		bus.MetaKeySessionScope:   buildSessionScope(c.Name(), accountID, chatID, threadID, senderID, ac.SessionScope),
+		bus.MetaKeyChannelAccount: accountIDOrDefault(accountID),
+	}
+	if historyLimit > 0 {
+		metadata["history_limit"] = historyLimit
+	}
+	if dmHistoryLimit > 0 {
+		metadata["dm_history_limit"] = dmHistoryLimit
+	}
 	c.Bus.PublishInbound(&bus.InboundMessage{
 		Channel:   c.Name(),
 		SenderID:  strings.TrimSpace(senderID),
@@ -142,29 +161,27 @@ func (c *SlackChannel) HandleInboundWithAccount(accountID, senderID, chatID, thr
 		ThreadID:  strings.TrimSpace(threadID),
 		MessageID: strings.TrimSpace(messageID),
 		Content:   text,
-		Metadata: map[string]any{
-			bus.MetaKeyMessageType: bus.MessageTypeExternal,
-			// Isolation boundary is channel + account + conversation/chat room.
-			bus.MetaKeySessionScope:   buildSessionScope(c.Name(), accountID, chatID, threadID, senderID, ac.SessionScope),
-			bus.MetaKeyChannelAccount: accountIDOrDefault(accountID),
-		},
+		Metadata:  metadata,
 	})
 	return nil
 }
 
 func (c *SlackChannel) slackAccountConfig(accountID string) config.SlackAccountConfig {
 	base := config.SlackAccountConfig{
-		ID:             "default",
-		Enabled:        c.config.Enabled,
-		BotToken:       c.config.BotToken,
-		AppToken:       c.config.AppToken,
-		InboundToken:   c.config.InboundToken,
-		OutboundURL:    c.config.OutboundURL,
-		SessionScope:   c.config.SessionScope,
-		AllowFrom:      c.config.AllowFrom,
-		DmPolicy:       c.config.DmPolicy,
-		GroupPolicy:    c.config.GroupPolicy,
-		RequireMention: c.config.RequireMention,
+		ID:               "default",
+		Enabled:          c.config.Enabled,
+		BotToken:         c.config.BotToken,
+		AppToken:         c.config.AppToken,
+		InboundToken:     c.config.InboundToken,
+		OutboundURL:      c.config.OutboundURL,
+		NativeStreaming:  boolPtr(c.config.NativeStreaming),
+		StreamMode:       c.config.StreamMode,
+		StreamChunkChars: c.config.StreamChunkChars,
+		SessionScope:     c.config.SessionScope,
+		AllowFrom:        c.config.AllowFrom,
+		DmPolicy:         c.config.DmPolicy,
+		GroupPolicy:      c.config.GroupPolicy,
+		RequireMention:   c.config.RequireMention,
 	}
 	id := accountIDOrDefault(accountID)
 	if id == "default" {
@@ -188,6 +205,15 @@ func (c *SlackChannel) slackAccountConfig(accountID string) config.SlackAccountC
 			if strings.TrimSpace(res.OutboundURL) == "" {
 				res.OutboundURL = base.OutboundURL
 			}
+			if res.NativeStreaming == nil {
+				res.NativeStreaming = base.NativeStreaming
+			}
+			if strings.TrimSpace(res.StreamMode) == "" {
+				res.StreamMode = base.StreamMode
+			}
+			if res.StreamChunkChars <= 0 {
+				res.StreamChunkChars = base.StreamChunkChars
+			}
 			if strings.TrimSpace(res.SessionScope) == "" {
 				res.SessionScope = base.SessionScope
 			}
@@ -204,4 +230,13 @@ func (c *SlackChannel) slackAccountConfig(accountID string) config.SlackAccountC
 		}
 	}
 	return base
+}
+
+func boolPtr(v bool) *bool { return &v }
+
+func slackNativeStreamingOrDefault(v *bool, fallback bool) bool {
+	if v != nil {
+		return *v
+	}
+	return fallback
 }

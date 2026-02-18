@@ -2058,7 +2058,7 @@ func (l *Loop) publishSubagentAnnounceWithRetry(
 	if skip {
 		l.subagents.markAnnounceAttempt(run.RunID, true)
 		if run.Cleanup == "delete" {
-			_ = l.sessions.Delete(run.ChildSessionKey)
+			l.deleteSessionWithRetry(run.ChildSessionKey)
 		}
 		return true
 	}
@@ -2085,7 +2085,7 @@ func (l *Loop) publishSubagentAnnounceWithRetry(
 			l.announceSent[announceID] = time.Now()
 			l.announceMu.Unlock()
 			if run.Cleanup == "delete" {
-				_ = l.sessions.Delete(run.ChildSessionKey)
+				l.deleteSessionWithRetry(run.ChildSessionKey)
 			}
 			return true
 		}
@@ -2093,6 +2093,28 @@ func (l *Loop) publishSubagentAnnounceWithRetry(
 		backoff *= 2
 	}
 	l.subagents.markAnnounceAttempt(run.RunID, false)
+	return false
+}
+
+func (l *Loop) deleteSessionWithRetry(sessionKey string) {
+	sessionKey = strings.TrimSpace(sessionKey)
+	if sessionKey == "" || l.sessions == nil {
+		return
+	}
+	for i := 0; i < 8; i++ {
+		if l.sessions.Delete(sessionKey) || !l.sessionExists(sessionKey) {
+			return
+		}
+		time.Sleep(25 * time.Millisecond)
+	}
+}
+
+func (l *Loop) sessionExists(sessionKey string) bool {
+	for _, info := range l.sessions.List() {
+		if strings.TrimSpace(info.Key) == sessionKey {
+			return true
+		}
+	}
 	return false
 }
 

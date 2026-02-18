@@ -98,14 +98,18 @@ func (c *MSTeamsChannel) Send(ctx context.Context, msg *bus.OutboundMessage) err
 }
 
 func (c *MSTeamsChannel) HandleInbound(senderID, chatID, threadID, messageID, text string, isGroup, wasMentioned bool) error {
-	return c.HandleInboundWithContext("default", senderID, chatID, threadID, messageID, text, isGroup, wasMentioned, "", "")
+	return c.HandleInboundWithContextAndHints("default", senderID, chatID, threadID, messageID, text, isGroup, wasMentioned, "", "", 0, 0)
 }
 
 func (c *MSTeamsChannel) HandleInboundWithAccount(accountID, senderID, chatID, threadID, messageID, text string, isGroup, wasMentioned bool) error {
-	return c.HandleInboundWithContext(accountID, senderID, chatID, threadID, messageID, text, isGroup, wasMentioned, "", "")
+	return c.HandleInboundWithContextAndHints(accountID, senderID, chatID, threadID, messageID, text, isGroup, wasMentioned, "", "", 0, 0)
 }
 
 func (c *MSTeamsChannel) HandleInboundWithContext(accountID, senderID, chatID, threadID, messageID, text string, isGroup, wasMentioned bool, groupID, channelID string) error {
+	return c.HandleInboundWithContextAndHints(accountID, senderID, chatID, threadID, messageID, text, isGroup, wasMentioned, groupID, channelID, 0, 0)
+}
+
+func (c *MSTeamsChannel) HandleInboundWithContextAndHints(accountID, senderID, chatID, threadID, messageID, text string, isGroup, wasMentioned bool, groupID, channelID string, historyLimit, dmHistoryLimit int) error {
 	ac := c.teamsAccountConfig(accountID)
 	targetAllowlistMode := isGroup && (ac.GroupPolicy == config.GroupPolicyAllowlist || strings.TrimSpace(string(ac.GroupPolicy)) == "") && hasTeamsGroupTargetEntries(ac.GroupAllowFrom)
 	groupAllowFrom := ac.GroupAllowFrom
@@ -151,6 +155,20 @@ func (c *MSTeamsChannel) HandleInboundWithContext(accountID, senderID, chatID, t
 		}
 	}
 	scopedChatID := withAccountChat(accountID, chatID)
+	metadata := map[string]any{
+		bus.MetaKeyMessageType: bus.MessageTypeExternal,
+		// Isolation boundary is channel + account + conversation/chat room.
+		bus.MetaKeySessionScope:   buildSessionScope(c.Name(), accountID, chatID, threadID, senderID, ac.SessionScope),
+		bus.MetaKeyChannelAccount: accountIDOrDefault(accountID),
+		"group_id":                strings.TrimSpace(groupID),
+		"channel_id":              strings.TrimSpace(channelID),
+	}
+	if historyLimit > 0 {
+		metadata["history_limit"] = historyLimit
+	}
+	if dmHistoryLimit > 0 {
+		metadata["dm_history_limit"] = dmHistoryLimit
+	}
 	c.Bus.PublishInbound(&bus.InboundMessage{
 		Channel:   c.Name(),
 		SenderID:  strings.TrimSpace(senderID),
@@ -158,14 +176,7 @@ func (c *MSTeamsChannel) HandleInboundWithContext(accountID, senderID, chatID, t
 		ThreadID:  strings.TrimSpace(threadID),
 		MessageID: strings.TrimSpace(messageID),
 		Content:   text,
-		Metadata: map[string]any{
-			bus.MetaKeyMessageType: bus.MessageTypeExternal,
-			// Isolation boundary is channel + account + conversation/chat room.
-			bus.MetaKeySessionScope:   buildSessionScope(c.Name(), accountID, chatID, threadID, senderID, ac.SessionScope),
-			bus.MetaKeyChannelAccount: accountIDOrDefault(accountID),
-			"group_id":                strings.TrimSpace(groupID),
-			"channel_id":              strings.TrimSpace(channelID),
-		},
+		Metadata:  metadata,
 	})
 	return nil
 }

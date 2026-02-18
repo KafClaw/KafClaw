@@ -113,32 +113,38 @@ const (
 
 // SlackConfig configures the Slack channel.
 type SlackConfig struct {
-	Enabled        bool                 `json:"enabled" envconfig:"SLACK_ENABLED"`
-	BotToken       string               `json:"botToken" envconfig:"SLACK_BOT_TOKEN"`
-	AppToken       string               `json:"appToken" envconfig:"SLACK_APP_TOKEN"`
-	InboundToken   string               `json:"inboundToken" envconfig:"SLACK_INBOUND_TOKEN"`
-	OutboundURL    string               `json:"outboundUrl" envconfig:"SLACK_OUTBOUND_URL"`
-	SessionScope   string               `json:"sessionScope" envconfig:"SLACK_SESSION_SCOPE"`
-	Accounts       []SlackAccountConfig `json:"accounts,omitempty"`
-	AllowFrom      []string             `json:"allowFrom"`
-	DmPolicy       DmPolicy             `json:"dmPolicy"`
-	GroupPolicy    GroupPolicy          `json:"groupPolicy"`
-	RequireMention bool                 `json:"requireMention" envconfig:"SLACK_REQUIRE_MENTION"`
+	Enabled          bool                 `json:"enabled" envconfig:"SLACK_ENABLED"`
+	BotToken         string               `json:"botToken" envconfig:"SLACK_BOT_TOKEN"`
+	AppToken         string               `json:"appToken" envconfig:"SLACK_APP_TOKEN"`
+	InboundToken     string               `json:"inboundToken" envconfig:"SLACK_INBOUND_TOKEN"`
+	OutboundURL      string               `json:"outboundUrl" envconfig:"SLACK_OUTBOUND_URL"`
+	NativeStreaming  bool                 `json:"nativeStreaming" envconfig:"SLACK_NATIVE_STREAMING"`
+	StreamMode       string               `json:"streamMode" envconfig:"SLACK_STREAM_MODE"`
+	StreamChunkChars int                  `json:"streamChunkChars" envconfig:"SLACK_STREAM_CHUNK_CHARS"`
+	SessionScope     string               `json:"sessionScope" envconfig:"SLACK_SESSION_SCOPE"`
+	Accounts         []SlackAccountConfig `json:"accounts,omitempty"`
+	AllowFrom        []string             `json:"allowFrom"`
+	DmPolicy         DmPolicy             `json:"dmPolicy"`
+	GroupPolicy      GroupPolicy          `json:"groupPolicy"`
+	RequireMention   bool                 `json:"requireMention" envconfig:"SLACK_REQUIRE_MENTION"`
 }
 
 // SlackAccountConfig configures one named Slack account.
 type SlackAccountConfig struct {
-	ID             string      `json:"id"`
-	Enabled        bool        `json:"enabled"`
-	BotToken       string      `json:"botToken"`
-	AppToken       string      `json:"appToken"`
-	InboundToken   string      `json:"inboundToken"`
-	OutboundURL    string      `json:"outboundUrl"`
-	SessionScope   string      `json:"sessionScope"`
-	AllowFrom      []string    `json:"allowFrom"`
-	DmPolicy       DmPolicy    `json:"dmPolicy"`
-	GroupPolicy    GroupPolicy `json:"groupPolicy"`
-	RequireMention bool        `json:"requireMention"`
+	ID               string      `json:"id"`
+	Enabled          bool        `json:"enabled"`
+	BotToken         string      `json:"botToken"`
+	AppToken         string      `json:"appToken"`
+	InboundToken     string      `json:"inboundToken"`
+	OutboundURL      string      `json:"outboundUrl"`
+	NativeStreaming  *bool       `json:"nativeStreaming,omitempty"`
+	StreamMode       string      `json:"streamMode"`
+	StreamChunkChars int         `json:"streamChunkChars"`
+	SessionScope     string      `json:"sessionScope"`
+	AllowFrom        []string    `json:"allowFrom"`
+	DmPolicy         DmPolicy    `json:"dmPolicy"`
+	GroupPolicy      GroupPolicy `json:"groupPolicy"`
+	RequireMention   bool        `json:"requireMention"`
 }
 
 // MSTeamsConfig configures the Microsoft Teams channel.
@@ -419,10 +425,13 @@ func DefaultConfig() *Config {
 		},
 		Channels: ChannelsConfig{
 			Slack: SlackConfig{
-				DmPolicy:       DmPolicyPairing,
-				GroupPolicy:    GroupPolicyAllowlist,
-				RequireMention: true,
-				SessionScope:   "room",
+				DmPolicy:         DmPolicyPairing,
+				GroupPolicy:      GroupPolicyAllowlist,
+				RequireMention:   true,
+				SessionScope:     "room",
+				NativeStreaming:  true,
+				StreamMode:       "replace",
+				StreamChunkChars: 320,
 			},
 			MSTeams: MSTeamsConfig{
 				DmPolicy:       DmPolicyPairing,

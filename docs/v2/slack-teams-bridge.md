@@ -158,6 +158,8 @@ Bridge outbound accepts optional fields:
 
 - `account_id` (`string`, defaults to `default`)
 - `reply_mode` (`off|first|all`, defaults to channel env default)
+- `stream_mode` (`replace|append|status_final`, Slack draft/native stream behavior)
+- `stream_chunk_chars` (`int`, Slack native stream chunk sizing)
 - `media_urls` (`[]string`)
 - `card` (`object`, Teams adaptive card payload)
 - `action` + `action_params` (Slack action operations)
@@ -169,34 +171,35 @@ Slack behavior:
 - First media URL is fetched and uploaded using `files.uploadV2`
 - Text/card/action/probe/resolve/send paths use the Go SDK module `github.com/slack-go/slack`
 - Text send maps `thread_id` -> `thread_ts`
+- Native streaming parity: `chat.startStream`/`chat.appendStream`/`chat.stopStream` with fallback to `chat.postMessage`
 - Supported action baseline: `react`, `edit`, `delete`, `pin`, `unpin`, `read`
 - Target normalization: `user:U...`, `channel:C...`
-- Inbound normalization baseline covers `message`, `app_mention`, and key message subtypes (`message_changed`, `message_deleted`, `file_share`) with bot-message filtering
+- Inbound normalization covers `message`, `app_mention`, and key message subtypes (`message_changed`, `message_deleted`, `message_replied`, `file_share`) with bot-message filtering
 - Multi-account baseline: account-aware inbound/outbound payload routing via `account_id`
 - Reply strategy parity: `off` (never thread), `first` (thread first reply per account/chat), `all` (thread all replies)
+- Reply-by-chat-type parity via `SLACK_REPLY_MODE_BY_CHAT_TYPE` (`direct|group|channel`)
+- History hint forwarding parity via `SLACK_HISTORY_LIMIT` / `SLACK_DM_HISTORY_LIMIT`
+- Chunking parity: long markdown payloads are split into safe chunks for multi-message fallback delivery
 
 Teams behavior:
 
-- First media URL is attached as `application/octet-stream` attachment URL
+- Media URLs are attached as `application/octet-stream` attachment URLs (multi-media supported)
 - `card` is attached as adaptive card (`application/vnd.microsoft.card.adaptive`)
 - Text send maps `thread_id` -> `replyToId`
-- Poll baseline builds an adaptive-card poll and stores poll metadata in bridge state
-- Inbound poll vote baseline records `activity.value.poll_choice` into stored poll metadata
+- Poll lifecycle parity builds adaptive-card polls with stable `poll_id`, validates/limits selections, and stores per-option results/totals in bridge state
 - Target normalization: `conversation:...`, `user:...`
-- Inbound normalization baseline includes `channelData` extraction (`team/channel/tenant`) and mention-text stripping before forwarding
+- Inbound normalization includes `channelData` extraction (`team/channel/tenant`), mention-text stripping, card-text fallback extraction, and attachment media URL extraction
 - Multi-account baseline: account-aware inbound/outbound payload routing via `account_id`
 - Group target allowlist parity baseline: `groupAllowFrom` supports team/channel entries (for example `team:<team-id>/channel:<channel-id>`, `<team-id>/<channel-id>`, `team:<team-id>`, `channel:<channel-id>`)
 - Reply strategy parity: `off` (omit `replyToId`), `first` (set `replyToId` only for first reply per account/chat), `all` (set `replyToId` whenever thread id is present)
+- Attachment URL host gating parity via `MSTEAMS_MEDIA_ALLOW_HOSTS`
+- History hint forwarding parity via `MSTEAMS_HISTORY_LIMIT` / `MSTEAMS_DM_HISTORY_LIMIT`
 
 ## Known limitations
 
 Current limitations for parity tracking:
 
-- Teams runtime is currently custom Go HTTP/JWT logic, not Microsoft Agents Hosting SDK parity
-- There is no direct Go equivalent for the exact Microsoft Agents Hosting runtime used by the OpenClaw Teams plugin
-- Advanced Bot Framework auth edges (for example endorsements and full channel-specific checks) are not complete yet
-- Full Slack event normalization parity is still open
-- Full Teams attachment lifecycle parity (including richer consent/file workflows) is still open
+- Teams runtime remains custom Go HTTP/JWT logic (not Microsoft Agents Hosting runtime)
 - Bridge process account credentials are still single-account per process; for multiple provider accounts run one bridge instance per account and set `SLACK_ACCOUNT_ID`/`MSTEAMS_ACCOUNT_ID`
 
 ## Parity snapshot (OpenClaw vs KafClaw)
@@ -217,9 +220,7 @@ KafClaw can do:
 
 Compared with OpenClaw, currently limited:
 
-- Not full Slack event normalization parity (beyond current subtype baseline)
-- Not full multi-account/account diagnostics parity
-- Not full reply style/chunking parity
+- Operational model differs (bridge process + gateway vs plugin runtime), but Slack transport parity goals are implemented in this bridge
 
 ### Teams
 
@@ -235,11 +236,7 @@ KafClaw can do:
 
 Compared with OpenClaw, currently limited:
 
-- No Microsoft Agents Hosting runtime parity in Go
-- Not full Bot Framework auth edge parity (for example endorsements/channel-specific checks)
-- Not full Teams inbound normalization parity for all conversation modes
-- Not full Teams attachment lifecycle parity (for example richer consent/upload workflows)
-- Not full poll lifecycle parity (results/update semantics beyond baseline)
+- No Microsoft Agents Hosting runtime parity in Go (runtime architecture differs)
 
 ## Rate limit handling
 

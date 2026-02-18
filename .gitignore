@@ -38,7 +38,7 @@ electron/dist/
 .DS_Store
 
 # Local planning / scratch
-/task.md
+/_tasks/
 /.tmp/
 
 # Keep Node version pins tracked

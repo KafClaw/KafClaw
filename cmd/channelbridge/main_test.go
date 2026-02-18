@@ -15,6 +15,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -258,6 +260,92 @@ func TestSlackEventsMessageDeletedForwardsTombstone(t *testing.T) {
 	}
 }
 
+func TestSlackEventsMessageRepliedForwardsNestedMessage(t *testing.T) {
+	var got map[string]any
+	api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/v1/channels/slack/inbound" {
+			defer r.Body.Close()
+			_ = json.NewDecoder(r.Body).Decode(&got)
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer api.Close()
+
+	b := newTestBridge(api.URL)
+	payload := map[string]any{
+		"type":     "event_callback",
+		"event_id": "EvReply",
+		"event": map[string]any{
+			"type":         "message",
+			"subtype":      "message_replied",
+			"channel":      "C555",
+			"channel_type": "channel",
+			"message": map[string]any{
+				"user":      "U555",
+				"text":      "thread reply text",
+				"thread_ts": "171.500",
+				"ts":        "171.501",
+			},
+		},
+	}
+	body, _ := json.Marshal(payload)
+	req := httptest.NewRequest(http.MethodPost, "/slack/events", bytes.NewReader(body))
+	w := httptest.NewRecorder()
+	b.handleSlackEvents(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+	}
+	if got == nil {
+		t.Fatal("expected forwarded payload")
+	}
+	if strings.TrimSpace(asString(got["text"])) != "thread reply text" {
+		t.Fatalf("unexpected text: %#v", got["text"])
+	}
+	if strings.TrimSpace(asString(got["thread_id"])) != "171.500" {
+		t.Fatalf("unexpected thread_id: %#v", got["thread_id"])
+	}
+}
+
+func TestSlackEventsTopLevelThreadTSUnthreaded(t *testing.T) {
+	var got map[string]any
+	api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/v1/channels/slack/inbound" {
+			defer r.Body.Close()
+			_ = json.NewDecoder(r.Body).Decode(&got)
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer api.Close()
+
+	b := newTestBridge(api.URL)
+	payload := map[string]any{
+		"type":     "event_callback",
+		"event_id": "EvRootThreadTS",
+		"event": map[string]any{
+			"type":         "message",
+			"channel":      "C321",
+			"channel_type": "channel",
+			"user":         "U321",
+			"text":         "root message",
+			"ts":           "171.700",
+			"thread_ts":    "171.700",
+		},
+	}
+	body, _ := json.Marshal(payload)
+	req := httptest.NewRequest(http.MethodPost, "/slack/events", bytes.NewReader(body))
+	w := httptest.NewRecorder()
+	b.handleSlackEvents(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+	}
+	if got == nil {
+		t.Fatal("expected forwarded payload")
+	}
+	if strings.TrimSpace(asString(got["thread_id"])) != "" {
+		t.Fatalf("expected empty thread_id for root message, got %#v", got["thread_id"])
+	}
+}
+
 func TestSlackEventsBotMessagesAreIgnored(t *testing.T) {
 	var forwards int32
 	api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -490,7 +578,7 @@ func TestTeamsInboundJWTValidation(t *testing.T) {
 			e := base64.RawURLEncoding.EncodeToString(big.NewInt(int64(key.PublicKey.E)).Bytes())
 			_ = json.NewEncoder(w).Encode(map[string]any{
 				"keys": []map[string]any{
-					{"kid": kid, "kty": "RSA", "n": n, "e": e},
+					{"kid": kid, "kty": "RSA", "n": n, "e": e, "endorsements": []string{"msteams"}},
 				},
 			})
 		default:
@@ -516,6 +604,8 @@ func TestTeamsInboundJWTValidation(t *testing.T) {
 	goodJWT := buildTestJWT(t, key, kid, map[string]any{
 		"iss":        issuer,
 		"aud":        appID,
+		"appid":      appID,
+		"channelid":  "msteams",
 		"serviceurl": "https://smba.trafficmanager.net/emea",
 		"exp":        time.Now().Add(5 * time.Minute).Unix(),
 		"nbf":        time.Now().Add(-1 * time.Minute).Unix(),
@@ -538,6 +628,7 @@ func TestTeamsInboundJWTValidation(t *testing.T) {
 			"conversationType": "personal",
 		},
 		"serviceUrl": "https://smba.trafficmanager.net/emea",
+		"channelId":  "msteams",
 	}
 	body, _ := json.Marshal(payload)
 
@@ -573,6 +664,37 @@ func TestTeamsInboundJWTValidation(t *testing.T) {
 	b.handleTeamsMessages(wSvc, reqSvc)
 	if wSvc.Code != http.StatusUnauthorized {
 		t.Fatalf("expected 401 for serviceurl mismatch jwt, got %d", wSvc.Code)
+	}
+
+	badChannelJWT := buildTestJWT(t, key, kid, map[string]any{
+		"iss":        issuer,
+		"aud":        appID,
+		"appid":      appID,
+		"channelid":  "webchat",
+		"serviceurl": "https://smba.trafficmanager.net/emea",
+		"exp":        time.Now().Add(5 * time.Minute).Unix(),
+		"nbf":        time.Now().Add(-1 * time.Minute).Unix(),
+	})
+	reqChannel := httptest.NewRequest(http.MethodPost, "/teams/messages", bytes.NewReader(body))
+	reqChannel.Header.Set("Authorization", "Bearer "+badChannelJWT)
+	wChannel := httptest.NewRecorder()
+	b.handleTeamsMessages(wChannel, reqChannel)
+	if wChannel.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401 for channel mismatch jwt, got %d", wChannel.Code)
+	}
+
+	reqNoChannel := httptest.NewRequest(http.MethodPost, "/teams/messages", bytes.NewReader(body))
+	reqNoChannel.Header.Set("Authorization", "Bearer "+goodJWT)
+	var noChannelPayload map[string]any
+	_ = json.Unmarshal(body, &noChannelPayload)
+	delete(noChannelPayload, "channelId")
+	noChannelBody, _ := json.Marshal(noChannelPayload)
+	reqNoChannel = httptest.NewRequest(http.MethodPost, "/teams/messages", bytes.NewReader(noChannelBody))
+	reqNoChannel.Header.Set("Authorization", "Bearer "+goodJWT)
+	wNoChannel := httptest.NewRecorder()
+	b.handleTeamsMessages(wNoChannel, reqNoChannel)
+	if wNoChannel.Code != http.StatusOK {
+		t.Fatalf("expected 200 when channelId is absent, got %d", wNoChannel.Code)
 	}
 
 	evilBody, _ := json.Marshal(map[string]any{
@@ -663,6 +785,184 @@ func TestTeamsInboundNormalizationIncludesChannelMetadata(t *testing.T) {
 	}
 	if isGroup, _ := got["is_group"].(bool); !isGroup {
 		t.Fatalf("expected is_group=true, got %#v", got["is_group"])
+	}
+}
+
+func TestTeamsInboundNormalizationExtractsAttachmentMediaAndFallbackText(t *testing.T) {
+	var got map[string]any
+	api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/v1/channels/msteams/inbound" {
+			defer r.Body.Close()
+			_ = json.NewDecoder(r.Body).Decode(&got)
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer api.Close()
+
+	b := newTestBridge(api.URL)
+	payload := map[string]any{
+		"type": "message",
+		"id":   "activity-media-1",
+		"from": map[string]any{
+			"id":          "29:user-2",
+			"aadObjectId": "aad-user-2",
+		},
+		"recipient": map[string]any{
+			"id":   "28:bot-1",
+			"name": "KafClaw",
+		},
+		"conversation": map[string]any{
+			"id":               "19:conv-2",
+			"conversationType": "groupChat",
+		},
+		"serviceUrl": "https://smba.trafficmanager.net/emea",
+		"attachments": []map[string]any{
+			{
+				"contentType": "application/vnd.microsoft.card.hero",
+				"content":     map[string]any{"title": "Card title"},
+			},
+			{
+				"contentType": "image/png",
+				"contentUrl":  "https://files.example.com/image.png",
+			},
+		},
+	}
+	body, _ := json.Marshal(payload)
+
+	req := httptest.NewRequest(http.MethodPost, "/teams/messages", bytes.NewReader(body))
+	w := httptest.NewRecorder()
+	b.handleTeamsMessages(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+	}
+	if got == nil {
+		t.Fatal("expected forwarded payload")
+	}
+	if strings.TrimSpace(asString(got["text"])) != "Card title" {
+		t.Fatalf("expected fallback text from card content, got %#v", got["text"])
+	}
+	media, _ := got["media_urls"].([]any)
+	if len(media) != 1 || strings.TrimSpace(asString(media[0])) != "https://files.example.com/image.png" {
+		t.Fatalf("expected extracted media_urls, got %#v", got["media_urls"])
+	}
+}
+
+func TestTeamsInboundAttachmentAllowlistFiltersMediaHosts(t *testing.T) {
+	var got map[string]any
+	api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/v1/channels/msteams/inbound" {
+			defer r.Body.Close()
+			_ = json.NewDecoder(r.Body).Decode(&got)
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer api.Close()
+
+	b := newTestBridge(api.URL)
+	b.cfg.MSTeamsMediaAllowHosts = []string{"files.example.com"}
+	payload := map[string]any{
+		"type": "message",
+		"id":   "activity-file-info-1",
+		"from": map[string]any{
+			"id":          "29:user-3",
+			"aadObjectId": "aad-user-3",
+		},
+		"conversation": map[string]any{
+			"id":               "19:conv-3",
+			"conversationType": "groupChat",
+		},
+		"serviceUrl": "https://smba.trafficmanager.net/emea",
+		"attachments": []map[string]any{
+			{
+				"contentType": "application/vnd.microsoft.teams.file.download.info",
+				"content": map[string]any{
+					"downloadUrl": "https://files.example.com/a.pdf",
+					"webUrl":      "https://evil.test/a.pdf",
+				},
+			},
+		},
+	}
+	body, _ := json.Marshal(payload)
+	req := httptest.NewRequest(http.MethodPost, "/teams/messages", bytes.NewReader(body))
+	w := httptest.NewRecorder()
+	b.handleTeamsMessages(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+	}
+	if got == nil {
+		t.Fatal("expected forwarded payload")
+	}
+	media, _ := got["media_urls"].([]any)
+	if len(media) != 1 || strings.TrimSpace(asString(media[0])) != "https://files.example.com/a.pdf" {
+		t.Fatalf("expected only allowlisted media url, got %#v", got["media_urls"])
+	}
+}
+
+func TestInboundForwardIncludesHistoryHints(t *testing.T) {
+	var gotSlack map[string]any
+	var gotTeams map[string]any
+	api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer r.Body.Close()
+		switch r.URL.Path {
+		case "/api/v1/channels/slack/inbound":
+			_ = json.NewDecoder(r.Body).Decode(&gotSlack)
+		case "/api/v1/channels/msteams/inbound":
+			_ = json.NewDecoder(r.Body).Decode(&gotTeams)
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer api.Close()
+
+	b := newTestBridge(api.URL)
+	b.cfg.SlackHistoryLimit = 44
+	b.cfg.SlackDMHistoryLimit = 12
+	b.cfg.MSTeamsHistoryLimit = 55
+	b.cfg.MSTeamsDMHistoryLimit = 13
+
+	slackPayload := map[string]any{
+		"type":     "event_callback",
+		"event_id": "EvHistSlack",
+		"event": map[string]any{
+			"type":         "message",
+			"channel":      "C123",
+			"channel_type": "channel",
+			"user":         "U123",
+			"text":         "hello",
+			"ts":           "1700000.001",
+		},
+	}
+	sb, _ := json.Marshal(slackPayload)
+	sr := httptest.NewRequest(http.MethodPost, "/slack/events", bytes.NewReader(sb))
+	sw := httptest.NewRecorder()
+	b.handleSlackEvents(sw, sr)
+	if sw.Code != http.StatusOK {
+		t.Fatalf("slack status=%d body=%s", sw.Code, sw.Body.String())
+	}
+
+	teamsPayload := map[string]any{
+		"type": "message",
+		"id":   "activity-hints-1",
+		"text": "hello",
+		"from": map[string]any{"id": "user-1"},
+		"conversation": map[string]any{
+			"id":               "conv-1",
+			"conversationType": "personal",
+		},
+		"serviceUrl": "https://smba.trafficmanager.net/emea",
+	}
+	tb, _ := json.Marshal(teamsPayload)
+	tr := httptest.NewRequest(http.MethodPost, "/teams/messages", bytes.NewReader(tb))
+	tw := httptest.NewRecorder()
+	b.handleTeamsMessages(tw, tr)
+	if tw.Code != http.StatusOK {
+		t.Fatalf("teams status=%d body=%s", tw.Code, tw.Body.String())
+	}
+
+	if gotSlack == nil || intFromAny(gotSlack["history_limit"], 0) != 44 || intFromAny(gotSlack["dm_history_limit"], 0) != 12 {
+		t.Fatalf("unexpected slack history hints: %#v", gotSlack)
+	}
+	if gotTeams == nil || intFromAny(gotTeams["history_limit"], 0) != 55 || intFromAny(gotTeams["dm_history_limit"], 0) != 13 {
+		t.Fatalf("unexpected teams history hints: %#v", gotTeams)
 	}
 }
 
@@ -804,6 +1104,43 @@ func TestTeamsOutboundCardAndAttachment(t *testing.T) {
 	atts, _ := payload["attachments"].([]any)
 	if len(atts) != 2 {
 		t.Fatalf("expected 2 attachments, got %#v", payload["attachments"])
+	}
+}
+
+func TestTeamsOutboundMultipleMediaAttachments(t *testing.T) {
+	var payload map[string]any
+	teamsAPI := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer r.Body.Close()
+		_ = json.NewDecoder(r.Body).Decode(&payload)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer teamsAPI.Close()
+
+	b := newTestBridge("http://example.invalid")
+	b.cfg.MSTeamsAPIBase = teamsAPI.URL
+	b.teamsMu.Lock()
+	b.teamsConvByID["conv-1"] = teamsConversationRef{
+		ServiceURL:     teamsAPI.URL,
+		ConversationID: "conv-1",
+		UserID:         "u1",
+	}
+	b.teamsToken = tokenCache{accessToken: "token", expiresAt: time.Now().Add(30 * time.Minute)}
+	b.teamsMu.Unlock()
+
+	reqBody, _ := json.Marshal(map[string]any{
+		"chat_id":    "conv-1",
+		"content":    "hello",
+		"media_urls": []string{"https://files.example.com/a.pdf", "https://files.example.com/b.png"},
+	})
+	req := httptest.NewRequest(http.MethodPost, "/teams/outbound", bytes.NewReader(reqBody))
+	w := httptest.NewRecorder()
+	b.handleTeamsOutbound(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+	}
+	atts, _ := payload["attachments"].([]any)
+	if len(atts) != 2 {
+		t.Fatalf("expected 2 media attachments, got %#v", payload["attachments"])
 	}
 }
 
@@ -1007,6 +1344,263 @@ func TestSlackOutboundCardBlocks(t *testing.T) {
 	}
 }
 
+func TestSlackOutboundCardAttachmentsAndSections(t *testing.T) {
+	var sawAttachments, sawBlocks bool
+	slackAPI := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/chat.postMessage" {
+			_ = r.ParseForm()
+			sawBlocks = strings.TrimSpace(r.FormValue("blocks")) != ""
+			sawAttachments = strings.TrimSpace(r.FormValue("attachments")) != ""
+			_ = json.NewEncoder(w).Encode(map[string]any{"ok": true, "ts": "1"})
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	defer slackAPI.Close()
+
+	b := newTestBridge("http://example.invalid")
+	b.cfg.SlackAPIBase = slackAPI.URL
+	b.cfg.SlackBotToken = "xoxb-test"
+
+	body, _ := json.Marshal(map[string]any{
+		"chat_id": "C111",
+		"card": map[string]any{
+			"sections": []any{"*one*", "*two*"},
+			"attachments": []map[string]any{
+				{"text": "attachment text"},
+			},
+		},
+	})
+	req := httptest.NewRequest(http.MethodPost, "/slack/outbound", bytes.NewReader(body))
+	w := httptest.NewRecorder()
+	b.handleSlackOutbound(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+	}
+	if !sawBlocks {
+		t.Fatal("expected blocks generated from sections")
+	}
+	if !sawAttachments {
+		t.Fatal("expected attachments payload")
+	}
+}
+
+func TestSlackOutboundNativeStreamingLifecycle(t *testing.T) {
+	var startCalls, appendCalls, stopCalls, postCalls int32
+	var streamTS string
+	var streamed []string
+	slackAPI := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = r.ParseForm()
+		switch r.URL.Path {
+		case "/chat.startStream":
+			atomic.AddInt32(&startCalls, 1)
+			streamTS = "s-1"
+			streamed = append(streamed, strings.TrimSpace(r.FormValue("markdown_text")))
+			_ = json.NewEncoder(w).Encode(map[string]any{"ok": true, "ts": streamTS})
+		case "/chat.appendStream":
+			atomic.AddInt32(&appendCalls, 1)
+			if strings.TrimSpace(r.FormValue("ts")) != streamTS {
+				t.Fatalf("append ts mismatch: %q", r.FormValue("ts"))
+			}
+			streamed = append(streamed, strings.TrimSpace(r.FormValue("markdown_text")))
+			_ = json.NewEncoder(w).Encode(map[string]any{"ok": true})
+		case "/chat.stopStream":
+			atomic.AddInt32(&stopCalls, 1)
+			if strings.TrimSpace(r.FormValue("ts")) != streamTS {
+				t.Fatalf("stop ts mismatch: %q", r.FormValue("ts"))
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{"ok": true})
+		case "/chat.postMessage":
+			atomic.AddInt32(&postCalls, 1)
+			_ = json.NewEncoder(w).Encode(map[string]any{"ok": true, "ts": "fallback"})
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer slackAPI.Close()
+
+	b := newTestBridge("http://example.invalid")
+	b.cfg.SlackAPIBase = slackAPI.URL
+	b.cfg.SlackBotToken = "xoxb-test"
+
+	body, _ := json.Marshal(map[string]any{
+		"chat_id":            "C111",
+		"thread_id":          "171.2",
+		"content":            "alpha beta gamma delta epsilon zeta eta theta",
+		"native_streaming":   true,
+		"stream_mode":        "append",
+		"stream_chunk_chars": 12,
+	})
+	req := httptest.NewRequest(http.MethodPost, "/slack/outbound", bytes.NewReader(body))
+	w := httptest.NewRecorder()
+	b.handleSlackOutbound(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+	}
+	if atomic.LoadInt32(&startCalls) != 1 || atomic.LoadInt32(&stopCalls) != 1 {
+		t.Fatalf("expected start/stop once, got start=%d stop=%d", startCalls, stopCalls)
+	}
+	if atomic.LoadInt32(&appendCalls) == 0 {
+		t.Fatal("expected appendStream calls")
+	}
+	if atomic.LoadInt32(&postCalls) != 0 {
+		t.Fatalf("expected no fallback postMessage, got %d", postCalls)
+	}
+	if strings.Join(streamed, " ") != "alpha beta gamma delta epsilon zeta eta theta" {
+		t.Fatalf("unexpected streamed body: %#v", streamed)
+	}
+}
+
+func TestSlackOutboundNativeStreamingFallbackToPostMessage(t *testing.T) {
+	var startCalls, postCalls int32
+	slackAPI := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = r.ParseForm()
+		switch r.URL.Path {
+		case "/chat.startStream":
+			atomic.AddInt32(&startCalls, 1)
+			_ = json.NewEncoder(w).Encode(map[string]any{"ok": false, "error": "streaming_not_allowed"})
+		case "/chat.postMessage":
+			atomic.AddInt32(&postCalls, 1)
+			_ = json.NewEncoder(w).Encode(map[string]any{"ok": true, "ts": "fallback"})
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer slackAPI.Close()
+
+	b := newTestBridge("http://example.invalid")
+	b.cfg.SlackAPIBase = slackAPI.URL
+	b.cfg.SlackBotToken = "xoxb-test"
+
+	body, _ := json.Marshal(map[string]any{
+		"chat_id":          "C111",
+		"thread_id":        "171.3",
+		"content":          "fallback please",
+		"native_streaming": true,
+	})
+	req := httptest.NewRequest(http.MethodPost, "/slack/outbound", bytes.NewReader(body))
+	w := httptest.NewRecorder()
+	b.handleSlackOutbound(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+	}
+	if atomic.LoadInt32(&startCalls) == 0 {
+		t.Fatal("expected startStream attempt")
+	}
+	if atomic.LoadInt32(&postCalls) != 1 {
+		t.Fatalf("expected fallback postMessage once, got %d", postCalls)
+	}
+}
+
+func TestSlackOutboundStatusFinalModeSkipsNativeStreaming(t *testing.T) {
+	var startCalls, postCalls int32
+	slackAPI := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/chat.startStream":
+			atomic.AddInt32(&startCalls, 1)
+			_ = json.NewEncoder(w).Encode(map[string]any{"ok": true, "ts": "s1"})
+		case "/chat.postMessage":
+			atomic.AddInt32(&postCalls, 1)
+			_ = json.NewEncoder(w).Encode(map[string]any{"ok": true, "ts": "p1"})
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer slackAPI.Close()
+
+	b := newTestBridge("http://example.invalid")
+	b.cfg.SlackAPIBase = slackAPI.URL
+	b.cfg.SlackBotToken = "xoxb-test"
+
+	body, _ := json.Marshal(map[string]any{
+		"chat_id":          "C111",
+		"thread_id":        "171.4",
+		"content":          "status final mode",
+		"native_streaming": true,
+		"stream_mode":      "status_final",
+	})
+	req := httptest.NewRequest(http.MethodPost, "/slack/outbound", bytes.NewReader(body))
+	w := httptest.NewRecorder()
+	b.handleSlackOutbound(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+	}
+	if atomic.LoadInt32(&startCalls) != 0 {
+		t.Fatalf("expected no streaming calls, got %d", startCalls)
+	}
+	if atomic.LoadInt32(&postCalls) != 1 {
+		t.Fatalf("expected postMessage once, got %d", postCalls)
+	}
+}
+
+func TestSlackOutboundRetriesOnRateLimitThenSucceeds(t *testing.T) {
+	var calls int32
+	slackAPI := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/chat.postMessage" {
+			http.NotFound(w, r)
+			return
+		}
+		n := atomic.AddInt32(&calls, 1)
+		if n == 1 {
+			w.WriteHeader(http.StatusTooManyRequests)
+			_ = json.NewEncoder(w).Encode(map[string]any{"ok": false, "error": "rate_limited"})
+			return
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"ok": true, "ts": "1"})
+	}))
+	defer slackAPI.Close()
+
+	b := newTestBridge("http://example.invalid")
+	b.cfg.SlackAPIBase = slackAPI.URL
+	b.cfg.SlackBotToken = "xoxb-test"
+
+	body, _ := json.Marshal(map[string]any{
+		"chat_id": "C111",
+		"content": "retry me",
+	})
+	req := httptest.NewRequest(http.MethodPost, "/slack/outbound", bytes.NewReader(body))
+	w := httptest.NewRecorder()
+	b.handleSlackOutbound(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+	}
+	if atomic.LoadInt32(&calls) < 2 {
+		t.Fatalf("expected retry call, got %d", calls)
+	}
+}
+
+func TestSlackOutboundChunksLongMarkdown(t *testing.T) {
+	var postCalls int32
+	slackAPI := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/chat.postMessage" {
+			http.NotFound(w, r)
+			return
+		}
+		atomic.AddInt32(&postCalls, 1)
+		_ = json.NewEncoder(w).Encode(map[string]any{"ok": true, "ts": "1"})
+	}))
+	defer slackAPI.Close()
+
+	b := newTestBridge("http://example.invalid")
+	b.cfg.SlackAPIBase = slackAPI.URL
+	b.cfg.SlackBotToken = "xoxb-test"
+
+	long := strings.Repeat("paragraph text line\n\n", 500)
+	body, _ := json.Marshal(map[string]any{
+		"chat_id": "C111",
+		"content": long,
+	})
+	req := httptest.NewRequest(http.MethodPost, "/slack/outbound", bytes.NewReader(body))
+	w := httptest.NewRecorder()
+	b.handleSlackOutbound(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+	}
+	if atomic.LoadInt32(&postCalls) < 2 {
+		t.Fatalf("expected chunked multi-message send, got %d post calls", postCalls)
+	}
+}
+
 func TestSlackReplyModeOffSuppressesThread(t *testing.T) {
 	var gotThreadTS string
 	slackAPI := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -1079,6 +1673,41 @@ func TestSlackReplyModeFirstUsesThreadOnce(t *testing.T) {
 	}
 	if got[0] == "" || got[1] != "" {
 		t.Fatalf("expected first threaded, second not threaded; got %#v", got)
+	}
+}
+
+func TestSlackReplyModeByChatTypeOverridesDefault(t *testing.T) {
+	var gotThreadTS string
+	slackAPI := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/chat.postMessage" {
+			_ = r.ParseForm()
+			gotThreadTS = strings.TrimSpace(r.FormValue("thread_ts"))
+			_ = json.NewEncoder(w).Encode(map[string]any{"ok": true, "ts": "1"})
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	defer slackAPI.Close()
+
+	b := newTestBridge("http://example.invalid")
+	b.cfg.SlackAPIBase = slackAPI.URL
+	b.cfg.SlackBotToken = "xoxb-test"
+	b.cfg.SlackReplyMode = "off"
+	b.cfg.SlackReplyModeByChatType = map[string]string{"direct": "all", "channel": "off", "group": "first"}
+
+	body, _ := json.Marshal(map[string]any{
+		"chat_id":   "D111",
+		"thread_id": "171.9",
+		"content":   "hello",
+	})
+	req := httptest.NewRequest(http.MethodPost, "/slack/outbound", bytes.NewReader(body))
+	w := httptest.NewRecorder()
+	b.handleSlackOutbound(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+	}
+	if gotThreadTS != "171.9" {
+		t.Fatalf("expected thread_ts from direct override, got %q", gotThreadTS)
 	}
 }
 
@@ -1199,22 +1828,63 @@ func TestTeamsReplyModeFirstUsesReplyPathOnce(t *testing.T) {
 func TestTeamsInboundPollVoteRecorded(t *testing.T) {
 	b := newTestBridge("http://example.invalid")
 	b.teamsPolls["poll-1"] = map[string]any{
-		"chat_id":  "conv-1",
-		"question": "Lunch?",
-		"options":  []string{"Sushi", "Pizza"},
+		"chat_id":        "conv-1",
+		"question":       "Lunch?",
+		"options":        []string{"Sushi", "Pizza"},
+		"allowed_values": []string{"opt_1", "opt_2"},
+		"max_selections": 1,
 	}
-	ok := b.handleTeamsPollVote("conv-1", "user-1", map[string]any{
+	ok, details := b.handleTeamsPollVote("conv-1", "user-1", map[string]any{
 		"value": map[string]any{
-			"poll_choice": "Sushi",
+			"poll_id":     "poll-1",
+			"poll_choice": "opt_1",
 		},
 	})
 	if !ok {
 		t.Fatal("expected poll vote recorded")
 	}
+	if details == nil {
+		t.Fatal("expected vote details")
+	}
 	p := b.teamsPolls["poll-1"]
 	votes, _ := p["votes"].(map[string]any)
-	if votes == nil || votes["user-1"] != "Sushi" {
+	if votes == nil {
+		t.Fatalf("unexpected votes map: %#v", votes)
+	}
+	chosen := normalizePollSelections(votes["user-1"])
+	if len(chosen) != 1 || chosen[0] != "opt_1" {
 		t.Fatalf("unexpected votes: %#v", votes)
+	}
+	results, _ := p["results"].(map[string]int)
+	if results["opt_1"] != 1 {
+		t.Fatalf("unexpected results: %#v", p["results"])
+	}
+}
+
+func TestTeamsInboundPollVoteEnforcesMaxSelections(t *testing.T) {
+	b := newTestBridge("http://example.invalid")
+	b.teamsPolls["poll-2"] = map[string]any{
+		"chat_id":        "conv-2",
+		"question":       "Pick two",
+		"allowed_values": []string{"opt_1", "opt_2", "opt_3"},
+		"max_selections": 2,
+	}
+	ok, _ := b.handleTeamsPollVote("conv-2", "user-1", map[string]any{
+		"value": map[string]any{
+			"poll_id":     "poll-2",
+			"poll_choice": "opt_1,opt_2,opt_3",
+		},
+	})
+	if !ok {
+		t.Fatal("expected vote to be recorded")
+	}
+	votes, _ := b.teamsPolls["poll-2"]["votes"].(map[string]any)
+	selected := normalizePollSelections(votes["user-1"])
+	if len(selected) != 2 {
+		t.Fatalf("expected max 2 selections, got %#v", selected)
+	}
+	if selected[0] != "opt_1" || selected[1] != "opt_2" {
+		t.Fatalf("unexpected truncated selection order: %#v", selected)
 	}
 }
 
@@ -1375,14 +2045,14 @@ func TestVerifyBearer(t *testing.T) {
 func TestVerifyTeamsJWTRequestBranches(t *testing.T) {
 	b := newTestBridge("http://example.invalid")
 
-	if err := b.verifyTeamsJWTRequest(httptest.NewRequest(http.MethodPost, "/teams/messages", nil), "https://service"); err != nil {
+	if err := b.verifyTeamsJWTRequest(httptest.NewRequest(http.MethodPost, "/teams/messages", nil), "https://service", "msteams"); err != nil {
 		t.Fatalf("expected bypass when jwt/app id unset: %v", err)
 	}
 
 	b.cfg.MSTeamsAppID = "app-id"
 	b.jwt = &teamsJWTVerifier{appID: "app-id"}
 	req := httptest.NewRequest(http.MethodPost, "/teams/messages", nil)
-	if err := b.verifyTeamsJWTRequest(req, "https://service"); err == nil {
+	if err := b.verifyTeamsJWTRequest(req, "https://service", "msteams"); err == nil {
 		t.Fatal("expected missing authorization error")
 	}
 }
@@ -1396,6 +2066,15 @@ func TestReplyRoutingHelpers(t *testing.T) {
 	}
 	if got := normalizeReplyMode("weird"); got != "all" {
 		t.Fatalf("normalize default mismatch: %q", got)
+	}
+	if got := resolveSlackReplyModeByChatType("D123", map[string]string{"direct": "all"}); got != "all" {
+		t.Fatalf("chat-type direct override mismatch: %q", got)
+	}
+	if got := resolveSlackReplyModeByChatType("C123", map[string]string{"channel": "off"}); got != "off" {
+		t.Fatalf("chat-type channel override mismatch: %q", got)
+	}
+	if got := resolveSlackReplyModeByChatType("G123", map[string]string{"group": "first"}); got != "first" {
+		t.Fatalf("chat-type group override mismatch: %q", got)
 	}
 
 	b := newTestBridge("http://example.invalid")
@@ -1440,8 +2119,14 @@ func TestEnvAndConfigHelpers(t *testing.T) {
 	t.Setenv("KAFCLAW_BASE_URL", " http://127.0.0.1:19991 ")
 	t.Setenv("SLACK_ACCOUNT_ID", " acct-a ")
 	t.Setenv("SLACK_REPLY_MODE", " first ")
+	t.Setenv("SLACK_REPLY_MODE_BY_CHAT_TYPE", "direct=all,group=first,channel=off")
+	t.Setenv("SLACK_HISTORY_LIMIT", "66")
+	t.Setenv("SLACK_DM_HISTORY_LIMIT", "7")
 	t.Setenv("MSTEAMS_ACCOUNT_ID", " acct-b ")
 	t.Setenv("MSTEAMS_REPLY_MODE", " off ")
+	t.Setenv("MSTEAMS_HISTORY_LIMIT", "77")
+	t.Setenv("MSTEAMS_DM_HISTORY_LIMIT", "9")
+	t.Setenv("MSTEAMS_MEDIA_ALLOW_HOSTS", "files.example.com,*.sharepoint.com")
 	t.Setenv("CHANNEL_BRIDGE_STATE", " /tmp/state.json ")
 
 	cfg := loadConfig()
@@ -1451,8 +2136,20 @@ func TestEnvAndConfigHelpers(t *testing.T) {
 	if cfg.SlackAccountID != "acct-a" || cfg.SlackReplyMode != "first" {
 		t.Fatalf("unexpected slack config: %#v", cfg)
 	}
+	if cfg.SlackReplyModeByChatType["direct"] != "all" || cfg.SlackReplyModeByChatType["channel"] != "off" {
+		t.Fatalf("unexpected slack chat-type reply mode config: %#v", cfg.SlackReplyModeByChatType)
+	}
+	if cfg.SlackHistoryLimit != 66 || cfg.SlackDMHistoryLimit != 7 {
+		t.Fatalf("unexpected slack history config: %#v", cfg)
+	}
 	if cfg.MSTeamsAccountID != "acct-b" || cfg.MSTeamsReplyMode != "off" {
 		t.Fatalf("unexpected teams config: %#v", cfg)
+	}
+	if cfg.MSTeamsHistoryLimit != 77 || cfg.MSTeamsDMHistoryLimit != 9 {
+		t.Fatalf("unexpected teams history config: %#v", cfg)
+	}
+	if len(cfg.MSTeamsMediaAllowHosts) != 2 || cfg.MSTeamsMediaAllowHosts[0] != "files.example.com" {
+		t.Fatalf("unexpected teams media allow hosts: %#v", cfg.MSTeamsMediaAllowHosts)
 	}
 	if cfg.StatePath != "/tmp/state.json" {
 		t.Fatalf("unexpected state path: %q", cfg.StatePath)
@@ -1569,6 +2266,25 @@ func TestRetryAndJWTUtilityHelpers(t *testing.T) {
 	roles, _ := diag["roles"].([]string)
 	if len(roles) != 1 || roles[0] != "Chat.Read" {
 		t.Fatalf("unexpected roles diagnostics: %#v", diag["roles"])
+	}
+}
+
+func TestDocsParitySnapshotUpdated(t *testing.T) {
+	path := filepath.Join("..", "..", "docs", "v2", "slack-teams-bridge.md")
+	body, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read docs: %v", err)
+	}
+	txt := string(body)
+	stale := []string{
+		"Not full Bot Framework auth edge parity",
+		"Not full poll lifecycle parity",
+		"Not full Teams inbound normalization parity",
+	}
+	for _, s := range stale {
+		if strings.Contains(txt, s) {
+			t.Fatalf("stale parity note still present: %q", s)
+		}
 	}
 }
 
