@@ -1,5 +1,6 @@
 ---
 parent: Agent Concepts
+title: How Agents Work
 ---
 
 # How Agents Work

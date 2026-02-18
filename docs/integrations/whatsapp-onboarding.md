@@ -1,5 +1,6 @@
 ---
 parent: Integrations
+title: WhatsApp Onboarding — Buddy Access
 ---
 
 # WhatsApp Onboarding — Buddy Access

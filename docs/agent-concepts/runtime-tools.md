@@ -1,5 +1,6 @@
 ---
 parent: Agent Concepts
+title: Runtime Tools and Capabilities
 ---
 
 # Runtime Tools and Capabilities

@@ -1,5 +1,6 @@
 ---
 parent: Integrations
+title: Slack + Teams Bridge
 ---
 
 # Slack + Teams Bridge

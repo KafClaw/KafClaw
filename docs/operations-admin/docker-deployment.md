@@ -1,10 +1,9 @@
 ---
 parent: Operations and Admin
+title: Docker Compose Deployment
 ---
 
 # Docker Compose Deployment
-
-> See also: [FR-024 Standalone Mode](../requirements/FR-024-standalone-mode/) for deployment mode details
 
 ## Build Image
 

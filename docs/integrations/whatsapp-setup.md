@@ -1,10 +1,9 @@
 ---
 parent: Integrations
+title: WhatsApp Setup (Default Deny)
 ---
 
 # WhatsApp Setup (Default Deny)
-
-> See also: [FR-001 WhatsApp Auth Flow](../requirements/FR-001-whatsapp-auth-flow/)
 
 ## Overview
 

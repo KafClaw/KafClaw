@@ -23,19 +23,17 @@ KafClaw is a Go-based agent runtime with three practical deployment modes:
 
 ## Start Here
 
-- [Start Here](./start-here/)
-- [Getting Started](./start-here/getting-started/)
+- [Getting Started](./start-here/)
+- [Getting Started Guide](./start-here/getting-started/)
 - [User Manual](./start-here/user-manual/)
 
-## Agent Concepts
+## Guides
 
+- [Guides](./guides/)
 - [Agent Concepts](./agent-concepts/)
 - [How Agents Work](./agent-concepts/how-agents-work/)
 - [Soul and Identity Files](./agent-concepts/soul-identity-tools/)
 - [Runtime Tools and Capabilities](./agent-concepts/runtime-tools/)
-
-## Integrations
-
 - [Integrations](./integrations/)
 - [Slack and Teams Bridge](./integrations/slack-teams-bridge/)
 - [WhatsApp Setup](./integrations/whatsapp-setup/)
@@ -50,6 +48,7 @@ KafClaw is a Go-based agent runtime with three practical deployment modes:
 - [Operations Guide](./operations-admin/operations-guide/)
 - [Docker Deployment](./operations-admin/docker-deployment/)
 - [Release Guide](./operations-admin/release/)
+- [Example Deployment](./operations-admin/example/)
 
 ## Architecture and Security
 
@@ -60,3 +59,10 @@ KafClaw is a Go-based agent runtime with three practical deployment modes:
 - [Timeline Architecture](./architecture-security/architecture-timeline/)
 - [Security Risks](./architecture-security/security-risks/)
 - [Subagents Threat Model](./architecture-security/subagents-threat-model/)
+
+## Reference
+
+- [Reference](./reference/)
+- [CLI Reference](./reference/cli-reference/)
+- [API Endpoints](./reference/api-endpoints/)
+- [Configuration Keys](./reference/config-keys/)

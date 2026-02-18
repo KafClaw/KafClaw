@@ -1,5 +1,6 @@
 ---
 parent: Agent Concepts
+title: Memory Notes
 ---
 
 # Memory Notes

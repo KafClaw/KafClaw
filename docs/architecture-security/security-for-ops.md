@@ -1,5 +1,6 @@
 ---
 parent: Architecture and Security
+title: Security for Operators
 nav_order: 1
 ---
 

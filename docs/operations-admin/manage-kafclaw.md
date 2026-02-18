@@ -1,5 +1,6 @@
 ---
 parent: Operations and Admin
+title: KafClaw Management Guide
 ---
 
 # KafClaw Management Guide

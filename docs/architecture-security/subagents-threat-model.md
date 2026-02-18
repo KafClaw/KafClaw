@@ -1,5 +1,6 @@
 ---
 parent: Architecture and Security
+title: Subagents Threat Model
 ---
 
 # Subagents Threat Model

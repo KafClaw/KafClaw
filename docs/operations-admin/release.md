@@ -1,10 +1,9 @@
 ---
 parent: Operations and Admin
+title: Release Process
 ---
 
 # Release Process
-
-> See also: [FR-017 Build/Test Strategy](../requirements/FR-017-build-test-strategy/)
 
 ## Versioning
 

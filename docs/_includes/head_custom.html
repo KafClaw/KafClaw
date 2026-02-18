@@ -1,0 +1,128 @@
+{% assign seo_title = page.title | default: site.title %}
+{% assign seo_description = page.description | default: page.excerpt | default: site.description | strip_html | normalize_whitespace %}
+{% assign seo_image = page.image | default: site.logo | default: "/assets/kafclaw.png" %}
+
+<script>
+  (function () {
+    var pref = null;
+    try {
+      pref = localStorage.getItem("kafclaw-theme");
+    } catch (e) {}
+    if (pref === "dark" || pref === "light") {
+      document.documentElement.setAttribute("data-theme", pref);
+    } else {
+      document.documentElement.removeAttribute("data-theme");
+    }
+  })();
+</script>
+
+<link rel="icon" type="image/png" href="{{ seo_image | relative_url }}">
+<link rel="apple-touch-icon" href="{{ seo_image | relative_url }}">
+
+<style>
+  .theme-toggle-btn.site-button {
+    border: 0;
+    background: transparent;
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+    color: var(--body-text-color);
+    cursor: pointer;
+  }
+
+  .theme-toggle-btn.site-button:hover {
+    background-image: linear-gradient(-90deg, #ebedf5 0%, rgba(235, 237, 245, 0.8) 100%);
+  }
+
+  .theme-toggle-btn svg {
+    width: 0.95rem;
+    height: 0.95rem;
+  }
+</style>
+
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    var auxNav = document.querySelector(".aux-nav .aux-nav-list");
+    if (!auxNav || document.getElementById("kafclaw-theme-switcher")) return;
+
+    var li = document.createElement("li");
+    li.className = "aux-nav-list-item";
+    li.id = "kafclaw-theme-switcher";
+
+    var btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "site-button theme-toggle-btn";
+    btn.setAttribute("aria-label", "Toggle color theme");
+
+    function storedTheme() {
+      try {
+        var pref = localStorage.getItem("kafclaw-theme");
+        return pref === "light" || pref === "dark" ? pref : null;
+      } catch (e) {
+        return null;
+      }
+    }
+
+    function activeTheme() {
+      var pref = storedTheme();
+      if (pref) return pref;
+      if (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) return "dark";
+      return "light";
+    }
+
+    function setIcon(theme) {
+      if (theme === "dark") {
+        btn.innerHTML =
+          '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M6.76 4.84l-1.8-1.79-1.41 1.41 1.79 1.8 1.42-1.42zM1 13h3v-2H1v2zm10 9h2v-3h-2v3zm9.66-17.54l-1.41-1.41-1.8 1.79 1.42 1.42 1.79-1.8zM17.24 19.16l1.8 1.79 1.41-1.41-1.79-1.8-1.42 1.42zM20 11v2h3v-2h-3zM12 6a6 6 0 100 12 6 6 0 000-12zm0-5h-2v3h2V1z"/></svg>';
+        btn.title = "Switch to light mode";
+      } else {
+        btn.innerHTML =
+          '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M21.75 15.5A9 9 0 1112.5 2.25a7 7 0 109.25 13.25z"/></svg>';
+        btn.title = "Switch to dark mode";
+      }
+    }
+
+    function applyTheme(val) {
+      document.documentElement.setAttribute("data-theme", val);
+      try {
+        localStorage.setItem("kafclaw-theme", val);
+      } catch (e) {}
+    }
+
+    btn.addEventListener("click", function () {
+      var now = activeTheme();
+      var next = now === "dark" ? "light" : "dark";
+      applyTheme(next);
+      setIcon(next);
+    });
+
+    setIcon(activeTheme());
+    li.appendChild(btn);
+    auxNav.appendChild(li);
+  });
+</script>
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "{% if page.url == '/' %}WebSite{% else %}TechArticle{% endif %}",
+  "name": "{{ seo_title | escape }}",
+  "headline": "{{ seo_title | escape }}",
+  "description": "{{ seo_description | escape }}",
+  "url": "{{ page.url | absolute_url }}",
+  "inLanguage": "en-US",
+  "publisher": {
+    "@type": "Organization",
+    "name": "Scalytics",
+    "url": "https://www.scalytics.io",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "{{ '/assets/kafclaw.png' | absolute_url }}"
+    }
+  },
+  "isPartOf": {
+    "@type": "WebSite",
+    "name": "{{ site.title | escape }}",
+    "url": "{{ '/' | absolute_url }}"
+  }
+}
+</script>

@@ -1,10 +1,9 @@
 ---
 parent: Architecture and Security
+title: Workspace Policy
 ---
 
 # Workspace Policy
-
-> See also: [FR-025 Workspace Policy](../requirements/FR-025-workspace-policy/)
 
 ## Fixed Workspace Path
 

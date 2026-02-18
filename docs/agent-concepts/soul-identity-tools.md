@@ -1,5 +1,6 @@
 ---
 parent: Agent Concepts
+title: Soul and Identity Files
 ---
 
 # Soul and Identity Files
