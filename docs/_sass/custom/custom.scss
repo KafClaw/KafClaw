@@ -1,23 +1,5 @@
-:root[data-theme="dark"] {
-  --body-background-color: #0b1220;
-  --body-heading-color: #f2f6ff;
-  --body-text-color: #d7e0ef;
-  --link-color: #8ab4ff;
-  --nav-child-link-color: #b8c8e6;
-  --sidebar-color: #111a2d;
-  --search-background-color: #111a2d;
-  --search-result-preview-color: #c7d2e7;
-  --table-background-color: #111a2d;
-  --table-border-color: #28344f;
-  --code-background-color: #0d1628;
-  --code-linenumber-color: #6c7fa5;
-  --feedback-color: #1a2741;
-  --btn-primary-color: #7ca8ff;
-  --border-color: #2a3854;
-}
-
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme]) {
+  :root {
     --body-background-color: #0b1220;
     --body-heading-color: #f2f6ff;
     --body-text-color: #d7e0ef;
@@ -34,22 +16,4 @@
     --btn-primary-color: #7ca8ff;
     --border-color: #2a3854;
   }
-}
-
-.theme-toggle-btn.site-button {
-  border: 0;
-  background: transparent;
-  padding-left: 0.75rem;
-  padding-right: 0.75rem;
-  color: var(--body-text-color);
-  cursor: pointer;
-}
-
-.theme-toggle-btn.site-button:hover {
-  background-image: linear-gradient(-90deg, #ebedf5 0%, rgba(235, 237, 245, 0.8) 100%);
-}
-
-.theme-toggle-btn svg {
-  width: 0.95rem;
-  height: 0.95rem;
 }
