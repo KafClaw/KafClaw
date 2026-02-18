@@ -350,7 +350,7 @@ These areas demonstrate good security practices:
 8. **WhatsApp allowlist/denylist** - Configurable sender filtering
 9. **Default localhost binding** - Gateway binds to `127.0.0.1` by default
 10. **No `eval()` or dynamic code** in web frontend JavaScript
-11. **Vue.js template escaping** - Proper `{{ }}` interpolation prevents XSS in dynamic content
+11. **Vue.js template escaping** - Proper `{% raw %}{{ }}{% endraw %}` interpolation prevents XSS in dynamic content
 12. **URL encoding** - API calls use `encodeURIComponent()` for parameters
 
 ---
