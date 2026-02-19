@@ -13,6 +13,9 @@ func TestOnboardNonInteractiveRequiresAcceptRisk(t *testing.T) {
 	origHome := os.Getenv("HOME")
 	defer os.Setenv("HOME", origHome)
 	_ = os.Setenv("HOME", tmpDir)
+	origAcceptRisk := onboardAcceptRisk
+	defer func() { onboardAcceptRisk = origAcceptRisk }()
+	onboardAcceptRisk = false
 
 	_, err := runRootCommand(t, "onboard", "--non-interactive", "--mode=local", "--llm=skip", "--skip-skills")
 	if err == nil {

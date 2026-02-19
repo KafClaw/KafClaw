@@ -128,10 +128,17 @@ func init() {
 }
 
 func runOnboard(cmd *cobra.Command, args []string) error {
+	_ = emitLifecycleEvent("onboard", "start", "info", "onboarding started", map[string]any{
+		"nonInteractive": onboardNonInteractive,
+		"profile":        strings.TrimSpace(onboardProfile),
+		"mode":           strings.TrimSpace(onboardMode),
+	})
 	if onboardNonInteractive && !onboardAcceptRisk {
+		_ = emitLifecycleEvent("onboard", "validate", "error", "missing --accept-risk for non-interactive mode", nil)
 		return fmt.Errorf("non-interactive onboarding requires --accept-risk")
 	}
 	if err := validateOnboardNonInteractiveFlags(); err != nil {
+		_ = emitLifecycleEvent("onboard", "validate", "error", err.Error(), nil)
 		return err
 	}
 
@@ -183,6 +190,7 @@ func runOnboard(cmd *cobra.Command, args []string) error {
 		SubThinking:      onboardSubThinking,
 		NonInteractive:   onboardNonInteractive,
 	}); err != nil {
+		_ = emitLifecycleEvent("onboard", "wizard", "error", err.Error(), nil)
 		return fmt.Errorf("onboarding wizard error: %w", err)
 	}
 
@@ -197,8 +205,13 @@ func runOnboard(cmd *cobra.Command, args []string) error {
 	}
 
 	if err := preflightOnboardingConfig(cfg, cfgPath); err != nil {
+		_ = emitLifecycleEvent("onboard", "preflight", "error", err.Error(), nil)
 		return err
 	}
+	_ = emitLifecycleEvent("onboard", "preflight", "ok", "onboarding preflight passed", map[string]any{
+		"gatewayHost": cfg.Gateway.Host,
+		"gatewayPort": cfg.Gateway.Port,
+	})
 
 	fmt.Fprintln(cmd.OutOrStdout(), onboarding.BuildProfileSummary(cfg))
 	if !onboardNonInteractive && (configExists || !onboardForce) {
@@ -213,11 +226,18 @@ func runOnboard(cmd *cobra.Command, args []string) error {
 		}
 	}
 	if err := enforceGatewayBindSafety(cfg, cmd); err != nil {
+		_ = emitLifecycleEvent("onboard", "bind-safety", "error", err.Error(), map[string]any{
+			"gatewayHost": cfg.Gateway.Host,
+		})
 		return err
 	}
 	if err := config.Save(cfg); err != nil {
+		_ = emitLifecycleEvent("onboard", "save-config", "error", err.Error(), nil)
 		return fmt.Errorf("error saving configured onboarding profile: %w", err)
 	}
+	_ = emitLifecycleEvent("onboard", "save-config", "ok", "configuration saved", map[string]any{
+		"configPath": cfgPath,
+	})
 	fmt.Printf("Updated configuration at: %s\n", cfgPath)
 
 	fmt.Printf("\nWorkspace: %s\n", cfg.Paths.Workspace)
@@ -370,6 +390,7 @@ func runOnboard(cmd *cobra.Command, args []string) error {
 			InstallRoot: onboardInstallRoot,
 		})
 		if err != nil {
+			_ = emitLifecycleEvent("onboard", "systemd", "error", err.Error(), nil)
 			fmt.Printf("\nSystemd setup failed: %v\n", err)
 			return nil
 		}
@@ -383,8 +404,16 @@ func runOnboard(cmd *cobra.Command, args []string) error {
 		fmt.Printf("  + Env file: %s\n", result.EnvPath)
 		fmt.Printf("  + Service port: %d\n", servicePort)
 		fmt.Println("  Next (as root): systemctl daemon-reload && systemctl enable --now kafclaw-gateway.service")
+		_ = emitLifecycleEvent("onboard", "systemd", "ok", "systemd setup completed", map[string]any{
+			"servicePort": servicePort,
+			"serviceUser": onboardServiceUser,
+		})
 	}
 	printPostOnboardingReadiness(cmd, cfg)
+	_ = emitLifecycleEvent("onboard", "complete", "ok", "onboarding completed", map[string]any{
+		"gatewayHost": cfg.Gateway.Host,
+		"gatewayPort": cfg.Gateway.Port,
+	})
 	return nil
 }
 

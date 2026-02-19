@@ -113,31 +113,45 @@ func runUpdatePlan(cmd *cobra.Command, args []string) error {
 }
 
 func runUpdateBackup(cmd *cobra.Command, args []string) error {
+	_ = emitLifecycleEvent("update", "backup", "info", "backup requested", nil)
 	backupRoot, err := resolveUpdateBackupRoot(updateBackupDir)
 	if err != nil {
+		_ = emitLifecycleEvent("update", "backup", "error", err.Error(), nil)
 		return err
 	}
 	path, _, err := createUpdateBackup(backupRoot)
 	if err != nil {
+		_ = emitLifecycleEvent("update", "backup", "error", err.Error(), nil)
 		return err
 	}
+	_ = emitLifecycleEvent("update", "backup", "ok", "backup created", map[string]any{"path": path})
 	fmt.Fprintf(cmd.OutOrStdout(), "Backup created: %s\n", path)
 	return nil
 }
 
 func runUpdateApply(cmd *cobra.Command, args []string) error {
+	_ = emitLifecycleEvent("update", "apply-start", "info", "update apply started", map[string]any{
+		"latest":     updateLatest,
+		"version":    strings.TrimSpace(updateVersion),
+		"source":     updateSource,
+		"skipBackup": updateSkipBackup,
+	})
 	if err := validateUpdateTarget(updateLatest, updateVersion, updateSource); err != nil {
+		_ = emitLifecycleEvent("update", "validate-target", "error", err.Error(), nil)
 		return err
 	}
 
 	current := strings.TrimSpace(version)
 	target := normalizeVersion(updateVersion)
 	if err := preflightUpdateCompatibility(current, target, updateAllowDowngrade); err != nil {
+		_ = emitLifecycleEvent("update", "preflight-compat", "error", err.Error(), nil)
 		return err
 	}
 	if err := preflightUpdateRuntime(); err != nil {
+		_ = emitLifecycleEvent("update", "preflight-runtime", "error", err.Error(), nil)
 		return err
 	}
+	_ = emitLifecycleEvent("update", "preflight", "ok", "preflight checks passed", nil)
 
 	beforeCfg, _ := loadConfigMapForDrift()
 
@@ -149,13 +163,16 @@ func runUpdateApply(cmd *cobra.Command, args []string) error {
 	if !updateSkipBackup {
 		p, _, bErr := createUpdateBackup(backupRoot)
 		if bErr != nil {
+			_ = emitLifecycleEvent("update", "backup", "error", bErr.Error(), nil)
 			return bErr
 		}
 		backupPath = p
+		_ = emitLifecycleEvent("update", "backup", "ok", "backup created", map[string]any{"path": backupPath})
 		fmt.Fprintf(cmd.OutOrStdout(), "Pre-update backup: %s\n", backupPath)
 	}
 
 	if updateDryRun {
+		_ = emitLifecycleEvent("update", "apply", "ok", "dry-run completed", nil)
 		fmt.Fprintln(cmd.OutOrStdout(), "Dry-run mode: update apply skipped.")
 		return nil
 	}
@@ -170,13 +187,16 @@ func runUpdateApply(cmd *cobra.Command, args []string) error {
 			repoPath = cwd
 		}
 		if err := runSourceUpdateFn(repoPath); err != nil {
+			_ = emitLifecycleEvent("update", "apply", "error", err.Error(), map[string]any{"path": "source"})
 			return fmt.Errorf("source update failed: %w", err)
 		}
 	} else {
 		if err := runBinaryUpdateFn(updateLatest, target); err != nil {
+			_ = emitLifecycleEvent("update", "apply", "error", err.Error(), map[string]any{"path": "binary"})
 			return fmt.Errorf("binary update failed: %w", err)
 		}
 	}
+	_ = emitLifecycleEvent("update", "apply", "ok", "update apply succeeded", nil)
 
 	failures := 0
 	doctorReport, err := runDoctorReportFn(cliconfig.DoctorOptions{})
@@ -208,31 +228,39 @@ func runUpdateApply(cmd *cobra.Command, args []string) error {
 	}
 
 	if failures > 0 {
+		_ = emitLifecycleEvent("update", "health-gate", "error", "post-update health gate failed", map[string]any{"failures": failures})
 		if backupPath != "" {
 			return fmt.Errorf("post-update health gate failed; run `kafclaw update rollback --backup-path %s`", backupPath)
 		}
 		return fmt.Errorf("post-update health gate failed")
 	}
+	_ = emitLifecycleEvent("update", "health-gate", "ok", "post-update health checks passed", nil)
+	_ = emitLifecycleEvent("update", "complete", "ok", "update flow completed", nil)
 	fmt.Fprintln(cmd.OutOrStdout(), "Update completed and health gates passed.")
 	return nil
 }
 
 func runUpdateRollback(cmd *cobra.Command, args []string) error {
+	_ = emitLifecycleEvent("update", "rollback-start", "info", "rollback requested", nil)
 	backupRoot, err := resolveUpdateBackupRoot(updateBackupDir)
 	if err != nil {
+		_ = emitLifecycleEvent("update", "rollback", "error", err.Error(), nil)
 		return err
 	}
 	path := strings.TrimSpace(updateRollbackPath)
 	if path == "" {
 		path, err = findLatestBackup(backupRoot)
 		if err != nil {
+			_ = emitLifecycleEvent("update", "rollback", "error", err.Error(), nil)
 			return err
 		}
 	}
 	manifest, err := restoreUpdateBackup(path, updateRestoreBinary)
 	if err != nil {
+		_ = emitLifecycleEvent("update", "rollback", "error", err.Error(), map[string]any{"path": path})
 		return err
 	}
+	_ = emitLifecycleEvent("update", "rollback", "ok", "rollback restored", map[string]any{"path": path})
 	fmt.Fprintf(cmd.OutOrStdout(), "Rollback restored from: %s\n", path)
 	fmt.Fprintf(cmd.OutOrStdout(), "Restored version context: %s\n", manifest.CurrentVersion)
 	return nil

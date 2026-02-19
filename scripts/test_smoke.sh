@@ -40,5 +40,9 @@ run "timeline persistence" \
 run "gateway boot + API smoke" \
   go test -count=1 -run "TestRunGatewayBootAndShutdown|TestRunGatewayServesDashboardEndpoints" ./internal/cli
 
+# Lifecycle smoke: onboard -> update -> rollback.
+run "lifecycle update smoke" \
+  go test -count=1 -run "TestLifecycleFullFlowSmoke|TestLifecycleUpdateApplyAndRollbackWithFailureInjection" ./internal/cli
+
 echo ""
 echo "Smoke suite passed."
