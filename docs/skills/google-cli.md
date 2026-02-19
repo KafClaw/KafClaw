@@ -1,10 +1,10 @@
 ---
-title: google-cli
+title: Google CLI
 parent: Skills
 nav_order: 7
 ---
 
-# google-cli
+# Google CLI
 
 Install and validate the Google Cloud CLI (`gcloud`) for cloud/operator workflows.
 

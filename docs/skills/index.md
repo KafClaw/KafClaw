@@ -29,8 +29,9 @@ For deep security posture and operational commands, see:
 
 ## Prerequisites
 
-- Node.js (`node` and `npm` in `PATH`)
-- `clawhub` CLI for external installs/updates
+- Default bundled `channel-onboarding` does not require Node/npm.
+- Node.js (`node` and `npm` in `PATH`) is required when enabling broader skills runtime.
+- `clawhub` CLI is required for external skill installs/updates.
 
 ```bash
 npm install -g --ignore-scripts clawhub

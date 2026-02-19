@@ -1,10 +1,10 @@
 ---
-title: skill-creator
+title: Skill Creator
 parent: Skills
 nav_order: 11
 ---
 
-# skill-creator
+# Skill Creator
 
 Create and maintain KafClaw skills with consistent structure and safety requirements.
 

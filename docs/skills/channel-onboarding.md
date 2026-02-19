@@ -1,10 +1,10 @@
 ---
-title: channel-onboarding
+title: Channel Onboarding
 parent: Skills
 nav_order: 1
 ---
 
-# channel-onboarding
+# Channel Onboarding
 
 Guides setup and verification for Slack, Teams, and WhatsApp channel integrations.
 

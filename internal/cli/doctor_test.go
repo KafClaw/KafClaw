@@ -71,3 +71,18 @@ func TestDoctorFixDoesNotChangeGatewayHost(t *testing.T) {
 		t.Fatalf("expected host unchanged after --fix, got %s", string(data))
 	}
 }
+
+func TestDoctorJSONOutput(t *testing.T) {
+	tmpDir := t.TempDir()
+	origHome := os.Getenv("HOME")
+	defer os.Setenv("HOME", origHome)
+	_ = os.Setenv("HOME", tmpDir)
+
+	out, err := runRootCommand(t, "doctor", "--json")
+	if err != nil {
+		t.Fatalf("doctor --json failed unexpectedly: %v", err)
+	}
+	if !strings.Contains(out, `"command": "doctor"`) || !strings.Contains(out, `"result"`) {
+		t.Fatalf("expected doctor json output, got %q", out)
+	}
+}

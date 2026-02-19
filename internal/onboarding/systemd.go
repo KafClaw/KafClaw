@@ -38,6 +38,8 @@ type SetupResult struct {
 	EnvPath      string
 }
 
+const systemdGatewayUnit = "kafclaw-gateway.service"
+
 func SetupSystemdGateway(opts SetupOptions) (*SetupResult, error) {
 	if opts.ServiceUser == "" {
 		return nil, fmt.Errorf("service user is required")
@@ -197,4 +199,15 @@ func shellEscape(v string) string {
 		return v
 	}
 	return strconv.Quote(v)
+}
+
+// ActivateSystemdGateway reloads units and enables + starts the gateway service.
+func ActivateSystemdGateway() error {
+	if _, err := runCommandFn("systemctl", "daemon-reload"); err != nil {
+		return fmt.Errorf("systemctl daemon-reload failed: %w", err)
+	}
+	if out, err := runCommandFn("systemctl", "enable", "--now", systemdGatewayUnit); err != nil {
+		return fmt.Errorf("systemctl enable --now %s failed: %w (%s)", systemdGatewayUnit, err, strings.TrimSpace(string(out)))
+	}
+	return nil
 }

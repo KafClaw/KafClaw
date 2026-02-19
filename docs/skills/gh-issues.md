@@ -1,10 +1,10 @@
 ---
-title: gh-issues
+title: GH Issues
 parent: Skills
 nav_order: 5
 ---
 
-# gh-issues
+# GH Issues
 
 Run issue-driven engineering loops with controlled PR lifecycle.
 

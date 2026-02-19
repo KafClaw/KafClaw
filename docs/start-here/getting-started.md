@@ -8,23 +8,83 @@ nav_order: 1
 
 This guide gets KafClaw from zero to a working setup, with focus on onboarding and workspace identity files.
 
-## 1. Prerequisites
+## 1. Quick Install (Release Binary)
+
+Fast path (downloads latest matching binary from GitHub Releases, verifies checksum + signature, installs completion):
+
+```bash
+curl --fail --show-error --silent --location \
+  https://raw.githubusercontent.com/kafclaw/kafclaw/main/scripts/install.sh \
+  | bash -s -- --latest
+```
+
+Reload shell config so `kafclaw` and completion are available in the current terminal:
+
+```bash
+source ~/.zshrc   # or: source ~/.bashrc
+```
+
+Quick verify:
+
+```bash
+kafclaw version
+# If you already onboarded:
+kafclaw status
+```
+
+Headless/unattended:
+
+```bash
+# Latest
+curl --fail --show-error --silent --location \
+  https://raw.githubusercontent.com/kafclaw/kafclaw/main/scripts/install.sh \
+  | bash -s -- --unattended --latest
+
+# Pinned version
+curl --fail --show-error --silent --location \
+  https://raw.githubusercontent.com/kafclaw/kafclaw/main/scripts/install.sh \
+  | bash -s -- --unattended --version v2.6.3
+```
+
+List available releases first:
+
+```bash
+curl --fail --show-error --silent --location \
+  https://raw.githubusercontent.com/kafclaw/kafclaw/main/scripts/install.sh \
+  | bash -s -- --list-releases
+```
+
+For full install flags and operator-focused behavior (root handling, signature controls, unattended modes), see [KafClaw Management Guide](../operations-admin/manage-kafclaw/).
+
+Desktop app distribution:
+
+- The Electron desktop app is shipped as prebuilt release artifacts (for example `.dmg`, `.exe`, Linux package formats).
+- Download/install it separately from GitHub Releases when you want the desktop experience.
+- Default gateway/headless onboarding/install does not auto-install Electron dependencies.
+
+## 2. Prerequisites (Source Build Path)
 
 - Go `1.24+`
 - Git
 - Optional for group mode: Kafka reachable from your machine
 - Optional for desktop: Electron dependencies
 
-## 2. Build
+## 3. Installing from Source
+
+This path is for developers who want to build KafClaw locally from source (for code changes, debugging, or running unreleased updates).
 
 ```bash
-cd /Users/alo/Development/scalytics/KafClaw
+git clone https://github.com/KafClaw/KafClaw.git
+cd KafClaw
+make check
 make build
 ```
 
 Binary target: `./kafclaw`
 
-## 3. Onboard (Mode + LLM)
+`make check` enforces Go `>=1.24` before build.
+
+## 4. Onboard (Mode + LLM)
 
 Run onboarding wizard:
 
@@ -64,11 +124,33 @@ Local + Kafka:
 ./kafclaw onboard --non-interactive --profile local-kafka --kafka-brokers localhost:9092 --group-name kafclaw --agent-id agent-local --role worker --llm skip
 ```
 
+Local + Kafka + SASL/SSL:
+
+```bash
+./kafclaw onboard --non-interactive --profile local-kafka --llm skip \
+  --kafka-brokers "broker1:9092,broker2:9092" \
+  --kafka-security-protocol SASL_SSL \
+  --kafka-sasl-mechanism SCRAM-SHA-512 \
+  --kafka-sasl-username "<username>" \
+  --kafka-sasl-password "<password>" \
+  --kafka-tls-ca-file "/path/to/ca.pem"
+```
+
 Kafka auth via KafScale proxy key (SASL/PLAIN over SSL auto-derived by `kshark --auto`):
 
 ```bash
 ./kafclaw config set group.lfsProxyUrl "https://your-kafscale-endpoint"
 ./kafclaw config set group.lfsProxyApiKey "<kafscale-api-key>"
+```
+
+Kafka auth via direct broker settings (Confluent/Redpanda-style SASL/SSL), post-onboarding:
+
+```bash
+./kafclaw config set group.kafkaSecurityProtocol "SASL_SSL"
+./kafclaw config set group.kafkaSaslMechanism "PLAIN"
+./kafclaw config set group.kafkaSaslUsername "<username>"
+./kafclaw config set group.kafkaSaslPassword "<password>"
+./kafclaw config set group.kafkaTlsCAFile "/path/to/ca.pem"
 ```
 
 Remote + Ollama/vLLM:
@@ -122,7 +204,14 @@ To reconfigure provider/token later, run onboarding again (interactive) or use:
 - Use `--force` to overwrite existing config and identity templates
 - Gateway also auto-scaffolds missing identity files at startup if workspace is incomplete
 
-## 4. Verify
+Minimal lifecycle flags:
+
+```bash
+./kafclaw onboard --reset-scope config --non-interactive --accept-risk --profile local --llm skip
+./kafclaw onboard --wait-for-gateway --health-timeout 20s
+```
+
+## 5. Verify
 
 ```bash
 ./kafclaw status
@@ -137,7 +226,7 @@ Optional hygiene fix:
 
 This merges discovered env files into `~/.config/kafclaw/env` and enforces mode `600`.
 
-## 5. Run
+## 6. Run
 
 Local gateway:
 
@@ -156,7 +245,7 @@ Single prompt test:
 ./kafclaw agent -m "hello"
 ```
 
-## 6. Systemd Setup (Linux)
+## 7. Systemd Setup (Linux)
 
 To install systemd unit/override/env during onboarding:
 
@@ -166,14 +255,21 @@ sudo ./kafclaw onboard --systemd
 
 This can create service user, install unit files, and write runtime env file.
 
-## 7. Where Config Lives
+After onboarding, manage service state with:
+
+```bash
+sudo ./kafclaw daemon status
+sudo ./kafclaw daemon restart
+```
+
+## 8. Where Config Lives
 
 - Main config: `~/.kafclaw/config.json`
 - Runtime env: `~/.config/kafclaw/env`
 - State DB: `~/.kafclaw/timeline.db`
 - Workspace identity files: `<workspace>/{AGENTS.md,SOUL.md,USER.md,TOOLS.md,IDENTITY.md}`
 
-## 8. Subagents (Phase 2)
+## 9. Subagents (Phase 2)
 
 KafClaw now supports sub-agent spawning through tools used by the agent loop:
 

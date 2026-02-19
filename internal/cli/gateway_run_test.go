@@ -130,6 +130,15 @@ func TestRunGatewayServesDashboardEndpoints(t *testing.T) {
 	waitForHTTP(t, dashBase+"/api/v1/status")
 
 	client := &http.Client{Timeout: 2 * time.Second}
+	getStatus := func(path string) int {
+		t.Helper()
+		resp, err := client.Get(dashBase + path)
+		if err != nil {
+			t.Fatalf("get %s: %v", path, err)
+		}
+		defer resp.Body.Close()
+		return resp.StatusCode
+	}
 	call := func(method, path, body string) {
 		t.Helper()
 		var reqBody *bytes.Buffer
@@ -150,6 +159,16 @@ func TestRunGatewayServesDashboardEndpoints(t *testing.T) {
 			return
 		}
 		_ = resp.Body.Close()
+	}
+
+	if got := getStatus("/"); got != http.StatusOK {
+		t.Fatalf("expected / status 200, got %d", got)
+	}
+	if got := getStatus("/timeline"); got != http.StatusOK {
+		t.Fatalf("expected /timeline status 200, got %d", got)
+	}
+	if got := getStatus("/approvals"); got != http.StatusOK {
+		t.Fatalf("expected /approvals status 200, got %d", got)
 	}
 
 	call(http.MethodGet, "/api/v1/status", "")

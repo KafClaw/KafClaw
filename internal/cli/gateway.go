@@ -207,10 +207,18 @@ func runGatewayMain(cmd *cobra.Command, args []string) {
 				consumerGroup = fmt.Sprintf("kafclaw-%s", hostname)
 			}
 		}
-		kafkaConsumer := group.NewKafkaConsumer(
+		dialer, err := group.BuildKafkaDialerFromGroupConfig(grpCfg)
+		if err != nil {
+			fmt.Println("⚠️ Kafka consumer config error: invalid or incomplete Kafka security settings.")
+			fmt.Println("⚠️ Group router not started until Kafka security settings are fixed.")
+			kafkaCancel()
+			return func() {}
+		}
+		kafkaConsumer := group.NewKafkaConsumerWithDialer(
 			grpCfg.KafkaBrokers,
 			consumerGroup,
 			extTopics.AllTopics(),
+			dialer,
 		)
 		grpState.SetConsumer(kafkaConsumer)
 		router := group.NewGroupRouter(mgr, msgBus, kafkaConsumer)
@@ -3253,7 +3261,7 @@ func runGatewayMain(cmd *cobra.Command, args []string) {
 
 		// SPA: Timeline
 		mux.HandleFunc("/timeline", func(w http.ResponseWriter, r *http.Request) {
-			http.ServeFile(w, r, "web/timeline.html")
+			serveDashboardAsset(w, "timeline.html")
 		})
 
 		// SPA: Group Management (blocked in standalone mode)
@@ -3262,17 +3270,17 @@ func runGatewayMain(cmd *cobra.Command, args []string) {
 				http.Redirect(w, r, "/timeline", http.StatusTemporaryRedirect)
 				return
 			}
-			http.ServeFile(w, r, "web/group.html")
+			serveDashboardAsset(w, "group.html")
 		})
 
 		// SPA: Approvals
 		mux.HandleFunc("/approvals", func(w http.ResponseWriter, r *http.Request) {
-			http.ServeFile(w, r, "web/approvals.html")
+			serveDashboardAsset(w, "approvals.html")
 		})
 
 		mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 			if r.URL.Path == "/" {
-				http.ServeFile(w, r, "web/index.html")
+				serveDashboardAsset(w, "index.html")
 			}
 		})
 

@@ -34,26 +34,38 @@ A comprehensive guide to installing, configuring, and using KafClaw — a person
 
 ### Installation
 
-Build from source:
+Release installer (recommended):
 
 ```bash
-cd KafClaw
-go build ./cmd/kafclaw
+curl --fail --show-error --silent --location \
+  https://raw.githubusercontent.com/kafclaw/kafclaw/main/scripts/install.sh \
+  | bash -s -- --latest
 ```
 
-Or use the Makefile:
+Headless/unattended:
+
+```bash
+curl --fail --show-error --silent --location \
+  https://raw.githubusercontent.com/kafclaw/kafclaw/main/scripts/install.sh \
+  | bash -s -- --unattended --latest
+```
+
+Pinned version:
+
+```bash
+curl --fail --show-error --silent --location \
+  https://raw.githubusercontent.com/kafclaw/kafclaw/main/scripts/install.sh \
+  | bash -s -- --version v2.6.3
+```
+
+Source build path:
 
 ```bash
 cd KafClaw
 make build
 ```
 
-Install system-wide to `/usr/local/bin`:
-
-```bash
-kafclaw install
-# May require sudo
-```
+For complete install options (`--list-releases`, signature verification defaults, root/runtime behavior), see [KafClaw Management Guide](../operations-admin/manage-kafclaw/).
 
 ### First-Time Setup
 
@@ -116,7 +128,7 @@ Once the gateway is running:
 ## 3. CLI Reference
 
 KafClaw provides the following CLI commands. Run `kafclaw --help` for the full list.
-Core startup commands: `onboard`, `doctor`, `status`, `gateway`, `agent`, `config`.
+Core startup commands: `onboard`, `doctor`, `status`, `gateway`, `daemon`, `agent`, `config`.
 
 ### 3.1 `gateway`
 
@@ -162,8 +174,20 @@ Common onboarding profiles:
 
 Useful onboarding flags:
 - `--systemd` to install service/override/env (Linux)
+- `--reset-scope` (`none|config|full`) for deterministic reset behavior
+- `--wait-for-gateway` and `--health-timeout` for post-onboard health gating
+- `--skip-healthcheck` to bypass readiness checks in constrained automation
+- `--daemon-runtime` to persist daemon runtime label in config
 - `--subagents-max-spawn-depth`, `--subagents-max-children`, `--subagents-max-concurrent`
 - `--subagents-archive-minutes`, `--subagents-model`, `--subagents-thinking`
+
+Service lifecycle commands:
+
+```bash
+sudo kafclaw daemon install --activate
+sudo kafclaw daemon status
+sudo kafclaw daemon restart
+```
 
 Subagent runtime notes:
 - `sessions_spawn` accepts `runTimeoutSeconds` for per-run hard timeout
@@ -180,10 +204,20 @@ kafclaw status
 
 ### 3.5 `install`
 
-Install binary to `/usr/local/bin`.
+Install the current local binary:
+
+- root: `/usr/local/bin`
+- non-root: `~/.local/bin`
 
 ```bash
 kafclaw install
+```
+
+Generate shell completion:
+
+```bash
+kafclaw completion zsh
+kafclaw completion bash
 ```
 
 ### 3.6 `doctor`
@@ -215,6 +249,7 @@ Guided config updates (higher-level than raw key/value `config set`).
 kafclaw configure
 kafclaw configure --subagents-allow-agents agent-main,agent-research --non-interactive
 kafclaw configure --clear-subagents-allow-agents --non-interactive
+kafclaw configure --non-interactive --kafka-brokers "broker1:9092,broker2:9092" --kafka-security-protocol SASL_SSL --kafka-sasl-mechanism SCRAM-SHA-512 --kafka-sasl-username "<username>" --kafka-sasl-password "<password>" --kafka-tls-ca-file "/path/to/ca.pem"
 ```
 
 ### 3.9 `kshark`

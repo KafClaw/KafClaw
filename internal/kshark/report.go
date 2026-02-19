@@ -135,10 +135,10 @@ func PrintPretty(r *Report) {
 		}
 
 		fmt.Printf("%s%-4s %-14s %-26s %-12s %s%s\n",
-			color, icon, row.Component, truncate(row.Target, 26), row.Layer, row.Detail, ColorReset)
+			color, icon, row.Component, "(hidden)", row.Layer, detailSummary(row.Status), ColorReset)
 
 		if row.Hint != "" && row.Status != OK {
-			fmt.Printf("  %s-> Hint: %s%s\n", ColorYellow, row.Hint, ColorReset)
+			fmt.Printf("  %s-> Hint: run with JSON output for full diagnostics%s\n", ColorYellow, ColorReset)
 		}
 	}
 	fmt.Println(strings.Repeat("-", 92))
@@ -158,6 +158,21 @@ func truncate(s string, n int) string {
 		return s
 	}
 	return s[:n-1] + "..."
+}
+
+func detailSummary(status CheckStatus) string {
+	switch status {
+	case OK:
+		return "check passed"
+	case WARN:
+		return "check warning"
+	case FAIL:
+		return "check failed"
+	case SKIP:
+		return "check skipped"
+	default:
+		return "check result"
+	}
 }
 
 // ---------- JSON export ----------

@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -96,5 +97,145 @@ func TestConfigureSkillsFlags(t *testing.T) {
 	}
 	if caps, ok := m365["capabilities"].([]any); !ok || len(caps) != 1 {
 		t.Fatalf("expected m365 capabilities [files], got %#v", m365["capabilities"])
+	}
+}
+
+func TestConfigureKafkaFlags(t *testing.T) {
+	tmpDir := t.TempDir()
+	cfgDir := filepath.Join(tmpDir, ".kafclaw")
+	if err := os.MkdirAll(cfgDir, 0o755); err != nil {
+		t.Fatalf("mkdir config dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(cfgDir, "config.json"), []byte(`{"group":{"kafkaBrokers":"localhost:9092"}}`), 0o600); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	origHome := os.Getenv("HOME")
+	defer os.Setenv("HOME", origHome)
+	_ = os.Setenv("HOME", tmpDir)
+
+	if _, err := runRootCommand(t,
+		"configure",
+		"--non-interactive",
+		"--kafka-brokers=broker-a:9092,broker-b:9092",
+		"--kafka-security-protocol=SASL_SSL",
+		"--kafka-sasl-mechanism=PLAIN",
+		"--kafka-sasl-username=svc",
+		"--kafka-sasl-password=secret",
+		"--kafka-tls-ca-file=/etc/ssl/ca.pem",
+		"--kafka-tls-cert-file=/etc/ssl/client.pem",
+		"--kafka-tls-key-file=/etc/ssl/client.key",
+	); err != nil {
+		t.Fatalf("configure kafka flags failed: %v", err)
+	}
+
+	data, err := os.ReadFile(filepath.Join(cfgDir, "config.json"))
+	if err != nil {
+		t.Fatalf("read config: %v", err)
+	}
+	var cfg map[string]any
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		t.Fatalf("unmarshal config: %v", err)
+	}
+	group, ok := cfg["group"].(map[string]any)
+	if !ok {
+		t.Fatalf("missing group section")
+	}
+	if v, _ := group["kafkaSecurityProtocol"].(string); v != "SASL_SSL" {
+		t.Fatalf("expected kafkaSecurityProtocol SASL_SSL, got %q", v)
+	}
+	if v, _ := group["kafkaSaslMechanism"].(string); v != "PLAIN" {
+		t.Fatalf("expected kafkaSaslMechanism PLAIN, got %q", v)
+	}
+	if v, _ := group["kafkaSaslUsername"].(string); v != "svc" {
+		t.Fatalf("expected kafkaSaslUsername svc, got %q", v)
+	}
+	if v, _ := group["kafkaTlsCAFile"].(string); v != "/etc/ssl/ca.pem" {
+		t.Fatalf("expected kafkaTlsCAFile set, got %q", v)
+	}
+}
+
+func TestConfigureKafkaInvalidSecurityProtocol(t *testing.T) {
+	tmpDir := t.TempDir()
+	cfgDir := filepath.Join(tmpDir, ".kafclaw")
+	if err := os.MkdirAll(cfgDir, 0o755); err != nil {
+		t.Fatalf("mkdir config dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(cfgDir, "config.json"), []byte(`{"group":{"kafkaBrokers":"localhost:9092"}}`), 0o600); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	origHome := os.Getenv("HOME")
+	defer os.Setenv("HOME", origHome)
+	_ = os.Setenv("HOME", tmpDir)
+
+	if _, err := runRootCommand(t, "configure", "--non-interactive", "--kafka-security-protocol=INVALID"); err == nil {
+		t.Fatal("expected invalid kafka security protocol error")
+	}
+}
+
+func TestConfigureKafkaInvalidSASLMechanism(t *testing.T) {
+	tmpDir := t.TempDir()
+	cfgDir := filepath.Join(tmpDir, ".kafclaw")
+	if err := os.MkdirAll(cfgDir, 0o755); err != nil {
+		t.Fatalf("mkdir config dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(cfgDir, "config.json"), []byte(`{"group":{"kafkaBrokers":"localhost:9092"}}`), 0o600); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	origHome := os.Getenv("HOME")
+	defer os.Setenv("HOME", origHome)
+	_ = os.Setenv("HOME", tmpDir)
+
+	if _, err := runRootCommand(t,
+		"configure",
+		"--non-interactive",
+		"--kafka-security-protocol=SASL_SSL",
+		"--kafka-sasl-mechanism=INVALID",
+	); err == nil {
+		t.Fatal("expected invalid kafka sasl mechanism error")
+	}
+}
+
+func TestConfigureJSONOutput(t *testing.T) {
+	tmpDir := t.TempDir()
+	cfgDir := filepath.Join(tmpDir, ".kafclaw")
+	if err := os.MkdirAll(cfgDir, 0o755); err != nil {
+		t.Fatalf("mkdir config dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(cfgDir, "config.json"), []byte(`{"group":{"kafkaBrokers":"localhost:9092"}}`), 0o600); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	origHome := os.Getenv("HOME")
+	defer os.Setenv("HOME", origHome)
+	_ = os.Setenv("HOME", tmpDir)
+	origKafkaSecurityProtocol := configureKafkaSecurityProtocol
+	origKafkaSASLMechanism := configureKafkaSASLMechanism
+	origKafkaSASLUsername := configureKafkaSASLUsername
+	origKafkaSASLPassword := configureKafkaSASLPassword
+	defer func() {
+		configureKafkaSecurityProtocol = origKafkaSecurityProtocol
+		configureKafkaSASLMechanism = origKafkaSASLMechanism
+		configureKafkaSASLUsername = origKafkaSASLUsername
+		configureKafkaSASLPassword = origKafkaSASLPassword
+	}()
+	configureKafkaSecurityProtocol = ""
+	configureKafkaSASLMechanism = ""
+	configureKafkaSASLUsername = ""
+	configureKafkaSASLPassword = ""
+
+	out, err := runRootCommand(t,
+		"configure",
+		"--non-interactive",
+		"--json",
+		"--kafka-brokers=broker-json:9092",
+	)
+	if err != nil {
+		t.Fatalf("configure failed: %v", err)
+	}
+	if !strings.Contains(out, `"status": "ok"`) || !strings.Contains(out, `"command": "configure"`) {
+		t.Fatalf("expected configure json output, got %q", out)
 	}
 }

@@ -1,10 +1,10 @@
 ---
-title: weather
+title: Weather
 parent: Skills
 nav_order: 6
 ---
 
-# weather
+# Weather
 
 Provide weather and short forecast responses.
 

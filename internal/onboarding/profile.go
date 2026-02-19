@@ -36,6 +36,13 @@ type WizardParams struct {
 	LLMAPIBase       string
 	LLMModel         string
 	KafkaBrokers     string
+	KafkaSecurity    string
+	KafkaSASLMech    string
+	KafkaSASLUser    string
+	KafkaSASLPass    string
+	KafkaTLSCAFile   string
+	KafkaTLSCertFile string
+	KafkaTLSKeyFile  string
 	GroupName        string
 	AgentID          string
 	Role             string
@@ -166,6 +173,9 @@ func applyMode(cfg *config.Config, mode RuntimeMode, p WizardParams) error {
 		cfg.Group.Enabled = true
 		cfg.Orchestrator.Enabled = true
 		cfg.Group.KafkaBrokers = firstNonEmpty(strings.TrimSpace(p.KafkaBrokers), "localhost:9092")
+		if err := applyKafkaSecurity(cfg, p); err != nil {
+			return err
+		}
 		cfg.Group.GroupName = firstNonEmpty(strings.TrimSpace(p.GroupName), "kafclaw")
 		cfg.Group.AgentID = firstNonEmpty(strings.TrimSpace(p.AgentID), defaultAgentID())
 		cfg.Group.ConsumerGroup = firstNonEmpty(strings.TrimSpace(cfg.Group.ConsumerGroup), cfg.Group.GroupName+"-workers")
@@ -192,6 +202,39 @@ func applyMode(cfg *config.Config, mode RuntimeMode, p WizardParams) error {
 	default:
 		return fmt.Errorf("unsupported runtime mode: %s", mode)
 	}
+}
+
+func applyKafkaSecurity(cfg *config.Config, p WizardParams) error {
+	rawRequested := strings.TrimSpace(p.KafkaSecurity)
+	securityProtocol := normalizeKafkaSecurityProtocol(firstNonEmpty(rawRequested, cfg.Group.KafkaSecurityProto))
+	if rawRequested != "" && securityProtocol == "" {
+		return fmt.Errorf("unsupported kafka security protocol: %s", rawRequested)
+	}
+	if securityProtocol == "" {
+		securityProtocol = "PLAINTEXT"
+	}
+	if !isAllowedKafkaSecurityProtocol(securityProtocol) {
+		return fmt.Errorf("unsupported kafka security protocol: %s", securityProtocol)
+	}
+	cfg.Group.KafkaSecurityProto = securityProtocol
+
+	saslMech := strings.ToUpper(strings.TrimSpace(firstNonEmpty(p.KafkaSASLMech, cfg.Group.KafkaSASLMechanism)))
+	if saslMech != "" && !isAllowedKafkaSASLMechanism(saslMech) {
+		return fmt.Errorf("unsupported kafka sasl mechanism: %s", saslMech)
+	}
+	cfg.Group.KafkaSASLMechanism = saslMech
+	cfg.Group.KafkaSASLUsername = strings.TrimSpace(firstNonEmpty(p.KafkaSASLUser, cfg.Group.KafkaSASLUsername))
+	cfg.Group.KafkaSASLPassword = strings.TrimSpace(firstNonEmpty(p.KafkaSASLPass, cfg.Group.KafkaSASLPassword))
+	cfg.Group.KafkaTLSCAFile = strings.TrimSpace(firstNonEmpty(p.KafkaTLSCAFile, cfg.Group.KafkaTLSCAFile))
+	cfg.Group.KafkaTLSCertFile = strings.TrimSpace(firstNonEmpty(p.KafkaTLSCertFile, cfg.Group.KafkaTLSCertFile))
+	cfg.Group.KafkaTLSKeyFile = strings.TrimSpace(firstNonEmpty(p.KafkaTLSKeyFile, cfg.Group.KafkaTLSKeyFile))
+
+	if strings.HasPrefix(securityProtocol, "SASL_") {
+		if cfg.Group.KafkaSASLMechanism == "" || cfg.Group.KafkaSASLUsername == "" || cfg.Group.KafkaSASLPassword == "" {
+			return fmt.Errorf("kafka sasl requires mechanism, username, and password")
+		}
+	}
+	return nil
 }
 
 func applyLLM(cfg *config.Config, preset LLMPreset, reader *bufio.Reader, out io.Writer, p WizardParams) error {
@@ -309,6 +352,29 @@ func normalizeLLMPreset(v string) LLMPreset {
 	}
 }
 
+func normalizeKafkaSecurityProtocol(v string) string {
+	switch strings.TrimSpace(strings.ToUpper(v)) {
+	case "PLAINTEXT":
+		return "PLAINTEXT"
+	case "SSL":
+		return "SSL"
+	case "SASL_PLAINTEXT":
+		return "SASL_PLAINTEXT"
+	case "SASL_SSL":
+		return "SASL_SSL"
+	default:
+		return ""
+	}
+}
+
+func isAllowedKafkaSecurityProtocol(v string) bool {
+	return v == "PLAINTEXT" || v == "SSL" || v == "SASL_PLAINTEXT" || v == "SASL_SSL"
+}
+
+func isAllowedKafkaSASLMechanism(v string) bool {
+	return v == "PLAIN" || v == "SCRAM-SHA-256" || v == "SCRAM-SHA-512"
+}
+
 func BuildProfileSummary(cfg *config.Config) string {
 	mode := detectModeFromConfig(cfg)
 	llmBase := cfg.Providers.OpenAI.APIBase
@@ -332,6 +398,12 @@ func BuildProfileSummary(cfg *config.Config) string {
 		fmt.Sprintf("- group.enabled: %t", cfg.Group.Enabled),
 		fmt.Sprintf("- orchestrator.enabled: %t", cfg.Orchestrator.Enabled),
 		fmt.Sprintf("- kafka.brokers: %s", firstNonEmpty(strings.TrimSpace(cfg.Group.KafkaBrokers), "(empty)")),
+		fmt.Sprintf("- kafka.securityProtocol: %s", firstNonEmpty(strings.TrimSpace(cfg.Group.KafkaSecurityProto), "(default)")),
+		fmt.Sprintf("- kafka.saslMechanism: %s", firstNonEmpty(strings.TrimSpace(cfg.Group.KafkaSASLMechanism), "(none)")),
+		fmt.Sprintf("- kafka.saslUsername: %s", firstNonEmpty(strings.TrimSpace(cfg.Group.KafkaSASLUsername), "(none)")),
+		fmt.Sprintf("- kafka.tls.caFile: %s", firstNonEmpty(strings.TrimSpace(cfg.Group.KafkaTLSCAFile), "(none)")),
+		fmt.Sprintf("- kafka.tls.certFile: %s", firstNonEmpty(strings.TrimSpace(cfg.Group.KafkaTLSCertFile), "(none)")),
+		fmt.Sprintf("- kafka.tls.keyFile: %s", firstNonEmpty(strings.TrimSpace(cfg.Group.KafkaTLSKeyFile), "(none)")),
 		fmt.Sprintf("- llm.model: %s", firstNonEmpty(strings.TrimSpace(cfg.Model.Name), "(empty)")),
 		fmt.Sprintf("- llm.apiBase: %s", llmBase),
 		fmt.Sprintf("- llm.apiKey: %s", tokenState),

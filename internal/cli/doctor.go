@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"github.com/KafClaw/KafClaw/internal/cliconfig"
@@ -9,6 +10,7 @@ import (
 
 var doctorFix bool
 var doctorGenerateGatewayToken bool
+var doctorJSON bool
 
 var doctorCmd = &cobra.Command{
 	Use:   "doctor",
@@ -20,6 +22,29 @@ var doctorCmd = &cobra.Command{
 		})
 		if err != nil {
 			return err
+		}
+		if doctorJSON {
+			payload := map[string]any{
+				"status":  "ok",
+				"command": "doctor",
+				"result":  report,
+			}
+			failures := 0
+			for _, check := range report.Checks {
+				if check.Status == cliconfig.DoctorFail {
+					failures++
+				}
+			}
+			if failures > 0 {
+				payload["status"] = "error"
+				payload["error"] = fmt.Sprintf("doctor found %d failing check(s)", failures)
+			}
+			b, _ := json.MarshalIndent(payload, "", "  ")
+			fmt.Fprintln(cmd.OutOrStdout(), string(b))
+			if failures > 0 {
+				return fmt.Errorf("doctor found %d failing check(s)", failures)
+			}
+			return nil
 		}
 
 		failures := 0
@@ -45,5 +70,6 @@ var doctorCmd = &cobra.Command{
 func init() {
 	doctorCmd.Flags().BoolVar(&doctorFix, "fix", false, "Apply safe fixes (merge env files, enforce loopback gateway host)")
 	doctorCmd.Flags().BoolVar(&doctorGenerateGatewayToken, "generate-gateway-token", false, "Generate and persist a new gateway auth token")
+	doctorCmd.Flags().BoolVar(&doctorJSON, "json", false, "Output machine-readable JSON report")
 	rootCmd.AddCommand(doctorCmd)
 }

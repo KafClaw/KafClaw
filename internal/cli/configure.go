@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -19,6 +20,15 @@ var configureEnableSkills []string
 var configureDisableSkills []string
 var configureGoogleWorkspaceRead string
 var configureM365Read string
+var configureKafkaBrokers string
+var configureKafkaSecurityProtocol string
+var configureKafkaSASLMechanism string
+var configureKafkaSASLUsername string
+var configureKafkaSASLPassword string
+var configureKafkaTLSCAFile string
+var configureKafkaTLSCertFile string
+var configureKafkaTLSKeyFile string
+var configureJSON bool
 
 var configureCmd = &cobra.Command{
 	Use:   "configure",
@@ -36,7 +46,16 @@ func init() {
 	configureCmd.Flags().StringSliceVar(&configureDisableSkills, "disable-skill", nil, "Disable one or more skills (repeatable)")
 	configureCmd.Flags().StringVar(&configureGoogleWorkspaceRead, "google-workspace-read", "", "Set google-workspace capabilities (mail,calendar,drive,all)")
 	configureCmd.Flags().StringVar(&configureM365Read, "m365-read", "", "Set m365 capabilities (mail,calendar,files,all)")
+	configureCmd.Flags().StringVar(&configureKafkaBrokers, "kafka-brokers", "", "Set group.kafkaBrokers (comma-separated host:port)")
+	configureCmd.Flags().StringVar(&configureKafkaSecurityProtocol, "kafka-security-protocol", "", "Set group.kafkaSecurityProtocol (PLAINTEXT|SSL|SASL_PLAINTEXT|SASL_SSL)")
+	configureCmd.Flags().StringVar(&configureKafkaSASLMechanism, "kafka-sasl-mechanism", "", "Set group.kafkaSaslMechanism (PLAIN|SCRAM-SHA-256|SCRAM-SHA-512)")
+	configureCmd.Flags().StringVar(&configureKafkaSASLUsername, "kafka-sasl-username", "", "Set group.kafkaSaslUsername")
+	configureCmd.Flags().StringVar(&configureKafkaSASLPassword, "kafka-sasl-password", "", "Set group.kafkaSaslPassword")
+	configureCmd.Flags().StringVar(&configureKafkaTLSCAFile, "kafka-tls-ca-file", "", "Set group.kafkaTlsCAFile")
+	configureCmd.Flags().StringVar(&configureKafkaTLSCertFile, "kafka-tls-cert-file", "", "Set group.kafkaTlsCertFile")
+	configureCmd.Flags().StringVar(&configureKafkaTLSKeyFile, "kafka-tls-key-file", "", "Set group.kafkaTlsKeyFile")
 	configureCmd.Flags().BoolVar(&configureNonInteractive, "non-interactive", false, "Apply flags only and skip prompts")
+	configureCmd.Flags().BoolVar(&configureJSON, "json", false, "Output machine-readable JSON summary")
 	configureCmd.Flags().Bool("skills-enabled-set", false, "Apply --skills-enabled value")
 	rootCmd.AddCommand(configureCmd)
 }
@@ -143,8 +162,74 @@ func runConfigure(cmd *cobra.Command, args []string) error {
 		cfg.Skills.Entries["m365"] = entry
 	}
 
+	if strings.TrimSpace(configureKafkaBrokers) != "" {
+		cfg.Group.KafkaBrokers = strings.TrimSpace(configureKafkaBrokers)
+	}
+	if strings.TrimSpace(configureKafkaSecurityProtocol) != "" {
+		proto := strings.ToUpper(strings.TrimSpace(configureKafkaSecurityProtocol))
+		switch proto {
+		case "PLAINTEXT", "SSL", "SASL_PLAINTEXT", "SASL_SSL":
+			cfg.Group.KafkaSecurityProto = proto
+		default:
+			return fmt.Errorf("invalid --kafka-security-protocol: %s (expected PLAINTEXT|SSL|SASL_PLAINTEXT|SASL_SSL)", proto)
+		}
+	}
+	if strings.TrimSpace(configureKafkaSASLMechanism) != "" {
+		mech := strings.ToUpper(strings.TrimSpace(configureKafkaSASLMechanism))
+		switch mech {
+		case "PLAIN", "SCRAM-SHA-256", "SCRAM-SHA-512":
+			cfg.Group.KafkaSASLMechanism = mech
+		default:
+			return fmt.Errorf("invalid --kafka-sasl-mechanism: %s (expected PLAIN|SCRAM-SHA-256|SCRAM-SHA-512)", mech)
+		}
+	}
+	if strings.TrimSpace(configureKafkaSASLUsername) != "" {
+		cfg.Group.KafkaSASLUsername = strings.TrimSpace(configureKafkaSASLUsername)
+	}
+	if strings.TrimSpace(configureKafkaSASLPassword) != "" {
+		cfg.Group.KafkaSASLPassword = strings.TrimSpace(configureKafkaSASLPassword)
+	}
+	if strings.TrimSpace(configureKafkaTLSCAFile) != "" {
+		cfg.Group.KafkaTLSCAFile = strings.TrimSpace(configureKafkaTLSCAFile)
+	}
+	if strings.TrimSpace(configureKafkaTLSCertFile) != "" {
+		cfg.Group.KafkaTLSCertFile = strings.TrimSpace(configureKafkaTLSCertFile)
+	}
+	if strings.TrimSpace(configureKafkaTLSKeyFile) != "" {
+		cfg.Group.KafkaTLSKeyFile = strings.TrimSpace(configureKafkaTLSKeyFile)
+	}
+
+	if strings.HasPrefix(strings.ToUpper(strings.TrimSpace(cfg.Group.KafkaSecurityProto)), "SASL_") {
+		if strings.TrimSpace(cfg.Group.KafkaSASLMechanism) == "" || strings.TrimSpace(cfg.Group.KafkaSASLUsername) == "" || strings.TrimSpace(cfg.Group.KafkaSASLPassword) == "" {
+			return fmt.Errorf("group.kafkaSecurityProtocol=%s requires kafka sasl mechanism, username, and password", cfg.Group.KafkaSecurityProto)
+		}
+	}
+
 	if err := config.Save(cfg); err != nil {
 		return fmt.Errorf("save config: %w", err)
+	}
+
+	if configureJSON {
+		summary := map[string]any{
+			"status":  "ok",
+			"command": "configure",
+			"result": map[string]any{
+				"allowAgents":           cfg.Tools.Subagents.AllowAgents,
+				"skillsEnabled":         cfg.Skills.Enabled,
+				"skillsNodeManager":     cfg.Skills.NodeManager,
+				"skillsScope":           cfg.Skills.Scope,
+				"kafkaBrokers":          cfg.Group.KafkaBrokers,
+				"kafkaSecurityProtocol": cfg.Group.KafkaSecurityProto,
+				"kafkaSaslMechanism":    cfg.Group.KafkaSASLMechanism,
+				"kafkaSaslUsername":     cfg.Group.KafkaSASLUsername,
+				"kafkaTlsCAFile":        cfg.Group.KafkaTLSCAFile,
+				"kafkaTlsCertFile":      cfg.Group.KafkaTLSCertFile,
+				"kafkaTlsKeyFile":       cfg.Group.KafkaTLSKeyFile,
+			},
+		}
+		b, _ := json.MarshalIndent(summary, "", "  ")
+		fmt.Fprintln(cmd.OutOrStdout(), string(b))
+		return nil
 	}
 
 	state := "(current agent only)"
@@ -155,6 +240,13 @@ func runConfigure(cmd *cobra.Command, args []string) error {
 	fmt.Fprintf(cmd.OutOrStdout(), "Updated skills.enabled: %v\n", cfg.Skills.Enabled)
 	fmt.Fprintf(cmd.OutOrStdout(), "Updated skills.nodeManager: %s\n", cfg.Skills.NodeManager)
 	fmt.Fprintf(cmd.OutOrStdout(), "Updated skills.scope: %s\n", cfg.Skills.Scope)
+	fmt.Fprintf(cmd.OutOrStdout(), "Updated group.kafkaBrokers: %s\n", cfg.Group.KafkaBrokers)
+	fmt.Fprintf(cmd.OutOrStdout(), "Updated group.kafkaSecurityProtocol: %s\n", cfg.Group.KafkaSecurityProto)
+	fmt.Fprintf(cmd.OutOrStdout(), "Updated group.kafkaSaslMechanism: %s\n", cfg.Group.KafkaSASLMechanism)
+	fmt.Fprintf(cmd.OutOrStdout(), "Updated group.kafkaSaslUsername: %s\n", cfg.Group.KafkaSASLUsername)
+	fmt.Fprintf(cmd.OutOrStdout(), "Updated group.kafkaTlsCAFile: %s\n", cfg.Group.KafkaTLSCAFile)
+	fmt.Fprintf(cmd.OutOrStdout(), "Updated group.kafkaTlsCertFile: %s\n", cfg.Group.KafkaTLSCertFile)
+	fmt.Fprintf(cmd.OutOrStdout(), "Updated group.kafkaTlsKeyFile: %s\n", cfg.Group.KafkaTLSKeyFile)
 	return nil
 }
 

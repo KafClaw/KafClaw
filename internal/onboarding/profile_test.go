@@ -29,10 +29,14 @@ func TestApplyModeLocal(t *testing.T) {
 func TestApplyModeLocalKafka(t *testing.T) {
 	cfg := config.DefaultConfig()
 	err := applyMode(cfg, ModeLocalKafka, WizardParams{
-		KafkaBrokers: "localhost:9092",
-		GroupName:    "workshop",
-		AgentID:      "agent-1",
-		Role:         "orchestrator",
+		KafkaBrokers:  "localhost:9092",
+		KafkaSecurity: "SASL_SSL",
+		KafkaSASLMech: "SCRAM-SHA-256",
+		KafkaSASLUser: "svc-user",
+		KafkaSASLPass: "svc-pass",
+		GroupName:     "workshop",
+		AgentID:       "agent-1",
+		Role:          "orchestrator",
 	})
 	if err != nil {
 		t.Fatalf("apply mode local-kafka: %v", err)
@@ -45,6 +49,32 @@ func TestApplyModeLocalKafka(t *testing.T) {
 	}
 	if cfg.Group.GroupName != "workshop" {
 		t.Fatalf("unexpected group name: %q", cfg.Group.GroupName)
+	}
+	if cfg.Group.KafkaSecurityProto != "SASL_SSL" {
+		t.Fatalf("unexpected kafka security protocol: %q", cfg.Group.KafkaSecurityProto)
+	}
+	if cfg.Group.KafkaSASLMechanism != "SCRAM-SHA-256" {
+		t.Fatalf("unexpected kafka sasl mechanism: %q", cfg.Group.KafkaSASLMechanism)
+	}
+}
+
+func TestApplyModeLocalKafkaSASLRequiresCredentials(t *testing.T) {
+	cfg := config.DefaultConfig()
+	err := applyMode(cfg, ModeLocalKafka, WizardParams{
+		KafkaSecurity: "SASL_SSL",
+	})
+	if err == nil {
+		t.Fatal("expected SASL validation error")
+	}
+}
+
+func TestApplyModeLocalKafkaRejectsInvalidKafkaSecurity(t *testing.T) {
+	cfg := config.DefaultConfig()
+	err := applyMode(cfg, ModeLocalKafka, WizardParams{
+		KafkaSecurity: "INVALID",
+	})
+	if err == nil {
+		t.Fatal("expected invalid kafka security protocol error")
 	}
 }
 
@@ -154,6 +184,12 @@ func TestNormalizeHelpers(t *testing.T) {
 	}
 	if normalizeLLMPreset("token") != LLMPresetCLIToken {
 		t.Fatal("expected token -> cli-token")
+	}
+	if normalizeKafkaSecurityProtocol("sasl_plaintext") != "SASL_PLAINTEXT" {
+		t.Fatal("expected kafka security protocol normalization for sasl_plaintext")
+	}
+	if normalizeKafkaSecurityProtocol("bogus") != "" {
+		t.Fatal("expected unknown kafka security protocol to normalize to empty")
 	}
 }
 

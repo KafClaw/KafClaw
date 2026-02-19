@@ -1,10 +1,10 @@
 ---
-title: summarize
+title: Summarize
 parent: Skills
 nav_order: 3
 ---
 
-# summarize
+# Summarize
 
 Produce concise summaries of long technical artifacts.
 

@@ -1,10 +1,10 @@
 ---
-title: github
+title: GitHub
 parent: Skills
 nav_order: 4
 ---
 
-# github
+# GitHub
 
 Operate GitHub issues, pull requests, and checks safely.
 

@@ -17,15 +17,18 @@ Operator-focused guide for managing KafClaw from CLI and runtime endpoints.
 | `kafclaw doctor` | Run setup/config diagnostics including skills readiness checks |
 | `kafclaw security` | Unified security checks/audit/fix (`check`, `audit --deep`, `fix --yes`) |
 | `kafclaw config` | Low-level dotted-path config read/write/unset |
-| `kafclaw configure` | Guided/non-interactive config updates (subagents + skills toggles) |
-| `kafclaw skills` | Skills lifecycle (`enable/disable/list/status/verify/install/update/auth/prereq`) |
+| `kafclaw configure` | Guided/non-interactive config updates (subagents, skills, Kafka group security) |
+| `kafclaw skills` | Skills lifecycle (`enable/disable/list/status/enable-skill/disable-skill/verify/install/update/exec/auth/prereq`) |
 | `kafclaw group` | Join/leave/status/members for Kafka collaboration group |
 | `kafclaw kshark` | Kafka connectivity and protocol diagnostics |
 | `kafclaw agent -m` | Single-shot direct CLI interaction with agent loop |
 | `kafclaw pairing` | Approve/deny pending Slack/Teams sender pairings |
 | `kafclaw whatsapp-setup` | Configure WhatsApp auth and initial lists |
 | `kafclaw whatsapp-auth` | Approve/deny/list WhatsApp JIDs |
-| `kafclaw install` | Install binary to `/usr/local/bin` |
+| `kafclaw install` | Install local binary (`/usr/local/bin` as root, `~/.local/bin` as non-root) |
+| `kafclaw daemon` | Manage systemd service lifecycle (`install`, `uninstall`, `start`, `stop`, `restart`, `status`) |
+| `kafclaw update` | Update lifecycle (`plan`, `apply`, `backup`, `rollback`) |
+| `kafclaw completion` | Generate shell completion scripts (`bash|zsh|fish|powershell`) |
 | `kafclaw version` | Print build version |
 
 ## 2. First-Time Operator Runbook
@@ -42,7 +45,119 @@ Then verify:
 - API: `http://127.0.0.1:18790`
 - Dashboard: `http://127.0.0.1:18791`
 
-## 3. Onboarding and Modes
+## 3. Release Installer (Recommended for Operators)
+
+Install via release script (host OS/arch auto-detected):
+
+```bash
+curl --fail --show-error --silent --location \
+  https://raw.githubusercontent.com/kafclaw/kafclaw/main/scripts/install.sh \
+  | bash -s -- --latest
+```
+
+List available versions:
+
+```bash
+curl --fail --show-error --silent --location \
+  https://raw.githubusercontent.com/kafclaw/kafclaw/main/scripts/install.sh \
+  | bash -s -- --list-releases
+```
+
+Pinned install:
+
+```bash
+curl --fail --show-error --silent --location \
+  https://raw.githubusercontent.com/kafclaw/kafclaw/main/scripts/install.sh \
+  | bash -s -- --version v2.6.3
+```
+
+Unattended/headless install requires explicit version selection:
+
+```bash
+# Latest channel
+curl --fail --show-error --silent --location \
+  https://raw.githubusercontent.com/kafclaw/kafclaw/main/scripts/install.sh \
+  | bash -s -- --unattended --latest
+
+# Pinned version
+curl --fail --show-error --silent --location \
+  https://raw.githubusercontent.com/kafclaw/kafclaw/main/scripts/install.sh \
+  | bash -s -- --unattended --version v2.6.3
+```
+
+Security behavior:
+
+- Checksum verification (`SHA256SUMS`) is always required.
+- Signature verification (`cosign`) is enabled by default.
+- Use `--no-signature-verify` only in constrained environments where `cosign` is unavailable.
+- Installer failures use structured error codes (for example `INSTALL_PREREQ_MISSING`, `INSTALL_DOWNLOAD_FAILED`) and include remediation text.
+
+Root install behavior:
+
+- Installer warns that root service install is a security risk.
+- If accepted, it creates non-root user `kafclaw` (Linux) for service runtime.
+- If declined (`n`), installer continues with root runtime and prints `Installing as root service.`
+
+Install verification path (automatic at end of install):
+
+- version check (`kafclaw version` / `kafclaw --version`)
+- PATH check (whether `kafclaw` resolves from current shell)
+- status check when config exists (`~/.kafclaw/config.json`), otherwise prints onboarding reminder
+
+## 3.1 Update / Rollback Lifecycle
+
+Plan the flow:
+
+```bash
+./kafclaw update plan
+```
+
+Create backup snapshot only:
+
+```bash
+./kafclaw update backup
+```
+
+Apply binary update:
+
+```bash
+./kafclaw update apply --latest
+./kafclaw update apply --version v2.6.3
+```
+
+Apply source update:
+
+```bash
+./kafclaw update apply --source --repo-path /path/to/KafClaw
+```
+
+Rollback state from latest snapshot:
+
+```bash
+./kafclaw update rollback
+```
+
+Rollback state from specific snapshot:
+
+```bash
+./kafclaw update rollback --backup-path ~/.kafclaw/backups/update-YYYYMMDD-HHMMSSZ
+```
+
+`update apply` runs:
+
+- preflight compatibility checks (config + timeline migration readiness)
+- pre-update backup snapshot
+- update apply (binary/source path)
+- post-update health gates (`doctor`, security check)
+- config drift report
+
+Lifecycle event logs:
+
+- Critical onboarding/update/rollback phases append JSONL events to:
+  - `~/.kafclaw/lifecycle-events.jsonl`
+- Use this for troubleshooting automation/non-interactive lifecycle runs.
+
+## 4. Onboarding and Modes
 
 ### Interactive
 
@@ -77,7 +192,42 @@ Onboarding also scaffolds workspace files:
 
 Use `--force` to overwrite existing config and scaffold files.
 
-## 4. Daily Health Checks
+Lifecycle flags (operator-focused):
+
+```bash
+./kafclaw onboard --reset-scope config --non-interactive --accept-risk --profile local --llm skip
+./kafclaw onboard --wait-for-gateway --health-timeout 20s
+./kafclaw onboard --skip-healthcheck
+./kafclaw onboard --daemon-runtime native
+```
+
+If onboarding installs systemd (`--systemd`), service activation is automatic by default.
+Disable auto-activation with `--systemd-activate=false`.
+
+## 4.1 Daemon / Service Lifecycle (Linux systemd)
+
+Install service and activate immediately:
+
+```bash
+sudo ./kafclaw daemon install --activate
+```
+
+Service operations:
+
+```bash
+sudo ./kafclaw daemon status
+sudo ./kafclaw daemon restart
+sudo ./kafclaw daemon stop
+sudo ./kafclaw daemon start
+```
+
+Uninstall service:
+
+```bash
+sudo ./kafclaw daemon uninstall
+```
+
+## 5. Daily Health Checks
 
 ### Status snapshot
 
@@ -104,7 +254,7 @@ Highlights include:
 When skills are enabled, doctor also checks `node`, `clawhub` (if external installs are enabled), runtime dir permissions, and channel-onboarding readiness.
 Use `kafclaw security` for consolidated security posture and deep skill audits.
 
-## 5. Config Management
+## 6. Config Management
 
 ### Low-level config edits
 
@@ -123,6 +273,7 @@ Use `kafclaw security` for consolidated security posture and deep skill audits.
 ./kafclaw configure --non-interactive --skills-enabled-set --skills-enabled=true --skills-node-manager npm
 ./kafclaw configure --non-interactive --skills-scope selected
 ./kafclaw configure --non-interactive --enable-skill github --disable-skill weather
+./kafclaw configure --non-interactive --kafka-brokers "broker1:9092,broker2:9092" --kafka-security-protocol SASL_SSL --kafka-sasl-mechanism SCRAM-SHA-512 --kafka-sasl-username "<username>" --kafka-sasl-password "<password>" --kafka-tls-ca-file "/path/to/ca.pem"
 ```
 
 Skills policy defaults:
@@ -155,7 +306,7 @@ Direct config edits:
 ./kafclaw config set model.name "anthropic/claude-sonnet-4-5"
 ```
 
-## 6. Group Collaboration Operations
+## 7. Group Collaboration Operations
 
 ```bash
 ./kafclaw group join mygroup
@@ -178,6 +329,18 @@ Using onboarding profile:
 ./kafclaw onboard --non-interactive --profile local-kafka --kafka-brokers "broker1:9092,broker2:9092" --group-name kafclaw --agent-id agent-ops --role worker --llm skip
 ```
 
+Using onboarding profile with broker security:
+
+```bash
+./kafclaw onboard --non-interactive --profile local-kafka --llm skip \
+  --kafka-brokers "broker1:9092,broker2:9092" \
+  --kafka-security-protocol SASL_SSL \
+  --kafka-sasl-mechanism SCRAM-SHA-512 \
+  --kafka-sasl-username "<username>" \
+  --kafka-sasl-password "<password>" \
+  --kafka-tls-ca-file "/path/to/ca.pem"
+```
+
 Using direct config commands:
 
 ```bash
@@ -186,6 +349,27 @@ Using direct config commands:
 ./kafclaw config set group.kafkaBrokers "broker1:9092,broker2:9092"
 ./kafclaw config set group.consumerGroup "kafclaw-workers"
 ./kafclaw config set group.agentId "agent-ops"
+```
+
+Kafka security options are optional. Plaintext/non-mTLS installs continue to work by default.
+
+Direct broker security (Confluent/Redpanda-style SASL/SSL):
+
+```bash
+./kafclaw config set group.kafkaSecurityProtocol "SASL_SSL"
+./kafclaw config set group.kafkaSaslMechanism "PLAIN"
+./kafclaw config set group.kafkaSaslUsername "<username>"
+./kafclaw config set group.kafkaSaslPassword "<password>"
+./kafclaw config set group.kafkaTlsCAFile "/path/to/ca.pem"
+```
+
+Mutual TLS (when required by cluster policy):
+
+```bash
+./kafclaw config set group.kafkaSecurityProtocol "SSL"
+./kafclaw config set group.kafkaTlsCAFile "/path/to/ca.pem"
+./kafclaw config set group.kafkaTlsCertFile "/path/to/client-cert.pem"
+./kafclaw config set group.kafkaTlsKeyFile "/path/to/client-key.pem"
 ```
 
 Using KafScale proxy style settings:
@@ -203,7 +387,9 @@ Verification:
 ./kafclaw kshark --auto --yes
 ```
 
-## 7. Kafka Diagnostics with KShark
+`kshark --auto` now reads the same group Kafka security settings used by runtime group consumers.
+
+## 8. Kafka Diagnostics with KShark
 
 Auto-config from current KafClaw group config:
 
@@ -223,7 +409,7 @@ Useful options:
 - `--diag` include traceroute/MTU diagnostics
 - `--preset` for predefined connection templates
 
-## 8. Channel Auth and Pairing
+## 9. Channel Auth and Pairing
 
 ### Pairing queue (Slack/Teams)
 
@@ -242,7 +428,7 @@ Useful options:
 ./kafclaw whatsapp-auth --deny "+123456789@s.whatsapp.net"
 ```
 
-## 9. Channel Bridge (`cmd/channelbridge`)
+## 10. Channel Bridge (`cmd/channelbridge`)
 
 Build and run:
 

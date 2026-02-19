@@ -1,10 +1,10 @@
 ---
-title: incident-comms
+title: Incident Comms
 parent: Skills
 nav_order: 10
 ---
 
-# incident-comms
+# Incident Comms
 
 Generate and send standardized incident communications.
 

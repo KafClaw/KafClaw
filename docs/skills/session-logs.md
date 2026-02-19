@@ -1,10 +1,10 @@
 ---
-title: session-logs
+title: Session Logs
 parent: Skills
 nav_order: 2
 ---
 
-# session-logs
+# Session Logs
 
 Analyze session logs to explain failures, regressions, and behavior drift.
 

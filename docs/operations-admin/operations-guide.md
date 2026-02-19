@@ -83,7 +83,7 @@ WhatsApp/CLI/Web/Scheduler --> Message Bus --> Agent Loop --> LLM Provider
 | `make build` | Build the `kafclaw` binary |
 | `make run` | Build and run the gateway |
 | `make rerun` | Kill ports 18790/18791, rebuild, run |
-| `make install` | Install via `kafclaw install` |
+| `make install` | Install local binary via `kafclaw install` |
 | `make test` | `go test ./...` |
 | `make test-smoke` | Fast critical-path smoke tests |
 | `make test-critical` | Enforce 100% critical logic coverage |
@@ -144,8 +144,10 @@ Container mounts:
 ### System Install
 
 ```bash
-kafclaw install      # copies to /usr/local/bin
+kafclaw install      # root: /usr/local/bin, non-root: ~/.local/bin
 ```
+
+For release-binary install flows (`--latest`, `--version`, `--list-releases`, unattended, signature verification), see [KafClaw Management Guide](../operations-admin/manage-kafclaw/).
 
 ### Deployment Modes
 

@@ -73,7 +73,14 @@ Guided alternative:
 
 ## Service Operation (Linux systemd)
 
-If installed as system service:
+Preferred (CLI-managed):
+
+```bash
+sudo ./kafclaw daemon status
+sudo ./kafclaw daemon restart
+```
+
+Direct `systemctl` fallback:
 
 ```bash
 sudo systemctl daemon-reload

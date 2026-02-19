@@ -1,10 +1,10 @@
 ---
-title: google-workspace
+title: Google Workspace
 parent: Skills
 nav_order: 8
 ---
 
-# google-workspace
+# Google Workspace
 
 Headless OAuth flow for Google Workspace integrations.
 
