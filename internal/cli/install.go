@@ -28,24 +28,20 @@ func runInstall(cmd *cobra.Command, args []string) {
 		return
 	}
 
-	script := filepath.Join(filepath.Dir(exe), "scripts", "install.sh")
-	if _, err := os.Stat(script); err == nil {
-		cmdRun := exec.Command("bash", script, exe)
-		cmdRun.Stdout = os.Stdout
-		cmdRun.Stderr = os.Stderr
-		if err := cmdRun.Run(); err != nil {
-			fmt.Printf("Install failed: %v\n", err)
-		}
+	targetDir := "/usr/local/bin"
+	if os.Geteuid() != 0 {
+		targetDir = filepath.Join(os.Getenv("HOME"), ".local", "bin")
+	}
+	if err := os.MkdirAll(targetDir, 0o755); err != nil {
+		fmt.Printf("Install failed: %v\n", err)
 		return
 	}
-
-	targetDir := "/usr/local/bin"
 	targetPath := filepath.Join(targetDir, "kafclaw")
 	cmdCopy := exec.Command("cp", exe, targetPath)
 	cmdCopy.Stdout = os.Stdout
 	cmdCopy.Stderr = os.Stderr
 	if err := cmdCopy.Run(); err != nil {
-		fmt.Printf("Install failed (try with sudo): %v\n", err)
+		fmt.Printf("Install failed: %v\n", err)
 		return
 	}
 	fmt.Printf("Installed to %s\n", targetPath)
