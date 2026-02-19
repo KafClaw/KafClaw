@@ -13,6 +13,7 @@ Primary command groups:
 - `kafclaw config` / `kafclaw configure` - low-level and guided config changes
 - `kafclaw agent -m` - one-shot interaction
 - `kafclaw install` - install local built binary (`/usr/local/bin` root, `~/.local/bin` non-root)
+- `kafclaw update` - update lifecycle (`plan`, `apply`, `backup`, `rollback`)
 - `kafclaw completion` - generate shell completion scripts
 - `kafclaw whatsapp-setup` / `kafclaw whatsapp-auth` - WhatsApp setup and auth controls
 - `kafclaw pairing` - Slack/Teams pairing approvals

@@ -26,6 +26,7 @@ Operator-focused guide for managing KafClaw from CLI and runtime endpoints.
 | `kafclaw whatsapp-setup` | Configure WhatsApp auth and initial lists |
 | `kafclaw whatsapp-auth` | Approve/deny/list WhatsApp JIDs |
 | `kafclaw install` | Install local binary (`/usr/local/bin` as root, `~/.local/bin` as non-root) |
+| `kafclaw update` | Update lifecycle (`plan`, `apply`, `backup`, `rollback`) |
 | `kafclaw completion` | Generate shell completion scripts (`bash|zsh|fish|powershell`) |
 | `kafclaw version` | Print build version |
 
@@ -101,6 +102,53 @@ Install verification path (automatic at end of install):
 - version check (`kafclaw version` / `kafclaw --version`)
 - PATH check (whether `kafclaw` resolves from current shell)
 - status check when config exists (`~/.kafclaw/config.json`), otherwise prints onboarding reminder
+
+## 3.1 Update / Rollback Lifecycle
+
+Plan the flow:
+
+```bash
+./kafclaw update plan
+```
+
+Create backup snapshot only:
+
+```bash
+./kafclaw update backup
+```
+
+Apply binary update:
+
+```bash
+./kafclaw update apply --latest
+./kafclaw update apply --version v2.6.3
+```
+
+Apply source update:
+
+```bash
+./kafclaw update apply --source --repo-path /path/to/KafClaw
+```
+
+Rollback state from latest snapshot:
+
+```bash
+./kafclaw update rollback
+```
+
+Rollback state from specific snapshot:
+
+```bash
+./kafclaw update rollback --backup-path ~/.kafclaw/backups/update-YYYYMMDD-HHMMSSZ
+```
+
+`update apply` runs:
+
+- preflight compatibility checks (config + timeline migration readiness)
+- pre-update backup snapshot
+- update apply (binary/source path)
+- post-update health gates (`doctor`, security check)
+- config drift report
 
 ## 4. Onboarding and Modes
 
