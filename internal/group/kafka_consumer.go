@@ -14,6 +14,7 @@ type KafkaConsumer struct {
 	brokers       string
 	consumerGroup string
 	topics        []string
+	dialer        *kafka.Dialer
 	readers       []*kafka.Reader
 	messages      chan ConsumerMessage
 	ctx           context.Context
@@ -28,6 +29,13 @@ func NewKafkaConsumer(brokers, consumerGroup string, topics []string) *KafkaCons
 		topics:        topics,
 		messages:      make(chan ConsumerMessage, 100),
 	}
+}
+
+// NewKafkaConsumerWithDialer creates a Kafka consumer with an explicit dialer.
+func NewKafkaConsumerWithDialer(brokers, consumerGroup string, topics []string, dialer *kafka.Dialer) *KafkaConsumer {
+	c := NewKafkaConsumer(brokers, consumerGroup, topics)
+	c.dialer = dialer
+	return c
 }
 
 // Start begins consuming from all configured topics.
@@ -69,6 +77,7 @@ func (c *KafkaConsumer) startReader(ctx context.Context, brokerList []string, to
 		GroupID:  c.consumerGroup,
 		MinBytes: 1,
 		MaxBytes: 10e6,
+		Dialer:   c.dialer,
 	})
 
 	c.mu.Lock()

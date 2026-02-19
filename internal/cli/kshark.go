@@ -204,8 +204,30 @@ func propsFromConfig() (map[string]string, error) {
 		"bootstrap.servers": brokers,
 	}
 
-	// If LFS proxy API key is set, assume SASL/PLAIN over SSL (KafScale convention).
-	if cfg.Group.LFSProxyAPIKey != "" {
+	if v := strings.TrimSpace(cfg.Group.KafkaSecurityProto); v != "" {
+		props["security.protocol"] = strings.ToUpper(v)
+	}
+	if v := strings.TrimSpace(cfg.Group.KafkaSASLMechanism); v != "" {
+		props["sasl.mechanism"] = strings.ToUpper(v)
+	}
+	if v := strings.TrimSpace(cfg.Group.KafkaSASLUsername); v != "" {
+		props["sasl.username"] = v
+	}
+	if v := strings.TrimSpace(cfg.Group.KafkaSASLPassword); v != "" {
+		props["sasl.password"] = v
+	}
+	if v := strings.TrimSpace(cfg.Group.KafkaTLSCAFile); v != "" {
+		props["ssl.ca.location"] = v
+	}
+	if v := strings.TrimSpace(cfg.Group.KafkaTLSCertFile); v != "" {
+		props["ssl.certificate.location"] = v
+	}
+	if v := strings.TrimSpace(cfg.Group.KafkaTLSKeyFile); v != "" {
+		props["ssl.key.location"] = v
+	}
+
+	// Backward-compatible KafScale convention fallback.
+	if cfg.Group.LFSProxyAPIKey != "" && props["sasl.password"] == "" {
 		props["security.protocol"] = "SASL_SSL"
 		props["sasl.mechanism"] = "PLAIN"
 		props["sasl.username"] = "token"

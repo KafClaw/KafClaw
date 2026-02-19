@@ -207,10 +207,18 @@ func runGatewayMain(cmd *cobra.Command, args []string) {
 				consumerGroup = fmt.Sprintf("kafclaw-%s", hostname)
 			}
 		}
-		kafkaConsumer := group.NewKafkaConsumer(
+		dialer, err := group.BuildKafkaDialerFromGroupConfig(grpCfg)
+		if err != nil {
+			fmt.Printf("⚠️ Kafka consumer config error: %v\n", err)
+			fmt.Println("⚠️ Group router not started until Kafka security settings are fixed.")
+			kafkaCancel()
+			return func() {}
+		}
+		kafkaConsumer := group.NewKafkaConsumerWithDialer(
 			grpCfg.KafkaBrokers,
 			consumerGroup,
 			extTopics.AllTopics(),
+			dialer,
 		)
 		grpState.SetConsumer(kafkaConsumer)
 		router := group.NewGroupRouter(mgr, msgBus, kafkaConsumer)

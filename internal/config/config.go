@@ -306,6 +306,13 @@ type GroupConfig struct {
 	LFSProxyURL        string `json:"lfsProxyUrl" envconfig:"KAFSCALE_LFS_PROXY_URL"`
 	LFSProxyAPIKey     string `json:"lfsProxyApiKey" envconfig:"KAFSCALE_LFS_PROXY_API_KEY"`
 	KafkaBrokers       string `json:"kafkaBrokers" envconfig:"KAFKA_BROKERS"`
+	KafkaSecurityProto string `json:"kafkaSecurityProtocol" envconfig:"KAFKA_SECURITY_PROTOCOL"` // PLAINTEXT|SSL|SASL_PLAINTEXT|SASL_SSL
+	KafkaSASLMechanism string `json:"kafkaSaslMechanism" envconfig:"KAFKA_SASL_MECHANISM"`       // PLAIN|SCRAM-SHA-256|SCRAM-SHA-512
+	KafkaSASLUsername  string `json:"kafkaSaslUsername" envconfig:"KAFKA_SASL_USERNAME"`
+	KafkaSASLPassword  string `json:"kafkaSaslPassword" envconfig:"KAFKA_SASL_PASSWORD"`
+	KafkaTLSCAFile     string `json:"kafkaTlsCAFile" envconfig:"KAFKA_TLS_CA_FILE"`
+	KafkaTLSCertFile   string `json:"kafkaTlsCertFile" envconfig:"KAFKA_TLS_CERT_FILE"`
+	KafkaTLSKeyFile    string `json:"kafkaTlsKeyFile" envconfig:"KAFKA_TLS_KEY_FILE"`
 	ConsumerGroup      string `json:"consumerGroup" envconfig:"KAFKA_CONSUMER_GROUP"`
 	AgentID            string `json:"agentId" envconfig:"AGENT_ID"`
 	PollIntervalMs     int    `json:"pollIntervalMs" envconfig:"POLL_INTERVAL_MS"`
