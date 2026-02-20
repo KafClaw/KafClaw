@@ -125,11 +125,16 @@ func runGatewayMain(cmd *cobra.Command, args []string) {
 	msgBus := bus.NewMessageBus()
 
 	// 4. Setup Providers
-	oaProv := provider.NewOpenAIProvider(cfg.Providers.OpenAI.APIKey, cfg.Providers.OpenAI.APIBase, cfg.Model.Name)
-	var prov provider.LLMProvider = oaProv
+	prov, provErr := provider.Resolve(cfg, "main")
+	if provErr != nil {
+		fmt.Printf("Provider error: %v\n", provErr)
+		os.Exit(1)
+	}
 
 	if cfg.Providers.LocalWhisper.Enabled {
-		prov = provider.NewLocalWhisperProvider(cfg.Providers.LocalWhisper, oaProv)
+		if oaProv, ok := prov.(*provider.OpenAIProvider); ok {
+			prov = provider.NewLocalWhisperProvider(cfg.Providers.LocalWhisper, oaProv)
+		}
 	}
 
 	// 4b. Setup Policy Engine
