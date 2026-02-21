@@ -245,8 +245,8 @@ Uses `internal/secrets` for encryption. Token files land at `<ToolsDir>/auth/pro
 ### 11 — Doctor + Status
 
 - [x] `internal/cliconfig/doctor.go` — add per-provider readiness checks: credential configured, CLI tools present
-- [ ] `internal/cli/status.go` — surface active provider ID and model per agent in status output
-- [ ] Remediation hints per failure type (missing CLI, expired token, bad URL, wrong key)
+- [x] `internal/cli/status.go` — surface active provider ID and model per agent in status output
+- [x] Remediation hints per failure type (missing CLI, expired token, bad URL, wrong key)
 
 ### 13 — Token Stats & Quota (`internal/provider/`, `internal/timeline/`, `internal/cli/`)
 
@@ -296,19 +296,19 @@ type Usage struct {
 - [x] `kafclaw models stats` command — print table: provider | today tokens | today requests | remaining tokens | remaining requests | reset at
 - [x] `kafclaw models stats --days 7` — print per-day per-provider trend from timeline DB
 - [x] `kafclaw models stats --json` — machine-readable output
-- [ ] Doctor check: warn if `RemainingTokens < 10%` of `LimitTokens` for any provider (using cached last-seen value)
-- [ ] `status` output: include today's total tokens + active provider rate limit remaining inline
+- [x] Doctor check: warn if `RemainingTokens < 10%` of `LimitTokens` for any provider (using cached last-seen value)
+- [x] `status` output: include today's total tokens + active provider rate limit remaining inline
 
 ### 12 — Security + Tests
 
-- [ ] Ensure credentials never appear in logs or status output (mask/redact) — both API keys (tomb) and OAuth tokens (encrypted blob)
-- [ ] `security check` already covers `auth/*/token.json` encryption — extend walk to include `auth/providers/*/token.json`
+- [x] Ensure credentials never appear in logs or status output (mask/redact) — both API keys (tomb) and OAuth tokens (encrypted blob)
+- [x] `security check` already covers `auth/*/token.json` encryption — extend walk to include `auth/providers/*/token.json`
 - [x] Unit tests for resolver: selection, alias normalization, fallback chain, error on missing config
-- [ ] Unit tests for credential store: encrypt/decrypt roundtrip, expiry, missing file
-- [ ] Unit tests for per-agent model spec parsing
-- [ ] Unit tests for `secrets.EncryptBlob`/`DecryptBlob` after extraction (verify no regression in skills OAuth)
-- [ ] Unit tests for rate limit header parsing: present, missing, malformed values
-- [ ] Unit tests for `GetDailyTokenUsageByProvider` and `GetTokenUsageSummary`
+- [x] Unit tests for credential store: encrypt/decrypt roundtrip, expiry, missing file
+- [x] Unit tests for per-agent model spec parsing
+- [x] Unit tests for `secrets.EncryptBlob`/`DecryptBlob` after extraction (verify no regression in skills OAuth)
+- [x] Unit tests for rate limit header parsing: present, missing, malformed values
+- [x] Unit tests for `GetDailyTokenUsageByProvider` and `GetTokenUsageSummary`
 - [x] Unit test for in-memory rate limit cache: concurrent update + read safety
 
 ### 14 — Chat Middleware Chain (`internal/provider/middleware/`)
@@ -531,10 +531,10 @@ Post-LLM middleware that attaches dollar cost per request based on provider pric
 - [x] Create `internal/provider/middleware/finops.go` — implements `ChatMiddleware`
 - [x] `ProcessRequest`: no-op
 - [x] `ProcessResponse`: calculate cost, set `meta.CostUSD`, budget warnings
-- [ ] Add `cost_usd REAL DEFAULT 0` column to `tasks` table (best-effort migration)
-- [ ] Extend `UpdateTaskTokensWithProvider` to write `cost_usd`
-- [ ] `kafclaw models stats` — add cost column to output when finops is enabled
-- [ ] `kafclaw models stats --days 7` — include cost per day per provider
+- [x] Add `cost_usd REAL DEFAULT 0` column to `tasks` table (best-effort migration)
+- [x] Extend `UpdateTaskTokensWithProvider` to write `cost_usd`
+- [x] `kafclaw models stats` — add cost column to output when finops is enabled
+- [x] `kafclaw models stats --days 7` — include cost per day per provider
 
 ### 19 — Task-Type Model Routing in Resolver (`internal/provider/resolver.go`)
 
@@ -561,7 +561,7 @@ Extend the resolver to dynamically select a model based on `TaskAssessment.Categ
 
 - [x] Add `TaskRouting map[string]string` to `ModelConfig` (`internal/config/config.go`)
 - [x] Add `ResolveWithTaskType(cfg *config.Config, agentID string, taskCategory string) (LLMProvider, error)` to `internal/provider/resolver.go`
-- [ ] Wire into `agent/loop.go`: call `agent.AssessTask(message)` early, pass `assessment.Category` to `ResolveWithTaskType` on first iteration
+- [x] Wire into `agent/loop.go`: call `agent.AssessTask(message)` early, pass `assessment.Category` to `ResolveWithTaskType` on first iteration
 - [ ] Log task-type routing decisions to timeline span metadata for observability
 
 ---

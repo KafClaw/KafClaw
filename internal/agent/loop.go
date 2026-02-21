@@ -358,6 +358,26 @@ func (l *Loop) ProcessDirectWithTrace(ctx context.Context, content, sessionKey, 
 	if l.cfg != nil && len(l.cfg.Model.TaskRouting) > 0 {
 		assessment := AssessTask(content)
 		if routed, err := provider.ResolveWithTaskType(l.cfg, l.agentID, assessment.Category); err == nil && routed != l.provider {
+			slog.Info("Task-type routing applied", "category", assessment.Category, "agent", l.agentID)
+			if l.timeline != nil && l.activeTraceID != "" {
+				routeMeta, _ := json.Marshal(map[string]string{
+					"category":       assessment.Category,
+					"cognitive_mode": assessment.CognitiveMode,
+					"agent_id":       l.agentID,
+				})
+				_ = l.timeline.AddEvent(&timeline.TimelineEvent{
+					EventID:        fmt.Sprintf("ROUTE_%s_%d", l.activeTraceID, time.Now().UnixNano()),
+					TraceID:        l.activeTraceID,
+					Timestamp:      time.Now(),
+					SenderID:       "AGENT",
+					SenderName:     "TaskRouter",
+					EventType:      "SYSTEM",
+					ContentText:    fmt.Sprintf("task-type routing: category=%s", assessment.Category),
+					Classification: "ROUTING",
+					Authorized:     true,
+					Metadata:       string(routeMeta),
+				})
+			}
 			origProvider := l.chain.Provider
 			l.chain.Provider = routed
 			defer func() { l.chain.Provider = origProvider }()
@@ -1163,6 +1183,9 @@ func (l *Loop) runAgentLoop(ctx context.Context, messages []provider.Message) (s
 		// TOKEN TRACKING (H-013): record usage
 		l.trackTokens(resp.Usage)
 
+		// Log middleware security events to timeline
+		l.logMiddlewareEvents(meta, i)
+
 		// Build LLM span summary
 		toolCallSummary := ""
 		if len(resp.ToolCalls) > 0 {
@@ -1508,6 +1531,76 @@ func (l *Loop) approvalTimeout() time.Duration {
 		return 60 * time.Second
 	}
 	return time.Duration(seconds) * time.Second
+}
+
+// logMiddlewareEvents logs security-relevant middleware actions to timeline.
+func (l *Loop) logMiddlewareEvents(meta *middleware.RequestMeta, iteration int) {
+	if meta == nil || l.timeline == nil || l.activeTraceID == "" {
+		return
+	}
+
+	// Prompt guard block
+	if meta.Blocked {
+		slog.Warn("Prompt guard blocked request", "reason", meta.BlockReason, "sender", meta.SenderID, "channel", meta.Channel)
+		eventMeta, _ := json.Marshal(map[string]string{
+			"block_reason": meta.BlockReason,
+			"sender_id":    meta.SenderID,
+			"channel":      meta.Channel,
+			"message_type": meta.MessageType,
+		})
+		_ = l.timeline.AddEvent(&timeline.TimelineEvent{
+			EventID:        fmt.Sprintf("GUARD_%s_%d_%d", l.activeTraceID, iteration, time.Now().UnixNano()),
+			TraceID:        l.activeTraceID,
+			Timestamp:      time.Now(),
+			SenderID:       meta.SenderID,
+			SenderName:     "PromptGuard",
+			EventType:      "SECURITY",
+			ContentText:    fmt.Sprintf("prompt guard blocked: %s", meta.BlockReason),
+			Classification: "BLOCKED",
+			Authorized:     false,
+			Metadata:       string(eventMeta),
+		})
+		return
+	}
+
+	// Prompt guard warnings (tagged but not blocked)
+	if mode, ok := meta.Tags["prompt_guard"]; ok {
+		slog.Info("Prompt guard triggered", "mode", mode, "sender", meta.SenderID)
+		eventMeta, _ := json.Marshal(meta.Tags)
+		_ = l.timeline.AddEvent(&timeline.TimelineEvent{
+			EventID:        fmt.Sprintf("GUARD_%s_%d_%d", l.activeTraceID, iteration, time.Now().UnixNano()),
+			TraceID:        l.activeTraceID,
+			Timestamp:      time.Now(),
+			SenderID:       meta.SenderID,
+			SenderName:     "PromptGuard",
+			EventType:      "SECURITY",
+			ContentText:    fmt.Sprintf("prompt guard: mode=%s", mode),
+			Classification: "GUARD",
+			Authorized:     true,
+			Metadata:       string(eventMeta),
+		})
+	}
+
+	// Output sanitizer actions
+	if action, ok := meta.Tags["output_sanitized"]; ok {
+		slog.Info("Output sanitized", "action", action)
+		eventMeta, _ := json.Marshal(map[string]string{
+			"action":  action,
+			"channel": meta.Channel,
+		})
+		_ = l.timeline.AddEvent(&timeline.TimelineEvent{
+			EventID:        fmt.Sprintf("SANITIZE_%s_%d_%d", l.activeTraceID, iteration, time.Now().UnixNano()),
+			TraceID:        l.activeTraceID,
+			Timestamp:      time.Now(),
+			SenderID:       "AGENT",
+			SenderName:     "OutputSanitizer",
+			EventType:      "SECURITY",
+			ContentText:    fmt.Sprintf("output sanitized: %s", action),
+			Classification: "SANITIZED",
+			Authorized:     true,
+			Metadata:       string(eventMeta),
+		})
+	}
 }
 
 // trackTokens persists token usage for the active task.
