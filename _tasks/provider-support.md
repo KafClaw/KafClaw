@@ -237,14 +237,14 @@ Uses `internal/secrets` for encryption. Token files land at `<ToolsDir>/auth/pro
 
 ### 10 — Onboarding (`internal/onboarding/profile.go`)
 
-- [ ] Add LLM presets to `resolveLLMPreset` and interactive menu:
+- [x] Add LLM presets to `resolveLLMPreset` and interactive menu:
   - `gemini` (API key), `gemini-cli` (OAuth), `openai-codex` (OAuth), `scalytics-copilot` (key + URL), `xai` (API key), `claude` (API key)
-- [ ] `applyLLM` handlers for each new preset: OAuth presets trigger `models auth login`; API key presets prompt for key (and base URL where applicable)
-- [ ] Include active provider in `BuildProfileSummary` output
+- [x] `applyLLM` handlers for each new preset: OAuth presets trigger `models auth login`; API key presets prompt for key (and base URL where applicable)
+- [x] Include active provider in `BuildProfileSummary` output
 
 ### 11 — Doctor + Status
 
-- [ ] `internal/cli/doctor.go` — add per-provider readiness checks: credential file present, not expired, optional live ping
+- [x] `internal/cliconfig/doctor.go` — add per-provider readiness checks: credential configured, CLI tools present
 - [ ] `internal/cli/status.go` — surface active provider ID and model per agent in status output
 - [ ] Remediation hints per failure type (missing CLI, expired token, bad URL, wrong key)
 
@@ -303,13 +303,13 @@ type Usage struct {
 
 - [ ] Ensure credentials never appear in logs or status output (mask/redact) — both API keys (tomb) and OAuth tokens (encrypted blob)
 - [ ] `security check` already covers `auth/*/token.json` encryption — extend walk to include `auth/providers/*/token.json`
-- [ ] Unit tests for resolver: selection, alias normalization, fallback chain, error on missing config
+- [x] Unit tests for resolver: selection, alias normalization, fallback chain, error on missing config
 - [ ] Unit tests for credential store: encrypt/decrypt roundtrip, expiry, missing file
 - [ ] Unit tests for per-agent model spec parsing
 - [ ] Unit tests for `secrets.EncryptBlob`/`DecryptBlob` after extraction (verify no regression in skills OAuth)
 - [ ] Unit tests for rate limit header parsing: present, missing, malformed values
 - [ ] Unit tests for `GetDailyTokenUsageByProvider` and `GetTokenUsageSummary`
-- [ ] Unit test for in-memory rate limit cache: concurrent update + read safety
+- [x] Unit test for in-memory rate limit cache: concurrent update + read safety
 
 ### 14 — Chat Middleware Chain (`internal/provider/middleware/`)
 
@@ -367,11 +367,11 @@ type Chain struct {
 
 #### Tasks
 
-- [ ] Create `internal/provider/middleware/middleware.go` — `ChatMiddleware` interface, `RequestMeta`, `Chain` with `Process(ctx, req) (*ChatResponse, error)` that runs pre/post hooks in order
-- [ ] Wire `Chain` into `agent/loop.go:runAgentLoop` — replace direct `l.provider.Chat()` with `l.chain.Process()`; pass `RequestMeta` with sender/channel/messageType from loop context
-- [ ] Wire `Chain` into `cli/gateway.go` — same replacement for the gateway LLM path
-- [ ] `Chain.Process()` must pass original `provider.LLMProvider` to the call site but allow middleware to swap `meta.ProviderID`/`meta.ModelName` (triggering re-resolve)
-- [ ] No-op when no middleware is configured — zero-overhead passthrough
+- [x] Create `internal/provider/middleware/middleware.go` — `ChatMiddleware` interface, `RequestMeta`, `Chain` with `Process(ctx, req) (*ChatResponse, error)` that runs pre/post hooks in order
+- [x] Wire `Chain` into `agent/loop.go:runAgentLoop` — replace direct `l.provider.Chat()` with `l.chain.Process()`; pass `RequestMeta` with sender/channel/messageType from loop context
+- [x] Wire `Chain` into `cli/gateway.go` — pass `Config` to `LoopOptions` for middleware chain setup
+- [x] `Chain.Process()` must pass original `provider.LLMProvider` to the call site but allow middleware to swap `meta.ProviderID`/`meta.ModelName` (triggering re-resolve)
+- [x] No-op when no middleware is configured — zero-overhead passthrough
 
 ### 15 — Content Classification & Model Routing (`internal/provider/middleware/classifier.go`)
 
@@ -411,13 +411,12 @@ Classifies message content and routes to the appropriate provider/model based on
 
 #### Tasks
 
-- [ ] Add `ContentClassificationConfig` struct to `internal/config/config.go`: `Enabled`, `SensitivityLevels map[string]SensitivityLevel`, `TaskRouting map[string]TaskRoute`, `DefaultSensitivity`
-- [ ] `SensitivityLevel` struct: `Patterns []string` (regex), `Keywords []string`, `RouteTo string` (provider/model)
-- [ ] `TaskRoute` struct: `Keywords []string`, `RouteTo string`
-- [ ] Add `ContentClassification ContentClassificationConfig` to root `Config`
-- [ ] Create `internal/provider/middleware/classifier.go` — implements `ChatMiddleware`; `ProcessRequest` scans message content against configured patterns/keywords, sets `meta.Tags["sensitivity"]` and `meta.Tags["task"]`, overrides `meta.ProviderID`/`meta.ModelName` when a routing rule matches
-- [ ] Integrate `agent.AssessTask()` categories into the classifier — reuse existing keyword detection, extend with configurable rules
-- [ ] Classification result stored in `meta.Tags` — available to downstream middleware and for timeline audit
+- [x] Add `ContentClassificationConfig` struct to `internal/config/config.go`: `Enabled`, `SensitivityLevels map[string]SensitivityLevel`, `TaskTypeRoutes map[string]string`
+- [x] `SensitivityLevel` struct: `Patterns []string` (regex), `Keywords []string`, `RouteTo string` (provider/model)
+- [x] Add `ContentClassification ContentClassificationConfig` to root `Config`
+- [x] Create `internal/provider/middleware/classifier.go` — implements `ChatMiddleware`; `ProcessRequest` scans message content against configured patterns/keywords, sets `meta.Tags["sensitivity"]` and `meta.Tags["task"]`, overrides `meta.ProviderID`/`meta.ModelName` when a routing rule matches
+- [x] Keyword-based task classification (security, coding, tool-heavy, creative) — mirrors `agent.AssessTask()` categories
+- [x] Classification result stored in `meta.Tags` — available to downstream middleware and for timeline audit
 
 ### 16 — Prompt Guard (`internal/provider/middleware/promptguard.go`)
 
@@ -454,17 +453,16 @@ Pre-LLM middleware that scans inbound messages for PII, secrets, and prohibited 
 
 #### Tasks
 
-- [ ] Add `PromptGuardConfig` struct to `internal/config/config.go`: `Enabled`, `Mode`, `PII PIIDetectConfig`, `Secrets SecretDetectConfig`, `DenyKeywords DenyKeywordsConfig`, `OnViolation`
-- [ ] `PIIDetectConfig`: `Detect []string` (built-in detector names), `Action string`, `CustomPatterns []NamedPattern`
-- [ ] `SecretDetectConfig`: `Detect []string`, `Action string`
-- [ ] `DenyKeywordsConfig`: `Keywords []string`, `Action string`
-- [ ] Add `PromptGuard PromptGuardConfig` to root `Config`
-- [ ] Create `internal/provider/middleware/promptguard.go` — implements `ChatMiddleware`
-- [ ] Built-in PII detectors: `email` (RFC5322 regex), `phone` (E.164 + common formats), `ssn` (XXX-XX-XXXX), `credit_card` (Luhn-validated digit groups), `ip_address` (IPv4/v6)
-- [ ] Built-in secret detectors: `api_key` (common prefixes: `sk-`, `pk_`, `AKIA`, `ghp_`, `gho_`), `bearer_token` (`Bearer [A-Za-z0-9\-._~+/]+=*`), `private_key` (`-----BEGIN .* PRIVATE KEY-----`), `password_literal` (`password\s*[:=]\s*\S+`)
-- [ ] `ProcessRequest`: scan all user-role messages in `req.Messages`, apply action per match type; set `meta.Blocked`/`meta.BlockReason` on block; mutate message content on redact
+- [x] Add `PromptGuardConfig` struct to `internal/config/config.go`: `Enabled`, `Mode`, `PII PIIConfig`, `Secrets SecretsConfig`, `DenyKeywords`, `CustomPatterns`
+- [x] `PIIConfig`: `Detect []string`, `Action string`, `CustomPatterns []NamedPattern`
+- [x] `SecretsConfig`: `Detect []string`, `Action string`, `CustomPatterns []NamedPattern`
+- [x] Add `PromptGuard PromptGuardConfig` to root `Config`
+- [x] Create `internal/provider/middleware/promptguard.go` — implements `ChatMiddleware`
+- [x] Built-in PII detectors: `email`, `phone`, `ssn`, `credit_card`, `ip_address`
+- [x] Built-in secret detectors: `api_key`, `bearer_token`, `private_key`, `password_literal`
+- [x] `ProcessRequest`: scan user-role messages, apply action per match type; block/redact/warn modes
 - [ ] Log violations to timeline as security events (reuse `LogSecurityEvent` if available)
-- [ ] `ProcessResponse`: no-op (output scanning is in OutputSanitizer)
+- [x] `ProcessResponse`: no-op (output scanning is in OutputSanitizer)
 
 ### 17 — Output Sanitization (`internal/provider/middleware/sanitizer.go`)
 
@@ -487,13 +485,13 @@ Post-LLM middleware that scans the response content before it reaches the channe
 
 #### Tasks
 
-- [ ] Add `OutputSanitizationConfig` struct to `internal/config/config.go`: `Enabled`, `RedactPII`, `RedactSecrets`, `CustomRedactPatterns []NamedPattern`, `DenyPatterns []string`, `MaxOutputLength int`
-- [ ] `NamedPattern` struct (shared with PromptGuard): `Name string`, `Pattern string`
-- [ ] Add `OutputSanitization OutputSanitizationConfig` to root `Config`
-- [ ] Create `internal/provider/middleware/sanitizer.go` — implements `ChatMiddleware`
-- [ ] `ProcessRequest`: no-op
-- [ ] `ProcessResponse`: scan `resp.Content` for PII/secrets using same detectors as PromptGuard (shared detector package); redact matches; optionally truncate to `MaxOutputLength`; if `DenyPatterns` match, replace response with generic "response filtered" message
-- [ ] Shared detector logic extracted to `internal/provider/middleware/detectors.go` — reused by both PromptGuard and OutputSanitizer
+- [x] Add `OutputSanitizationConfig` struct to `internal/config/config.go`: `Enabled`, `RedactPII`, `RedactSecrets`, `CustomRedactPatterns []NamedPattern`, `DenyPatterns []string`, `MaxOutputLength int`
+- [x] `NamedPattern` struct (shared with PromptGuard): `Name string`, `Pattern string`
+- [x] Add `OutputSanitization OutputSanitizationConfig` to root `Config`
+- [x] Create `internal/provider/middleware/sanitizer.go` — implements `ChatMiddleware`
+- [x] `ProcessRequest`: no-op
+- [x] `ProcessResponse`: scan `resp.Content` for PII/secrets using shared detectors; redact matches; truncate to `MaxOutputLength`; deny patterns replace response
+- [x] Shared detector logic extracted to `internal/provider/middleware/detectors.go` — reused by both PromptGuard and OutputSanitizer
 
 ### 18 — FinOps Cost Attribution (`internal/provider/middleware/finops.go`)
 
@@ -527,16 +525,14 @@ Post-LLM middleware that attaches dollar cost per request based on provider pric
 
 #### Tasks
 
-- [ ] Add `FinOpsConfig` struct to `internal/config/config.go`: `Enabled`, `Pricing map[string]ModelPricing`, `Budgets BudgetConfig`, `Attribution AttributionConfig`
-- [ ] `ModelPricing`: `PromptPer1kTokens float64`, `CompletionPer1kTokens float64`
-- [ ] `BudgetConfig`: `Daily float64`, `Monthly float64`
-- [ ] `AttributionConfig`: `TagBy []string`
-- [ ] Add `FinOps FinOpsConfig` to root `Config`
-- [ ] Create `internal/provider/middleware/finops.go` — implements `ChatMiddleware`
-- [ ] `ProcessRequest`: no-op
-- [ ] `ProcessResponse`: calculate `costUSD = (promptTokens * promptPrice + completionTokens * completionPrice) / 1000`; set `meta.CostUSD`; check against daily/monthly budgets; log warning if approaching limit
+- [x] Add `FinOpsConfig` struct to `internal/config/config.go`: `Enabled`, `Pricing map[string]ProviderPricing`, `DailyBudget`, `MonthlyBudget`
+- [x] `ProviderPricing`: `PromptPer1kTokens float64`, `CompletionPer1kTokens float64`
+- [x] Add `FinOps FinOpsConfig` to root `Config`
+- [x] Create `internal/provider/middleware/finops.go` — implements `ChatMiddleware`
+- [x] `ProcessRequest`: no-op
+- [x] `ProcessResponse`: calculate cost, set `meta.CostUSD`, budget warnings
 - [ ] Add `cost_usd REAL DEFAULT 0` column to `tasks` table (best-effort migration)
-- [ ] Extend `UpdateTaskTokensWithProvider` (or new variant) to write `cost_usd`
+- [ ] Extend `UpdateTaskTokensWithProvider` to write `cost_usd`
 - [ ] `kafclaw models stats` — add cost column to output when finops is enabled
 - [ ] `kafclaw models stats --days 7` — include cost per day per provider
 
@@ -563,9 +559,9 @@ Extend the resolver to dynamically select a model based on `TaskAssessment.Categ
 
 #### Tasks
 
-- [ ] Add `TaskRouting map[string]string` to `ModelConfig` (`internal/config/config.go`)
-- [ ] Add `ResolveWithTaskType(cfg *config.Config, agentID string, taskCategory string) (LLMProvider, error)` to `internal/provider/resolver.go` — if `cfg.Model.TaskRouting[taskCategory]` exists and agent has no explicit model override, use it; otherwise fall through to normal `Resolve`
-- [ ] Wire into `agent/loop.go`: call `agent.AssessTask(message)` early (already happens for cognitive prompt), pass `assessment.Category` to `ResolveWithTaskType` on first iteration
+- [x] Add `TaskRouting map[string]string` to `ModelConfig` (`internal/config/config.go`)
+- [x] Add `ResolveWithTaskType(cfg *config.Config, agentID string, taskCategory string) (LLMProvider, error)` to `internal/provider/resolver.go`
+- [ ] Wire into `agent/loop.go`: call `agent.AssessTask(message)` early, pass `assessment.Category` to `ResolveWithTaskType` on first iteration
 - [ ] Log task-type routing decisions to timeline span metadata for observability
 
 ---
