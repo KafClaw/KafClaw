@@ -79,6 +79,8 @@ func NewTimelineService(dbPath string) (*TimelineService, error) {
 	// Best-effort migration: add provider and model columns to tasks table.
 	_, _ = db.Exec(`ALTER TABLE tasks ADD COLUMN provider_id TEXT DEFAULT ''`)
 	_, _ = db.Exec(`ALTER TABLE tasks ADD COLUMN model_name TEXT DEFAULT ''`)
+	// Best-effort migration: add cost_usd column to tasks table.
+	_, _ = db.Exec(`ALTER TABLE tasks ADD COLUMN cost_usd REAL DEFAULT 0`)
 	// Best-effort migration: policy_decisions table.
 	_, _ = db.Exec(`CREATE TABLE IF NOT EXISTS policy_decisions (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -788,6 +790,15 @@ func (s *TimelineService) UpdateTaskTokensWithProvider(taskID string, prompt, co
 		model_name = CASE WHEN model_name = '' OR model_name IS NULL THEN ? ELSE model_name END,
 		updated_at = datetime('now')
 	WHERE task_id = ?`, prompt, completion, total, providerID, model, taskID)
+	return err
+}
+
+// UpdateTaskCost adds cost attribution to a task.
+func (s *TimelineService) UpdateTaskCost(taskID string, costUSD float64) error {
+	_, err := s.db.Exec(`UPDATE tasks SET
+		cost_usd = cost_usd + ?,
+		updated_at = datetime('now')
+	WHERE task_id = ?`, costUSD, taskID)
 	return err
 }
 
