@@ -206,9 +206,9 @@ func TestSealAndLoadEnvSecrets_Roundtrip(t *testing.T) {
 	}
 
 	secrets := map[string]string{
-		"API_KEY":    "sk-12345",
-		"DB_PASS":    "hunter2",
-		"EMPTY_VAL":  "",
+		"API_KEY":   "sk-12345",
+		"DB_PASS":   "hunter2",
+		"EMPTY_VAL": "",
 	}
 
 	if err := SealEnvSecretsIntoTombDoc(doc, secrets); err != nil {

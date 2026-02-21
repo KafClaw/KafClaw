@@ -303,20 +303,20 @@ func applyLLM(cfg *config.Config, preset LLMPreset, reader *bufio.Reader, out io
 
 	case LLMPresetClaude:
 		return applyAPIKeyPreset(cfg, reader, out, p, applyAPIKeyOpts{
-			providerLabel:  "Claude/Anthropic",
-			envVar:         "ANTHROPIC_API_KEY",
-			defaultModel:   "claude/claude-sonnet-4-5-20250514",
-			setKey:         func(c *config.Config, k string) { c.Providers.Anthropic.APIKey = k },
-			modelPrefix:    "claude",
+			providerLabel: "Claude/Anthropic",
+			envVar:        "ANTHROPIC_API_KEY",
+			defaultModel:  "claude/claude-sonnet-4-5-20250514",
+			setKey:        func(c *config.Config, k string) { c.Providers.Anthropic.APIKey = k },
+			modelPrefix:   "claude",
 		})
 
 	case LLMPresetGemini:
 		return applyAPIKeyPreset(cfg, reader, out, p, applyAPIKeyOpts{
-			providerLabel:  "Gemini",
-			envVar:         "GEMINI_API_KEY",
-			defaultModel:   "gemini/gemini-2.5-pro",
-			setKey:         func(c *config.Config, k string) { c.Providers.Gemini.APIKey = k },
-			modelPrefix:    "gemini",
+			providerLabel: "Gemini",
+			envVar:        "GEMINI_API_KEY",
+			defaultModel:  "gemini/gemini-2.5-pro",
+			setKey:        func(c *config.Config, k string) { c.Providers.Gemini.APIKey = k },
+			modelPrefix:   "gemini",
 		})
 
 	case LLMPresetGeminiCLI:
@@ -331,38 +331,38 @@ func applyLLM(cfg *config.Config, preset LLMPreset, reader *bufio.Reader, out io
 
 	case LLMPresetXAI:
 		return applyAPIKeyPreset(cfg, reader, out, p, applyAPIKeyOpts{
-			providerLabel:  "xAI/Grok",
-			envVar:         "XAI_API_KEY",
-			defaultModel:   "xai/grok-3",
-			setKey:         func(c *config.Config, k string) { c.Providers.XAI.APIKey = k },
-			modelPrefix:    "xai",
+			providerLabel: "xAI/Grok",
+			envVar:        "XAI_API_KEY",
+			defaultModel:  "xai/grok-3",
+			setKey:        func(c *config.Config, k string) { c.Providers.XAI.APIKey = k },
+			modelPrefix:   "xai",
 		})
 
 	case LLMPresetOpenRouter:
 		return applyAPIKeyPreset(cfg, reader, out, p, applyAPIKeyOpts{
-			providerLabel:  "OpenRouter",
-			envVar:         "OPENROUTER_API_KEY",
-			defaultModel:   "openrouter/anthropic/claude-sonnet-4-5",
-			setKey:         func(c *config.Config, k string) { c.Providers.OpenRouter.APIKey = k },
-			modelPrefix:    "openrouter",
+			providerLabel: "OpenRouter",
+			envVar:        "OPENROUTER_API_KEY",
+			defaultModel:  "openrouter/anthropic/claude-sonnet-4-5",
+			setKey:        func(c *config.Config, k string) { c.Providers.OpenRouter.APIKey = k },
+			modelPrefix:   "openrouter",
 		})
 
 	case LLMPresetDeepSeek:
 		return applyAPIKeyPreset(cfg, reader, out, p, applyAPIKeyOpts{
-			providerLabel:  "DeepSeek",
-			envVar:         "DEEPSEEK_API_KEY",
-			defaultModel:   "deepseek/deepseek-chat",
-			setKey:         func(c *config.Config, k string) { c.Providers.DeepSeek.APIKey = k },
-			modelPrefix:    "deepseek",
+			providerLabel: "DeepSeek",
+			envVar:        "DEEPSEEK_API_KEY",
+			defaultModel:  "deepseek/deepseek-chat",
+			setKey:        func(c *config.Config, k string) { c.Providers.DeepSeek.APIKey = k },
+			modelPrefix:   "deepseek",
 		})
 
 	case LLMPresetGroq:
 		return applyAPIKeyPreset(cfg, reader, out, p, applyAPIKeyOpts{
-			providerLabel:  "Groq",
-			envVar:         "GROQ_API_KEY",
-			defaultModel:   "groq/llama-3.3-70b-versatile",
-			setKey:         func(c *config.Config, k string) { c.Providers.Groq.APIKey = k },
-			modelPrefix:    "groq",
+			providerLabel: "Groq",
+			envVar:        "GROQ_API_KEY",
+			defaultModel:  "groq/llama-3.3-70b-versatile",
+			setKey:        func(c *config.Config, k string) { c.Providers.Groq.APIKey = k },
+			modelPrefix:   "groq",
 		})
 
 	case LLMPresetScalyticsCopilot:

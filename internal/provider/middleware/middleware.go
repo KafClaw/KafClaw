@@ -25,16 +25,16 @@ type ChatMiddleware interface {
 
 // RequestMeta carries mutable context through the chain.
 type RequestMeta struct {
-	ProviderID       string            // resolved provider; middleware can override
-	ModelName        string            // resolved model; middleware can override
-	SenderID         string            // who sent the message
-	Channel          string            // e.g. "telegram", "discord", "cli"
-	MessageType      string            // "internal" / "external"
-	Tags             map[string]string // classification tags (e.g. "sensitivity":"pii", "task":"coding")
-	Blocked          bool              // set by PromptGuard to abort
-	BlockReason      string            // reason for blocking
+	ProviderID       string               // resolved provider; middleware can override
+	ModelName        string               // resolved model; middleware can override
+	SenderID         string               // who sent the message
+	Channel          string               // e.g. "telegram", "discord", "cli"
+	MessageType      string               // "internal" / "external"
+	Tags             map[string]string    // classification tags (e.g. "sensitivity":"pii", "task":"coding")
+	Blocked          bool                 // set by PromptGuard to abort
+	BlockReason      string               // reason for blocking
 	ProviderOverride provider.LLMProvider // middleware can swap the provider
-	CostUSD          float64           // set by FinOps recorder
+	CostUSD          float64              // set by FinOps recorder
 }
 
 // NewRequestMeta creates a RequestMeta with initialized Tags map.

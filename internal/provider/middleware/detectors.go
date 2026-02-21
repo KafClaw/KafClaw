@@ -9,10 +9,10 @@ import (
 
 // DetectorMatch represents a single detection hit.
 type DetectorMatch struct {
-	Type    string // e.g. "email", "ssn", "api_key"
-	Value   string // the matched text
-	Start   int    // byte offset in source string
-	End     int    // byte offset end
+	Type  string // e.g. "email", "ssn", "api_key"
+	Value string // the matched text
+	Start int    // byte offset in source string
+	End   int    // byte offset end
 }
 
 // Detector scans text for sensitive patterns.

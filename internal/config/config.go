@@ -6,23 +6,23 @@ import "time"
 // Config is the root configuration struct.
 // Top-level groups: Paths, Model, Channels, Providers, Gateway, Tools.
 type Config struct {
-	Paths                 PathsConfig                `json:"paths"`
-	Model                 ModelConfig                `json:"model"`
-	Agents                *AgentsConfig              `json:"agents,omitempty"`
-	Channels              ChannelsConfig             `json:"channels"`
-	Providers             ProvidersConfig            `json:"providers"`
-	Gateway               GatewayConfig              `json:"gateway"`
-	Tools                 ToolsConfig                `json:"tools"`
-	Skills                SkillsConfig               `json:"skills"`
-	Group                 GroupConfig                `json:"group"`
-	Orchestrator          OrchestratorConfig         `json:"orchestrator"`
-	Scheduler             SchedulerConfig            `json:"scheduler"`
-	ER1                   ER1IntegrationConfig       `json:"er1"`
-	Observer              ObserverMemoryConfig       `json:"observer"`
+	Paths                 PathsConfig                 `json:"paths"`
+	Model                 ModelConfig                 `json:"model"`
+	Agents                *AgentsConfig               `json:"agents,omitempty"`
+	Channels              ChannelsConfig              `json:"channels"`
+	Providers             ProvidersConfig             `json:"providers"`
+	Gateway               GatewayConfig               `json:"gateway"`
+	Tools                 ToolsConfig                 `json:"tools"`
+	Skills                SkillsConfig                `json:"skills"`
+	Group                 GroupConfig                 `json:"group"`
+	Orchestrator          OrchestratorConfig          `json:"orchestrator"`
+	Scheduler             SchedulerConfig             `json:"scheduler"`
+	ER1                   ER1IntegrationConfig        `json:"er1"`
+	Observer              ObserverMemoryConfig        `json:"observer"`
 	ContentClassification ContentClassificationConfig `json:"contentClassification"`
-	PromptGuard           PromptGuardConfig          `json:"promptGuard"`
-	OutputSanitization    OutputSanitizationConfig   `json:"outputSanitization"`
-	FinOps                FinOpsConfig               `json:"finops"`
+	PromptGuard           PromptGuardConfig           `json:"promptGuard"`
+	OutputSanitization    OutputSanitizationConfig    `json:"outputSanitization"`
+	FinOps                FinOpsConfig                `json:"finops"`
 }
 
 // ---------------------------------------------------------------------------
@@ -193,16 +193,16 @@ type MSTeamsAccountConfig struct {
 
 // ProvidersConfig contains LLM provider configurations.
 type ProvidersConfig struct {
-	Anthropic       ProviderConfig     `json:"anthropic"`
-	OpenAI          ProviderConfig     `json:"openai"`
-	LocalWhisper    LocalWhisperConfig `json:"localWhisper"`
-	OpenRouter      ProviderConfig     `json:"openrouter"`
-	DeepSeek        ProviderConfig     `json:"deepseek"`
-	Groq            ProviderConfig     `json:"groq"`
-	Gemini          ProviderConfig     `json:"gemini"`
-	VLLM            ProviderConfig     `json:"vllm"`
-	XAI             ProviderConfig     `json:"xai"`
-	ScalyticsCopilot ProviderConfig    `json:"scalyticsCopilot"`
+	Anthropic        ProviderConfig     `json:"anthropic"`
+	OpenAI           ProviderConfig     `json:"openai"`
+	LocalWhisper     LocalWhisperConfig `json:"localWhisper"`
+	OpenRouter       ProviderConfig     `json:"openrouter"`
+	DeepSeek         ProviderConfig     `json:"deepseek"`
+	Groq             ProviderConfig     `json:"groq"`
+	Gemini           ProviderConfig     `json:"gemini"`
+	VLLM             ProviderConfig     `json:"vllm"`
+	XAI              ProviderConfig     `json:"xai"`
+	ScalyticsCopilot ProviderConfig     `json:"scalyticsCopilot"`
 }
 
 // ProviderConfig contains settings for a single LLM provider.
@@ -462,12 +462,12 @@ type SecretsConfig struct {
 
 // OutputSanitizationConfig controls post-LLM response filtering.
 type OutputSanitizationConfig struct {
-	Enabled             bool           `json:"enabled"`
-	RedactPII           bool           `json:"redactPII"`
-	RedactSecrets       bool           `json:"redactSecrets"`
+	Enabled              bool           `json:"enabled"`
+	RedactPII            bool           `json:"redactPII"`
+	RedactSecrets        bool           `json:"redactSecrets"`
 	CustomRedactPatterns []NamedPattern `json:"customRedactPatterns,omitempty"`
-	DenyPatterns        []string       `json:"denyPatterns,omitempty"`
-	MaxOutputLength     int            `json:"maxOutputLength,omitempty"`
+	DenyPatterns         []string       `json:"denyPatterns,omitempty"`
+	MaxOutputLength      int            `json:"maxOutputLength,omitempty"`
 }
 
 // ProviderPricing holds per-1k-token pricing for a provider.

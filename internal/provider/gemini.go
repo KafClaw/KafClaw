@@ -122,8 +122,8 @@ func (p *GeminiProvider) setAuth(req *http.Request) error {
 // --- Gemini request/response types ---
 
 type geminiRequest struct {
-	Contents         []geminiContent        `json:"contents"`
-	Tools            []geminiTool           `json:"tools,omitempty"`
+	Contents         []geminiContent         `json:"contents"`
+	Tools            []geminiTool            `json:"tools,omitempty"`
 	GenerationConfig *geminiGenerationConfig `json:"generationConfig,omitempty"`
 }
 
