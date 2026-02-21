@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
+	"strings"
 	"time"
 )
 
@@ -19,8 +21,13 @@ type LFSClient struct {
 
 // NewLFSClient creates a new LFS proxy client.
 func NewLFSClient(baseURL, apiKey string) *LFSClient {
+	// Validate URL scheme to prevent request forgery via arbitrary protocols.
+	base := strings.TrimRight(baseURL, "/")
+	if u, err := url.Parse(base); err != nil || (u.Scheme != "http" && u.Scheme != "https") {
+		base = "http://localhost:0" // safe fallback — will fail on connect
+	}
 	return &LFSClient{
-		baseURL: baseURL,
+		baseURL: base,
 		apiKey:  apiKey,
 		httpClient: &http.Client{
 			Timeout: 30 * time.Second,

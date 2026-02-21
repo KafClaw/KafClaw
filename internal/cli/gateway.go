@@ -665,6 +665,7 @@ func runGatewayMain(cmd *cobra.Command, args []string) {
 				Metadata:       string(outMeta),
 			})
 			fmt.Printf("📤 Local outbound status=sent session=%s\n", session)
+			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 			fmt.Fprint(w, resp)
 		})
 
@@ -2547,8 +2548,8 @@ func runGatewayMain(cmd *cobra.Command, args []string) {
 			w.Header().Set("Content-Type", "application/json")
 
 			repo := resolveRepo(r)
-			rel := strings.TrimSpace(r.URL.Query().Get("path"))
-			if rel == "" {
+			rel := filepath.Clean(strings.TrimSpace(r.URL.Query().Get("path")))
+			if rel == "" || rel == "." {
 				http.Error(w, "path required", http.StatusBadRequest)
 				return
 			}
@@ -2674,8 +2675,8 @@ func runGatewayMain(cmd *cobra.Command, args []string) {
 				return
 			}
 			branch := strings.TrimSpace(body.Branch)
-			if branch == "" {
-				http.Error(w, "branch required", http.StatusBadRequest)
+			if branch == "" || strings.HasPrefix(branch, "-") {
+				http.Error(w, "invalid branch name", http.StatusBadRequest)
 				return
 			}
 			out, err := runGit(resolveRepo(r), "checkout", branch)
@@ -2693,6 +2694,10 @@ func runGatewayMain(cmd *cobra.Command, args []string) {
 			limit := strings.TrimSpace(r.URL.Query().Get("limit"))
 			if limit == "" {
 				limit = "20"
+			}
+			if n, err := strconv.Atoi(limit); err != nil || n < 1 || n > 500 {
+				http.Error(w, "limit must be a number between 1 and 500", http.StatusBadRequest)
+				return
 			}
 			out, err := runGit(resolveRepo(r), "log", "--oneline", "-n", limit)
 			if err != nil {
@@ -2713,9 +2718,9 @@ func runGatewayMain(cmd *cobra.Command, args []string) {
 		mux.HandleFunc("/api/v1/repo/diff-file", func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Access-Control-Allow-Origin", "*")
 			w.Header().Set("Content-Type", "application/json")
-			rel := strings.TrimSpace(r.URL.Query().Get("path"))
-			if rel == "" {
-				http.Error(w, "path required", http.StatusBadRequest)
+			rel := filepath.Clean(strings.TrimSpace(r.URL.Query().Get("path")))
+			if rel == "" || rel == "." || strings.HasPrefix(rel, "-") {
+				http.Error(w, "invalid path", http.StatusBadRequest)
 				return
 			}
 			out, err := runGit(resolveRepo(r), "diff", "--", rel)
@@ -2730,9 +2735,9 @@ func runGatewayMain(cmd *cobra.Command, args []string) {
 		mux.HandleFunc("/api/v1/repo/diff", func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Access-Control-Allow-Origin", "*")
 			w.Header().Set("Content-Type", "application/json")
-			rel := strings.TrimSpace(r.URL.Query().Get("path"))
+			rel := filepath.Clean(strings.TrimSpace(r.URL.Query().Get("path")))
 			args := []string{"diff"}
-			if rel != "" {
+			if rel != "" && rel != "." && !strings.HasPrefix(rel, "-") {
 				args = append(args, "--", rel)
 			}
 			out, err := runGit(resolveRepo(r), args...)
@@ -2834,9 +2839,10 @@ func runGatewayMain(cmd *cobra.Command, args []string) {
 			} else if warn != "" {
 				fmt.Printf("Work repo warning: %s\n", warn)
 			}
-			if strings.TrimSpace(body.RemoteURL) != "" {
+			remoteURL := strings.TrimSpace(body.RemoteURL)
+			if remoteURL != "" && !strings.HasPrefix(remoteURL, "-") {
 				_, _ = runGit(repo, "remote", "remove", "origin")
-				if _, err := runGit(repo, "remote", "add", "origin", strings.TrimSpace(body.RemoteURL)); err != nil {
+				if _, err := runGit(repo, "remote", "add", "origin", remoteURL); err != nil {
 					http.Error(w, err.Error(), http.StatusInternalServerError)
 					return
 				}

@@ -265,7 +265,11 @@ func (m *Manager) List() []SessionInfo {
 
 func (m *Manager) sessionPath(key string) string {
 	safeKey := strings.ReplaceAll(key, ":", "_")
-	return filepath.Join(m.sessionsDir, safeKey+".jsonl")
+	// Strip path separators and traversal components to prevent path injection.
+	safeKey = strings.ReplaceAll(safeKey, "/", "_")
+	safeKey = strings.ReplaceAll(safeKey, "\\", "_")
+	safeKey = strings.ReplaceAll(safeKey, "..", "_")
+	return filepath.Join(m.sessionsDir, filepath.Base(safeKey)+".jsonl")
 }
 
 func (m *Manager) load(key string) *Session {

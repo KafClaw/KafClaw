@@ -14,6 +14,7 @@ func EnsureWorkRepo(path string) (string, error) {
 	if path == "" {
 		return "", fmt.Errorf("work repo path is empty")
 	}
+	path = filepath.Clean(path)
 	if err := os.MkdirAll(path, 0755); err != nil {
 		return "", err
 	}
