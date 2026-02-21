@@ -804,9 +804,10 @@ func (s *TimelineService) UpdateTaskCost(taskID string, costUSD float64) error {
 
 // ProviderDayStat holds per-provider per-day token usage.
 type ProviderDayStat struct {
-	ProviderID string `json:"provider_id"`
-	Day        string `json:"day"`
-	Tokens     int    `json:"tokens"`
+	ProviderID string  `json:"provider_id"`
+	Day        string  `json:"day"`
+	Tokens     int     `json:"tokens"`
+	CostUSD    float64 `json:"cost_usd"`
 }
 
 // GetDailyTokenUsageByProvider returns today's token usage grouped by provider.
@@ -832,9 +833,32 @@ func (s *TimelineService) GetDailyTokenUsageByProvider() (map[string]int, error)
 	return out, rows.Err()
 }
 
+// GetDailyCostByProvider returns today's cost grouped by provider.
+func (s *TimelineService) GetDailyCostByProvider() (map[string]float64, error) {
+	rows, err := s.db.Query(`SELECT COALESCE(provider_id,''), COALESCE(SUM(cost_usd),0)
+		FROM tasks WHERE created_at >= date('now') GROUP BY provider_id`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string]float64{}
+	for rows.Next() {
+		var prov string
+		var cost float64
+		if err := rows.Scan(&prov, &cost); err != nil {
+			return nil, err
+		}
+		if prov == "" {
+			prov = "unknown"
+		}
+		out[prov] = cost
+	}
+	return out, rows.Err()
+}
+
 // GetTokenUsageSummary returns per-provider per-day totals for the last N days.
 func (s *TimelineService) GetTokenUsageSummary(days int) ([]ProviderDayStat, error) {
-	rows, err := s.db.Query(`SELECT COALESCE(provider_id,''), date(created_at), COALESCE(SUM(total_tokens),0)
+	rows, err := s.db.Query(`SELECT COALESCE(provider_id,''), date(created_at), COALESCE(SUM(total_tokens),0), COALESCE(SUM(cost_usd),0)
 		FROM tasks WHERE created_at >= date('now', ? || ' days')
 		GROUP BY provider_id, date(created_at)
 		ORDER BY date(created_at), provider_id`, -days)
@@ -845,7 +869,7 @@ func (s *TimelineService) GetTokenUsageSummary(days int) ([]ProviderDayStat, err
 	var out []ProviderDayStat
 	for rows.Next() {
 		var s ProviderDayStat
-		if err := rows.Scan(&s.ProviderID, &s.Day, &s.Tokens); err != nil {
+		if err := rows.Scan(&s.ProviderID, &s.Day, &s.Tokens, &s.CostUSD); err != nil {
 			return nil, err
 		}
 		if s.ProviderID == "" {

@@ -274,9 +274,13 @@ func runModelsStats(_ *cobra.Command, _ []string) {
 			_ = enc.Encode(summary)
 			return
 		}
-		fmt.Printf("%-15s %-12s %s\n", "PROVIDER", "DAY", "TOKENS")
+		fmt.Printf("%-15s %-12s %-10s %s\n", "PROVIDER", "DAY", "TOKENS", "COST")
 		for _, s := range summary {
-			fmt.Printf("%-15s %-12s %d\n", s.ProviderID, s.Day, s.Tokens)
+			costStr := "-"
+			if s.CostUSD > 0 {
+				costStr = fmt.Sprintf("$%.4f", s.CostUSD)
+			}
+			fmt.Printf("%-15s %-12s %-10d %s\n", s.ProviderID, s.Day, s.Tokens, costStr)
 		}
 		return
 	}
@@ -290,10 +294,13 @@ func runModelsStats(_ *cobra.Command, _ []string) {
 
 	totalToday, _ := tl.GetDailyTokenUsage()
 
+	costByProvider, _ := tl.GetDailyCostByProvider()
+
 	if statsJSON {
 		out := map[string]any{
 			"today_total":       totalToday,
 			"today_by_provider": byProvider,
+			"today_cost":        costByProvider,
 			"rate_limits":       provider.AllRateLimitSnapshots(),
 		}
 		enc := json.NewEncoder(os.Stdout)
@@ -304,9 +311,13 @@ func runModelsStats(_ *cobra.Command, _ []string) {
 
 	fmt.Printf("Today's token usage: %d\n\n", totalToday)
 	if len(byProvider) > 0 {
-		fmt.Printf("%-20s %s\n", "PROVIDER", "TOKENS")
+		fmt.Printf("%-20s %-10s %s\n", "PROVIDER", "TOKENS", "COST")
 		for prov, tokens := range byProvider {
-			fmt.Printf("%-20s %d\n", prov, tokens)
+			costStr := "-"
+			if c, ok := costByProvider[prov]; ok && c > 0 {
+				costStr = fmt.Sprintf("$%.4f", c)
+			}
+			fmt.Printf("%-20s %-10d %s\n", prov, tokens, costStr)
 		}
 	}
 
