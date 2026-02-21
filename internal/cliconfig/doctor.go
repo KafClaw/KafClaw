@@ -14,6 +14,7 @@ import (
 
 	"github.com/KafClaw/KafClaw/internal/channels"
 	"github.com/KafClaw/KafClaw/internal/config"
+	"github.com/KafClaw/KafClaw/internal/provider"
 	skillruntime "github.com/KafClaw/KafClaw/internal/skills"
 )
 
@@ -302,6 +303,7 @@ func RunDoctorWithOptions(opts DoctorOptions) (DoctorReport, error) {
 		})
 	}
 
+	appendRateLimitDoctorChecks(&report)
 	appendSkillsDoctorChecks(&report, cfg, opts)
 
 	return report, nil
@@ -877,6 +879,25 @@ func appendProviderDoctorChecks(report *DoctorReport, cfg *config.Config) {
 			Status:  DoctorPass,
 			Message: "codex CLI found in PATH",
 		})
+	}
+}
+
+func appendRateLimitDoctorChecks(report *DoctorReport) {
+	snapshots := provider.AllRateLimitSnapshots()
+	if len(snapshots) == 0 {
+		return
+	}
+	for provID, snap := range snapshots {
+		if snap.RemainingTokens != nil && snap.LimitTokens != nil && *snap.LimitTokens > 0 {
+			pct := float64(*snap.RemainingTokens) / float64(*snap.LimitTokens) * 100
+			if pct < 10 {
+				report.Checks = append(report.Checks, DoctorCheck{
+					Name:    fmt.Sprintf("rate_limit_%s", provID),
+					Status:  DoctorWarn,
+					Message: fmt.Sprintf("%s: only %d/%d tokens remaining (%.0f%%)", provID, *snap.RemainingTokens, *snap.LimitTokens, pct),
+				})
+			}
+		}
 	}
 }
 
