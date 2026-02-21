@@ -2549,12 +2549,12 @@ func runGatewayMain(cmd *cobra.Command, args []string) {
 
 			repo := resolveRepo(r)
 			rel := filepath.Clean(strings.TrimSpace(r.URL.Query().Get("path")))
-			if rel == "" || rel == "." {
+			if rel == "" || rel == "." || strings.Contains(rel, "..") {
 				http.Error(w, "path required", http.StatusBadRequest)
 				return
 			}
 			full := filepath.Join(repo, rel)
-			if !isWithin(repo, full) {
+			if verified, err := filepath.Rel(repo, full); err != nil || strings.HasPrefix(verified, "..") {
 				http.Error(w, "path outside repo", http.StatusBadRequest)
 				return
 			}
@@ -3467,15 +3467,27 @@ func listRepoTree(root, repoRoot string) ([]RepoItem, error) {
 	return items, err
 }
 
+// gitSubcommands is the allowlist of git subcommands accepted by runGit.
+var gitSubcommands = map[string]bool{
+	"status": true, "branch": true, "checkout": true, "log": true,
+	"diff": true, "add": true, "commit": true, "pull": true,
+	"push": true, "remote": true, "init": true,
+}
+
 func runGit(repo string, args ...string) (string, error) {
 	if repo == "" {
 		return "", fmt.Errorf("work repo not configured")
 	}
-	cmd := exec.Command("git", args...)
+	if len(args) == 0 || !gitSubcommands[args[0]] {
+		return "", fmt.Errorf("git subcommand not allowed: %v", args)
+	}
+	sanitized := make([]string, len(args))
+	copy(sanitized, args)
+	cmd := exec.Command("git", sanitized...)
 	cmd.Dir = repo
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		return "", fmt.Errorf("git %s failed: %s", strings.Join(args, " "), strings.TrimSpace(string(out)))
+		return "", fmt.Errorf("git %s failed: %s", sanitized[0], strings.TrimSpace(string(out)))
 	}
 	return string(out), nil
 }

@@ -165,6 +165,9 @@ func (b *ContextBuilder) loadMemory() string {
 	}
 
 	path := filepath.Clean(filepath.Join(base, "memory", "MEMORY.md"))
+	if strings.Contains(path, "..") {
+		return ""
+	}
 	content, err := os.ReadFile(path)
 	if err != nil {
 		return ""

@@ -21,13 +21,8 @@ type LFSClient struct {
 
 // NewLFSClient creates a new LFS proxy client.
 func NewLFSClient(baseURL, apiKey string) *LFSClient {
-	// Validate URL scheme to prevent request forgery via arbitrary protocols.
-	base := strings.TrimRight(baseURL, "/")
-	if u, err := url.Parse(base); err != nil || (u.Scheme != "http" && u.Scheme != "https") {
-		base = "http://localhost:0" // safe fallback — will fail on connect
-	}
 	return &LFSClient{
-		baseURL: base,
+		baseURL: strings.TrimRight(baseURL, "/"),
 		apiKey:  apiKey,
 		httpClient: &http.Client{
 			Timeout: 30 * time.Second,
@@ -51,9 +46,12 @@ type LFSEnvelope struct {
 
 // Produce sends a message to the LFS proxy which produces it to the given Kafka topic.
 func (c *LFSClient) Produce(ctx context.Context, topic string, requestID string, payload []byte) (*LFSEnvelope, error) {
-	url := c.baseURL + "/lfs/produce"
+	endpoint, err := c.safeURL("/lfs/produce")
+	if err != nil {
+		return nil, fmt.Errorf("lfs produce: %w", err)
+	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(payload))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(payload))
 	if err != nil {
 		return nil, fmt.Errorf("lfs produce: create request: %w", err)
 	}
@@ -102,7 +100,11 @@ func (c *LFSClient) ProduceEnvelope(ctx context.Context, topic string, env *Grou
 
 // Healthy checks if the LFS proxy is reachable.
 func (c *LFSClient) Healthy(ctx context.Context) bool {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+"/lfs/produce", nil)
+	endpoint, err := c.safeURL("/lfs/produce")
+	if err != nil {
+		return false
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
 		return false
 	}
@@ -113,4 +115,17 @@ func (c *LFSClient) Healthy(ctx context.Context) bool {
 	resp.Body.Close()
 	// The proxy returns 400 for GET (method not allowed or missing topic), but that means it's up.
 	return resp.StatusCode < 500
+}
+
+// safeURL parses and validates the base URL, then appends the given path.
+func (c *LFSClient) safeURL(path string) (string, error) {
+	u, err := url.Parse(c.baseURL)
+	if err != nil {
+		return "", fmt.Errorf("invalid base URL: %w", err)
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return "", fmt.Errorf("unsupported URL scheme: %s", u.Scheme)
+	}
+	u.Path = strings.TrimRight(u.Path, "/") + path
+	return u.String(), nil
 }
