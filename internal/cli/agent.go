@@ -79,6 +79,7 @@ func runAgent(cmd *cobra.Command, args []string) {
 		SubagentThinking:      cfg.Tools.Subagents.Thinking,
 		SubagentToolsAllow:    cfg.Tools.Subagents.Tools.Allow,
 		SubagentToolsDeny:     cfg.Tools.Subagents.Tools.Deny,
+		Config:                cfg,
 	})
 
 	fmt.Printf("🤖 KafClaw (%s)\n", cfg.Model.Name)

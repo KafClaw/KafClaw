@@ -23,6 +23,7 @@ import (
 	"github.com/KafClaw/KafClaw/internal/memory"
 	"github.com/KafClaw/KafClaw/internal/policy"
 	"github.com/KafClaw/KafClaw/internal/provider"
+	"github.com/KafClaw/KafClaw/internal/provider/middleware"
 	"github.com/KafClaw/KafClaw/internal/session"
 	"github.com/KafClaw/KafClaw/internal/timeline"
 	"github.com/KafClaw/KafClaw/internal/tools"
@@ -65,6 +66,7 @@ type LoopOptions struct {
 	SubagentThinking      string
 	SubagentToolsAllow    []string
 	SubagentToolsDeny     []string
+	Config                *config.Config // for middleware chain setup
 }
 
 // Loop is the core agent processing engine.
@@ -99,6 +101,7 @@ type Loop struct {
 	activeThreadID    string
 	activeTraceID     string
 	activeMessageType string
+	chain             *middleware.Chain
 	subagents         *subagentManager
 	agentID           string
 	subagentAllowList []string
@@ -171,6 +174,23 @@ func NewLoop(opts LoopOptions) *Loop {
 			Deny:  append([]string{}, opts.SubagentToolsDeny...),
 		},
 		announceSent: make(map[string]time.Time),
+	}
+
+	// Build middleware chain.
+	loop.chain = middleware.NewChain(opts.Provider)
+	if opts.Config != nil {
+		if opts.Config.ContentClassification.Enabled {
+			loop.chain.Use(middleware.NewContentClassifier(opts.Config.ContentClassification))
+		}
+		if opts.Config.PromptGuard.Enabled {
+			loop.chain.Use(middleware.NewPromptGuard(opts.Config.PromptGuard))
+		}
+		if opts.Config.OutputSanitization.Enabled {
+			loop.chain.Use(middleware.NewOutputSanitizer(opts.Config.OutputSanitization))
+		}
+		if opts.Config.FinOps.Enabled {
+			loop.chain.Use(middleware.NewFinOpsRecorder(opts.Config.FinOps))
+		}
 	}
 
 	// Register default tools
@@ -1108,15 +1128,20 @@ func (l *Loop) runAgentLoop(ctx context.Context, messages []provider.Message) (s
 			return err.Error(), nil
 		}
 
-		// Call LLM
+		// Call LLM (through middleware chain)
 		llmStart := time.Now()
-		resp, err := l.provider.Chat(ctx, &provider.ChatRequest{
+		chatReq := &provider.ChatRequest{
 			Messages:    messages,
 			Tools:       toolDefs,
 			Model:       l.model,
 			MaxTokens:   4096,
 			Temperature: 0.7,
-		})
+		}
+		meta := middleware.NewRequestMeta("", l.model)
+		meta.SenderID = l.activeSender
+		meta.Channel = l.activeChannel
+		meta.MessageType = l.activeMessageType
+		resp, err := l.chain.Process(ctx, chatReq, meta)
 		llmDuration := time.Since(llmStart)
 		if err != nil {
 			return "", fmt.Errorf("LLM call failed: %w", err)

@@ -422,6 +422,7 @@ func runGatewayMain(cmd *cobra.Command, args []string) {
 		SubagentThinking:      cfg.Tools.Subagents.Thinking,
 		SubagentToolsAllow:    cfg.Tools.Subagents.Tools.Allow,
 		SubagentToolsDeny:     cfg.Tools.Subagents.Tools.Deny,
+		Config:                cfg,
 	})
 
 	// 5b. Index soul files (non-blocking background)
