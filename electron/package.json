@@ -1,6 +1,6 @@
 {
   "name": "kafclaw-desktop",
-  "version": "2.6.3",
+  "version": "2.7.0",
   "description": "KafClaw Desktop - AI Assistant with three operation modes",
   "main": "dist/main/index.js",
   "scripts": {

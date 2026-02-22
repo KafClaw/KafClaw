@@ -8,7 +8,7 @@ import (
 var (
 	// version can be overridden at build time via:
 	// go build -ldflags "-X github.com/KafClaw/KafClaw/internal/cli.version=1.2.3"
-	version = "2.6.3"
+	version = "2.7.0"
 	logo    = "\n" +
 		"  _  __       __  ____ _\n" +
 		" | |/ / __ _ / _|/ ___| | __ ___      __\n" +
