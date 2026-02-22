@@ -19,6 +19,7 @@ KafClaw is a Go-based agent runtime with three practical deployment modes:
 
 - **KafScale** ([github.com/kafscale](https://github.com/kafscale), [kafscale.io](https://kafscale.io)): Kafka-compatible and S3-compatible data plane used for durable event transport and large artifact flows in agent systems.
 - **GitClaw** (in this KafClaw repository): agentic, self-hosted GitHub replacement focused on autonomous repository workflows and automation.
+- **Scalytics Copilot** ([github.com/scalytics/ScalyticsCopilot](https://github.com/scalytics/ScalyticsCopilot)): Apache 2.0-licensed open-source operations stack for private AI inference with open models, providing OpenAI-compatible APIs, hardware monitoring, and management for GenAI workloads.
 - **KafClaw**: runtime and coordination layer for local, Kafka-connected, and remote/headless agents.
 
 ## Start Here

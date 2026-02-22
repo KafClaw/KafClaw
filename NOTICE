@@ -6,8 +6,7 @@ https://github.com/kamir/nanobot
 
 ================================================================================
 
-This project is a hard fork of nanobot, originally developed by HKUDS
-(https://github.com/HKUDS/nanobot), licensed under the MIT License:
+This project was originally inspired by and forked from nanobot (https://github.com/HKUDS/nanobot). While the current implementation is a ground-up rewrite in Go, the original MIT license and attribution are preserved here for transparency and compliance.
 
     MIT License
 

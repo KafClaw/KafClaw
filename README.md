@@ -15,6 +15,8 @@ KafClaw is part of a broader infrastructure stack:
 - **KafScale**: Kafka-compatible + S3-compatible platform for event transport and large artifact flows.  
   [kafscale.io](https://kafscale.io) • [github.com/kafscale](https://github.com/kafscale)
 - **GitClaw**: agent-first self-hosted Git platform for repository workflows and automation.
+- **Scalytics Copilot**: open-source operations stack for private AI inference with open models.  
+  [github.com/scalytics/ScalyticsCopilot](https://github.com/scalytics/ScalyticsCopilot)
 - **KafClaw**: agent runtime and coordination layer (local, Kafka-connected, and remote gateway modes).
 
 **Enterprise-grade multi-agent collaboration over Apache Kafka.**
@@ -251,4 +253,4 @@ KShark is a built-in Kafka diagnostic tool for verifying connectivity and inspec
 
 Licensed under the [Apache License, Version 2.0](LICENSE).
 
-This project is a hard fork of [HKUDS/nanobot](https://github.com/HKUDS/nanobot), which was originally released under the MIT License. The original MIT license and attribution are preserved in the [NOTICE](NOTICE) file, as required.
+This project was inspired by [HKUDS/nanobot](https://github.com/HKUDS/nanobot). While originally a fork, KafClaw has been completely rewritten in Go to support enterprise-grade Kafka backends and multi-agent coordination. Original attribution is preserved in the [NOTICE](NOTICE) file.

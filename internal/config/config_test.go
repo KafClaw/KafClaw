@@ -41,7 +41,7 @@ func TestDefaultConfig(t *testing.T) {
 func TestLoadDefaults(t *testing.T) {
 	// Temporarily set HOME to a non-existent directory
 	origHome := os.Getenv("HOME")
-	os.Setenv("HOME", "/tmp/nonexistent-nanobot-test")
+	os.Setenv("HOME", "/tmp/nonexistent-kafclaw-test")
 	defer os.Setenv("HOME", origHome)
 
 	cfg, err := Load()
