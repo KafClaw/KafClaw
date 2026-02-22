@@ -104,7 +104,7 @@ kafclaw doctor
 }
 ```
 
-Each provider entry accepts `apiKey` and `apiBase`. See [LLM Providers](providers/) for details.
+Each provider entry accepts `apiKey` and `apiBase`. See [LLM Providers](/reference/providers/) for details.
 
 ## Per-Agent Model Configuration
 
@@ -137,10 +137,10 @@ Each provider entry accepts `apiKey` and `apiBase`. See [LLM Providers](provider
 
 | Section | Reference |
 |---------|-----------|
-| `contentClassification` | [Content Classification](middleware/#content-classification) |
-| `promptGuard` | [Prompt Guard](middleware/#prompt-guard) |
-| `outputSanitization` | [Output Sanitizer](middleware/#output-sanitizer) |
-| `finops` | [FinOps Cost Attribution](middleware/#finops-cost-attribution) |
+| `contentClassification` | [Content Classification](/reference/middleware/#content-classification) |
+| `promptGuard` | [Prompt Guard](/reference/middleware/#prompt-guard) |
+| `outputSanitization` | [Output Sanitizer](/reference/middleware/#output-sanitizer) |
+| `finops` | [FinOps Cost Attribution](/reference/middleware/#finops-cost-attribution) |
 
 ## Common Environment Variables
 
@@ -163,9 +163,9 @@ Each provider entry accepts `apiKey` and `apiBase`. See [LLM Providers](provider
 
 ## Related Docs
 
-- [LLM Providers](providers/)
-- [Models CLI](models-cli/)
-- [Chat Middleware](middleware/)
-- [Getting Started Guide](../start-here/getting-started/)
-- [KafClaw Administration Guide](../operations-admin/admin-guide/)
-- [Workspace Policy](../architecture-security/workspace-policy/)
+- [LLM Providers](/reference/providers/)
+- [Models CLI](/reference/models-cli/)
+- [Chat Middleware](/reference/middleware/)
+- [Getting Started Guide](/start-here/getting-started/)
+- [KafClaw Administration Guide](/operations-admin/admin-guide/)
+- [Workspace Policy](/architecture-security/workspace-policy/)

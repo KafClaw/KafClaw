@@ -18,6 +18,6 @@ Runtime HTTP surfaces:
   - repo/orchestrator/group endpoints under `/api/v1/*`
 
 Detailed API docs:
-- [KafClaw Operations Guide](../operations-admin/operations-guide/)
-- [KafClaw Administration Guide](../operations-admin/admin-guide/)
-- [Detailed Architecture](../architecture-security/architecture-detailed/)
+- [KafClaw Operations Guide](/operations-admin/operations-guide/)
+- [KafClaw Administration Guide](/operations-admin/admin-guide/)
+- [Detailed Architecture](/architecture-security/architecture-detailed/)

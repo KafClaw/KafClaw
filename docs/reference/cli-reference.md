@@ -35,10 +35,10 @@ Automation-friendly lifecycle output:
 - `kafclaw daemon <install|uninstall|start|stop|restart|status> --json`
 
 Detailed command examples:
-- [Getting Started](../start-here/getting-started/)
-- [User Manual - CLI Reference section](../start-here/user-manual/#3-cli-reference)
-- [Manage KafClaw](../operations-admin/manage-kafclaw/)
-- [Models CLI Reference](models-cli/) - provider management, auth, usage stats
+- [Getting Started](/start-here/getting-started/)
+- [User Manual - CLI Reference section](/start-here/user-manual/#3-cli-reference)
+- [Manage KafClaw](/operations-admin/manage-kafclaw/)
+- [Models CLI Reference](/reference/models-cli/) - provider management, auth, usage stats
 
 Skills execution example:
 - `kafclaw skills exec <skill-id> --input '{"text":"..."}'`

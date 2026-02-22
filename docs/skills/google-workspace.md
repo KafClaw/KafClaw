@@ -19,7 +19,7 @@ Headless OAuth flow for Google Workspace integrations.
 - Stores token state securely for runtime use by the local agent.
 - Enables policy-gated Google Workspace operations after enrollment.
 
-For key backend options and storage/security posture, see [Skills](./index.md).
+For key backend options and storage/security posture, see [Skills](/skills/).
 
 ## Install / Enable
 
@@ -50,7 +50,7 @@ kafclaw skills auth complete google-workspace \
 
 - Start flow, open returned URL in a browser, approve scopes, and paste callback URL.
 - Keep scopes minimal and aligned with tenant policy.
-- OAuth flow start/complete events are recorded in chained security audit logs (see [Skills](./index.md)).
+- OAuth flow start/complete events are recorded in chained security audit logs (see [Skills](/skills/)).
 - Agent read-only tool:
   - `google_workspace_read` with `operation=gmail_list_messages|calendar_list_events|drive_list_files`
   - include Gmail/Calendar/Drive read scopes during `auth start` for the operation you need.

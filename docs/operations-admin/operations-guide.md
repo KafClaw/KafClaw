@@ -69,7 +69,7 @@ WhatsApp/CLI/Web/Scheduler --> Message Bus --> Agent Loop --> LLM Provider
 
 ## 2. Build and Release
 
-> See also: [release.md](./release/) for versioning details
+> See also: [Release Process](/operations-admin/release/) for versioning details
 
 ### Prerequisites
 
@@ -147,7 +147,7 @@ Container mounts:
 kafclaw install      # root: /usr/local/bin, non-root: ~/.local/bin
 ```
 
-For release-binary install flows (`--latest`, `--version`, `--list-releases`, unattended, signature verification), see [KafClaw Management Guide](../operations-admin/manage-kafclaw/).
+For release-binary install flows (`--latest`, `--version`, `--list-releases`, unattended, signature verification), see [KafClaw Management Guide](/operations-admin/manage-kafclaw/).
 
 ### Deployment Modes
 

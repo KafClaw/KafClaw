@@ -5,7 +5,7 @@ title: KafClaw System Architecture — Detailed Reference
 
 # KafClaw System Architecture — Detailed Reference
 
-> For the quick overview, see [architecture.md](./architecture/).
+> For the quick overview, see [Architecture Overview](/architecture-security/architecture/).
 
 ---
 
@@ -576,7 +576,7 @@ Renderer (Vue 3 SPA)
 
 ## 9. Security Model
 
-> See also: [admin-guide.md](./admin-guide.md#2-security-model) for the comprehensive security reference, [security-risks.md](./security-risks/) for threat model
+> See also: [Administration Guide](/operations-admin/admin-guide/#2-security-model) for the comprehensive security reference, [Security Risks](/architecture-security/security-risks/) for threat model
 
 ### 9.1 Tool Authorization (3-Tier)
 
@@ -608,7 +608,7 @@ Destructive deletion, VCS deletion, disk destruction, device redirection, permis
 
 ## 10. Deployment Modes
 
-> See also: [operations-guide.md](./operations-guide.md#3-deployment) for full deployment instructions
+> See also: [Operations Guide](/operations-admin/operations-guide/#3-deployment) for full deployment instructions
 
 | Mode | Command | Description |
 |------|---------|-------------|
@@ -642,7 +642,7 @@ KAFCLAW_GATEWAY_HOST=192.168.0.199 make run      # bind to specific IP
 
 ## 11. Build and Release
 
-> See also: [release.md](./release/), [operations-guide.md](./operations-guide.md#2-build-and-release)
+> See also: [Release Process](/operations-admin/release/), [Operations Guide](/operations-admin/operations-guide/#2-build-and-release)
 
 ### Key Makefile Targets
 
@@ -746,7 +746,7 @@ ContextBuilder.BuildSystemPrompt()
 
 ## 13. Extension Points
 
-> See also: [admin-guide.md](./admin-guide.md#6-extending-kafclaw) for detailed extension instructions with code examples
+> See also: [Administration Guide](/operations-admin/admin-guide/#6-extending-kafclaw) for detailed extension instructions with code examples
 
 ### Adding a New Tool
 

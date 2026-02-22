@@ -281,7 +281,7 @@ Skills policy defaults:
 - `skills.scope=selected` (least-privilege, recommended)
 - `skills.runtimeIsolation=auto` (use strict if container runtime is mandatory in your environment)
 
-See [Skills](../skills/index.md) for full skill policy details.
+See [Skills](/skills/) for full skill policy details.
 
 ### LLM provider and token management
 
@@ -488,8 +488,8 @@ Recommended usage:
 - `security fix --yes`: apply safe remediations; re-run check after changes.
 - `doctor --fix`: merges env files, syncs sensitive env keys into tomb-managed encrypted storage, then scrubs those sensitive keys from `~/.config/kafclaw/env`.
 
-For security posture details, see [Security for Operators](../architecture-security/security-for-ops.md).
-For skills policy, OAuth keying, and source pinning syntax, see [Skills](../skills/index.md).
+For security posture details, see [Security for Operators](/architecture-security/security-for-ops/).
+For skills policy, OAuth keying, and source pinning syntax, see [Skills](/skills/).
 
 Recommended CI gate:
 

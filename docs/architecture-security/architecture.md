@@ -5,7 +5,7 @@ title: KafClaw Architecture — Overview
 
 # KafClaw Architecture — Overview
 
-A quick reference for the KafClaw system architecture. For the comprehensive deep-dive, see [architecture-detailed.md](./architecture-detailed/).
+A quick reference for the KafClaw system architecture. For the comprehensive deep-dive, see [Detailed Architecture](/architecture-security/architecture-detailed/).
 
 ---
 

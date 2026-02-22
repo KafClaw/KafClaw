@@ -65,7 +65,7 @@ cd KafClaw
 make build
 ```
 
-For complete install options (`--list-releases`, signature verification defaults, root/runtime behavior), see [KafClaw Management Guide](../operations-admin/manage-kafclaw/).
+For complete install options (`--list-releases`, signature verification defaults, root/runtime behavior), see [KafClaw Management Guide](/operations-admin/manage-kafclaw/).
 
 ### First-Time Setup
 
@@ -346,7 +346,7 @@ Header status indicators: mode badge, memory LED, sidecar/connection status.
 
 ## 5. WhatsApp, Slack, and Teams Integration
 
-> See also: [whatsapp-setup.md](./whatsapp-setup/) for full details
+> See also: [WhatsApp Setup](/integrations/whatsapp-setup/) for full details
 
 KafClaw uses `whatsmeow` for native Go WhatsApp connectivity. No Node.js bridge required.
 
@@ -410,7 +410,7 @@ Known limits:
 
 ## 6. Memory System
 
-> See also: [architecture-timeline.md](./architecture-timeline/) for the full memory architecture
+> See also: [Timeline Architecture](/architecture-security/architecture-timeline/) for the full memory architecture
 
 ### Overview
 

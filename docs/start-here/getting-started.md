@@ -54,7 +54,7 @@ curl --fail --show-error --silent --location \
   | bash -s -- --list-releases
 ```
 
-For full install flags and operator-focused behavior (root handling, signature controls, unattended modes), see [KafClaw Management Guide](../operations-admin/manage-kafclaw/).
+For full install flags and operator-focused behavior (root handling, signature controls, unattended modes), see [KafClaw Management Guide](/operations-admin/manage-kafclaw/).
 
 Desktop app distribution:
 
@@ -206,7 +206,7 @@ kafclaw models auth login --provider gemini
 kafclaw models stats
 ```
 
-See [LLM Providers](../reference/providers/) and [Models CLI](../reference/models-cli/) for full details.
+See [LLM Providers](/reference/providers/) and [Models CLI](/reference/models-cli/) for full details.
 
 To reconfigure provider/token later, run onboarding again (interactive) or use:
 
@@ -382,9 +382,9 @@ Join and verify:
 
 ## Next
 
-- [Manage KafClaw](../operations-admin/manage-kafclaw/)
-- [Operations and Maintenance](../operations-admin/maintenance/)
-- [How Agents Work](../agent-concepts/how-agents-work/)
-- [Soul and Identity Files](../agent-concepts/soul-identity-tools/)
-- [User Manual](./user-manual/)
-- [Admin Guide](../operations-admin/admin-guide/)
+- [Manage KafClaw](/operations-admin/manage-kafclaw/)
+- [Operations and Maintenance](/operations-admin/maintenance/)
+- [How Agents Work](/agent-concepts/how-agents-work/)
+- [Soul and Identity Files](/agent-concepts/soul-identity-tools/)
+- [User Manual](/start-here/user-manual/)
+- [Admin Guide](/operations-admin/admin-guide/)

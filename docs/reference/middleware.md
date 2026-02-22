@@ -240,6 +240,6 @@ kafclaw status
 
 ## Related Docs
 
-- [LLM Providers](providers/)
-- [Models CLI Reference](models-cli/)
-- [Configuration Keys](config-keys/)
+- [LLM Providers](/reference/providers/)
+- [Models CLI Reference](/reference/models-cli/)
+- [Configuration Keys](/reference/config-keys/)

@@ -158,6 +158,6 @@ kafclaw models auth set-key --provider scalytics-copilot --key <bearer-token> --
 
 ## Related Docs
 
-- [LLM Providers](providers/)
-- [Chat Middleware](middleware/)
-- [Configuration Keys](config-keys/)
+- [LLM Providers](/reference/providers/)
+- [Chat Middleware](/reference/middleware/)
+- [Configuration Keys](/reference/config-keys/)

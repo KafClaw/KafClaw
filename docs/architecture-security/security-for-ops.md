@@ -110,5 +110,5 @@ Use these as part of daily operations and after any security-relevant change.
 - `doctor --fix` moves sensitive env keys into tomb-managed encrypted storage and scrubs them from `~/.config/kafclaw/env`.
 - Security events and install decisions are chained into immutable-style audit logs under `~/.kafclaw/skills/audit/`.
 - For deployment-specific skill operations and remediations, refer to:
-  - [Skills](../skills/index.md)
-  - [KafClaw Management Guide](../operations-admin/manage-kafclaw.md)
+  - [Skills](/skills/)
+  - [KafClaw Management Guide](/operations-admin/manage-kafclaw/)

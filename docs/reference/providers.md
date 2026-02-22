@@ -195,6 +195,6 @@ kafclaw models stats --days 7
 
 ## Related Docs
 
-- [Models CLI Reference](models-cli/)
-- [Middleware Configuration](middleware/)
-- [Configuration Keys](config-keys/)
+- [Models CLI Reference](/reference/models-cli/)
+- [Middleware Configuration](/reference/middleware/)
+- [Configuration Keys](/reference/config-keys/)

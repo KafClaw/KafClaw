@@ -10,8 +10,8 @@ Operator and security notes for bundled and external skills.
 
 For deep security posture and operational commands, see:
 
-- [Security for Operators](../architecture-security/security-for-ops.md)
-- [KafClaw Management Guide](../operations-admin/manage-kafclaw.md)
+- [Security for Operators](/architecture-security/security-for-ops/)
+- [KafClaw Management Guide](/operations-admin/manage-kafclaw/)
 
 ## Bundled Skills
 
@@ -144,8 +144,8 @@ Agent tool names for OAuth-enrolled read-only access:
 - `kafclaw doctor --fix` also syncs sensitive env keys into tomb-managed encrypted storage (`env_tomb_sync` check).
 - After successful tomb sync, `doctor --fix` scrubs sensitive keys from `~/.config/kafclaw/env` (`env_sensitive_scrub` check). Runtime then loads them from tomb into process env.
 - For provider-specific enrollment flows, use:
-  - [google-workspace](./google-workspace.md)
-  - [m365](./m365.md)
+  - [google-workspace](/skills/google-workspace/)
+  - [m365](/skills/m365/)
 
 ## External Source Pinning
 
@@ -159,4 +159,4 @@ Agent tool names for OAuth-enrolled read-only access:
 - `clawhub:<slug>` installs are staged in quarantine, verified, then installed.
 - ClawHub state/metadata is synchronized under skills runtime tools state.
 - Security events and install decisions are recorded as chained JSONL audit logs in `~/.kafclaw/skills/audit/`.
-- See [KafClaw Management Guide](../operations-admin/manage-kafclaw.md) for operations workflow.
+- See [KafClaw Management Guide](/operations-admin/manage-kafclaw/) for operations workflow.

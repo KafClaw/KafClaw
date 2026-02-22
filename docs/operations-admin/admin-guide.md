@@ -64,7 +64,7 @@ type Config struct {
 }
 ```
 
-New sections added in this release: `Model`, `Paths`, `ContentClassification`, `PromptGuard`, `OutputSanitization`, `FinOps`. See [Configuration Keys](../reference/config-keys/) for details.
+New sections added in this release: `Model`, `Paths`, `ContentClassification`, `PromptGuard`, `OutputSanitization`, `FinOps`. See [Configuration Keys](/reference/config-keys/) for details.
 
 ### Agent Configuration
 
@@ -389,7 +389,7 @@ type LLMProvider interface {
 | `groq` | API key | `https://api.groq.com/openai/v1` |
 | `vllm` | optional key + base | _(configured)_ |
 
-For full provider setup, see [LLM Providers Reference](../reference/providers/).
+For full provider setup, see [LLM Providers Reference](/reference/providers/).
 
 ### Provider Resolution Order
 
@@ -408,7 +408,7 @@ kafclaw models auth set-key --provider claude --key sk-ant-...
 kafclaw models auth login --provider gemini
 ```
 
-See [Models CLI Reference](../reference/models-cli/) for all auth commands.
+See [Models CLI Reference](/reference/models-cli/) for all auth commands.
 
 ### Middleware Chain
 
@@ -419,7 +419,7 @@ A configurable middleware chain runs between the agent loop and the LLM provider
 - **Output Sanitizer** — response redaction and deny pattern filtering
 - **FinOps Recorder** — per-request cost calculation and budget warnings
 
-See [Chat Middleware Reference](../reference/middleware/) for configuration.
+See [Chat Middleware Reference](/reference/middleware/) for configuration.
 
 ### Token & Cost Tracking
 

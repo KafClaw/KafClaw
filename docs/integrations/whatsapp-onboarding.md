@@ -7,7 +7,7 @@ title: WhatsApp Onboarding — Buddy Access
 
 End-to-end guide for connecting a buddy to your KafClaw instance via WhatsApp.
 
-> See also: [WhatsApp Setup (Default Deny)](whatsapp-setup/) for CLI reference.
+> See also: [WhatsApp Setup (Default Deny)](/integrations/whatsapp-setup/) for CLI reference.
 
 ## Overview
 
@@ -81,7 +81,7 @@ Once setup is verified and the buddy is approved:
 
 For channel parity status versus OpenClaw (what WhatsApp can do today in KafClaw, and what remains limited), see:
 
-- [WhatsApp Setup (Default Deny)](whatsapp-setup/) -> **Parity snapshot (OpenClaw vs KafClaw)**
+- [WhatsApp Setup (Default Deny)](/integrations/whatsapp-setup/) -> **Parity snapshot (OpenClaw vs KafClaw)**
 
 ## CLI Quick Reference
 
