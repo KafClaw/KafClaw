@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -102,7 +103,12 @@ func (p *OpenAIProvider) Chat(ctx context.Context, req *ChatRequest) (*ChatRespo
 		return nil, fmt.Errorf("parse response: %w", err)
 	}
 
-	return p.parseResponse(&apiResp)
+	chatResp, err := p.parseResponse(&apiResp)
+	if err != nil {
+		return nil, err
+	}
+	parseOpenAIRateLimitHeaders(resp.Header, &chatResp.Usage)
+	return chatResp, nil
 }
 
 // convertMessages converts our Message type to OpenAI API format.
@@ -199,6 +205,43 @@ type openAIToolCall struct {
 		Name      string `json:"name"`
 		Arguments string `json:"arguments"`
 	} `json:"function"`
+}
+
+// parseOpenAIRateLimitHeaders extracts rate limit information from OpenAI-compatible
+// response headers. This covers openai, openai-codex, xai, scalytics-copilot,
+// openrouter, deepseek, groq providers.
+func parseOpenAIRateLimitHeaders(h http.Header, u *Usage) {
+	if v := h.Get("x-ratelimit-remaining-tokens"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			u.RemainingTokens = &n
+		}
+	}
+	if v := h.Get("x-ratelimit-remaining-requests"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			u.RemainingRequests = &n
+		}
+	}
+	if v := h.Get("x-ratelimit-limit-tokens"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			u.LimitTokens = &n
+		}
+	}
+	// Anthropic-style headers (for claude provider routed via OpenAI-compat proxy).
+	if v := h.Get("anthropic-ratelimit-tokens-remaining"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			u.RemainingTokens = &n
+		}
+	}
+	// Parse reset time.
+	for _, key := range []string{"x-ratelimit-reset-tokens", "x-ratelimit-reset-requests", "anthropic-ratelimit-tokens-reset"} {
+		if v := h.Get(key); v != "" {
+			if t, err := time.Parse(time.RFC3339, v); err == nil {
+				u.ResetAt = &t
+				break
+			}
+			// Some providers use duration format like "6m0s"; skip those.
+		}
+	}
 }
 
 // Transcribe converts audio to text using OpenAI Whisper API.

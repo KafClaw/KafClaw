@@ -76,6 +76,11 @@ func NewTimelineService(dbPath string) (*TimelineService, error) {
 	_, _ = db.Exec(`ALTER TABLE tasks ADD COLUMN prompt_tokens INTEGER NOT NULL DEFAULT 0`)
 	_, _ = db.Exec(`ALTER TABLE tasks ADD COLUMN completion_tokens INTEGER NOT NULL DEFAULT 0`)
 	_, _ = db.Exec(`ALTER TABLE tasks ADD COLUMN total_tokens INTEGER NOT NULL DEFAULT 0`)
+	// Best-effort migration: add provider and model columns to tasks table.
+	_, _ = db.Exec(`ALTER TABLE tasks ADD COLUMN provider_id TEXT DEFAULT ''`)
+	_, _ = db.Exec(`ALTER TABLE tasks ADD COLUMN model_name TEXT DEFAULT ''`)
+	// Best-effort migration: add cost_usd column to tasks table.
+	_, _ = db.Exec(`ALTER TABLE tasks ADD COLUMN cost_usd REAL DEFAULT 0`)
 	// Best-effort migration: policy_decisions table.
 	_, _ = db.Exec(`CREATE TABLE IF NOT EXISTS policy_decisions (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -773,6 +778,106 @@ func (s *TimelineService) GetDailyTokenUsage() (int, error) {
 	var total int
 	err := s.db.QueryRow(`SELECT COALESCE(SUM(total_tokens), 0) FROM tasks WHERE created_at >= date('now')`).Scan(&total)
 	return total, err
+}
+
+// UpdateTaskTokensWithProvider adds token usage and sets provider/model on first update.
+func (s *TimelineService) UpdateTaskTokensWithProvider(taskID string, prompt, completion, total int, providerID, model string) error {
+	_, err := s.db.Exec(`UPDATE tasks SET
+		prompt_tokens = prompt_tokens + ?,
+		completion_tokens = completion_tokens + ?,
+		total_tokens = total_tokens + ?,
+		provider_id = CASE WHEN provider_id = '' OR provider_id IS NULL THEN ? ELSE provider_id END,
+		model_name = CASE WHEN model_name = '' OR model_name IS NULL THEN ? ELSE model_name END,
+		updated_at = datetime('now')
+	WHERE task_id = ?`, prompt, completion, total, providerID, model, taskID)
+	return err
+}
+
+// UpdateTaskCost adds cost attribution to a task.
+func (s *TimelineService) UpdateTaskCost(taskID string, costUSD float64) error {
+	_, err := s.db.Exec(`UPDATE tasks SET
+		cost_usd = cost_usd + ?,
+		updated_at = datetime('now')
+	WHERE task_id = ?`, costUSD, taskID)
+	return err
+}
+
+// ProviderDayStat holds per-provider per-day token usage.
+type ProviderDayStat struct {
+	ProviderID string  `json:"provider_id"`
+	Day        string  `json:"day"`
+	Tokens     int     `json:"tokens"`
+	CostUSD    float64 `json:"cost_usd"`
+}
+
+// GetDailyTokenUsageByProvider returns today's token usage grouped by provider.
+func (s *TimelineService) GetDailyTokenUsageByProvider() (map[string]int, error) {
+	rows, err := s.db.Query(`SELECT COALESCE(provider_id,''), COALESCE(SUM(total_tokens),0)
+		FROM tasks WHERE created_at >= date('now') GROUP BY provider_id`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string]int{}
+	for rows.Next() {
+		var prov string
+		var total int
+		if err := rows.Scan(&prov, &total); err != nil {
+			return nil, err
+		}
+		if prov == "" {
+			prov = "unknown"
+		}
+		out[prov] = total
+	}
+	return out, rows.Err()
+}
+
+// GetDailyCostByProvider returns today's cost grouped by provider.
+func (s *TimelineService) GetDailyCostByProvider() (map[string]float64, error) {
+	rows, err := s.db.Query(`SELECT COALESCE(provider_id,''), COALESCE(SUM(cost_usd),0)
+		FROM tasks WHERE created_at >= date('now') GROUP BY provider_id`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string]float64{}
+	for rows.Next() {
+		var prov string
+		var cost float64
+		if err := rows.Scan(&prov, &cost); err != nil {
+			return nil, err
+		}
+		if prov == "" {
+			prov = "unknown"
+		}
+		out[prov] = cost
+	}
+	return out, rows.Err()
+}
+
+// GetTokenUsageSummary returns per-provider per-day totals for the last N days.
+func (s *TimelineService) GetTokenUsageSummary(days int) ([]ProviderDayStat, error) {
+	rows, err := s.db.Query(`SELECT COALESCE(provider_id,''), date(created_at), COALESCE(SUM(total_tokens),0), COALESCE(SUM(cost_usd),0)
+		FROM tasks WHERE created_at >= date('now', ? || ' days')
+		GROUP BY provider_id, date(created_at)
+		ORDER BY date(created_at), provider_id`, -days)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []ProviderDayStat
+	for rows.Next() {
+		var s ProviderDayStat
+		if err := rows.Scan(&s.ProviderID, &s.Day, &s.Tokens, &s.CostUSD); err != nil {
+			return nil, err
+		}
+		if s.ProviderID == "" {
+			s.ProviderID = "unknown"
+		}
+		out = append(out, s)
+	}
+	return out, rows.Err()
 }
 
 // LogPolicyDecision records a policy evaluation result.

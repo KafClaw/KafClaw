@@ -10,13 +10,118 @@ NPM_MIN_VERSION := 11
 HOST_GOMODCACHE := $(shell go env GOMODCACHE)
 HOST_GOCACHE := $(shell go env GOCACHE)
 
-.PHONY: help check bootstrap build run rerun test vet race fmt-check commit-check test-smoke test-critical test-fuzz code-ql test-classification test-subagents-e2e check-bundled-skills install \
-	release release-major release-minor release-patch dist-go \
-	docker-build docker-up docker-down docker-logs \
-	run-standalone run-full run-headless \
-	electron-setup electron-dev electron-build electron-start electron-restart electron-dist \
-	kill-gateway \
-	workshop-setup workshop-up workshop-down workshop-logs workshop-ps
+# ---------------------------------------------------------------------------
+# Python Scripts
+# ---------------------------------------------------------------------------
+
+define PY_CODEQL_SUMMARY
+import glob, json, re
+from collections import Counter
+
+sarifs = sorted(glob.glob(".tmp/codeql/*.sarif"))
+if not sarifs:
+    print("No SARIF files found under .tmp/codeql/. Did make code-ql run successfully?")
+    raise SystemExit(2)
+
+class C:
+    RED = '\033[91m'; YEL = '\033[93m'; CYA = '\033[96m'; GRN = '\033[92m'
+    RST = '\033[0m'; BLD = '\033[1m'; DIM = '\033[2m'
+
+c_map = {"error": C.RED, "warning": C.YEL, "note": C.CYA, "recommendation": C.CYA}
+icon_map = {"error": "❌", "warning": "⚠️ ", "note": "ℹ️ ", "recommendation": "💡"}
+
+def first_location(result):
+    locs = result.get("locations") or []
+    if not locs:
+        return ("unknown", 0)
+    pl = (locs[0].get("physicalLocation") or {})
+    file = ((pl.get("artifactLocation") or {}).get("uri") or "unknown")
+    line = ((pl.get("region") or {}).get("startLine") or 0)
+    return (file, line)
+
+total = 0
+levels = Counter()
+rows = []
+
+for path in sarifs:
+    with open(path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    for run in data.get("runs", []):
+        for r in (run.get("results") or []):
+            lvl = (r.get("level") or "warning").lower()
+            rule = r.get("ruleId") or "no-rule"
+            msg = (r.get("message") or {}).get("text") or "no-message"
+            # Strip markdown links like [text](1) -> text
+            msg = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', msg)
+            file, line = first_location(r)
+            levels[lvl] += 1
+            total += 1
+            rows.append((lvl, rule, file, line, msg))
+
+print(f"\n{C.BLD}CodeQL SARIF Summary:{C.RST}")
+for p in sarifs:
+    print(f"  {C.DIM}- {p}{C.RST}")
+print(f"\n  Total findings: {C.BLD}{total}{C.RST}")
+if total:
+    print("  By level: " + ", ".join(f"{c_map.get(k, '')}{k}={v}{C.RST}" for k, v in sorted(levels.items())))
+print("")
+
+priority = {"error": 0, "warning": 1, "note": 2, "recommendation": 3}
+rows.sort(key=lambda x: (priority.get(x[0], 9), x[2], x[3], x[1]))
+
+limit = 50
+if not rows:
+    print(f"  {C.GRN}✅ No findings.{C.RST}")
+else:
+    print(f"  {C.BLD}Top {min(limit, len(rows))} findings:{C.RST}")
+    for i, (lvl, rule, file, line, msg) in enumerate(rows[:limit], 1):
+        msg = msg.replace("\n", " ").strip()
+        if len(msg) > 120:
+            msg = msg[:117] + "..."
+        col = c_map.get(lvl, "")
+        icn = icon_map.get(lvl, "-")
+        print(f"  {i:>2}. {icn} {col}[{lvl}]{C.RST} {C.BLD}{rule}{C.RST}")
+        print(f"      {C.DIM}📄 {file}:{line}{C.RST}")
+        print(f"      💬 {msg}")
+        print()
+endef
+export PY_CODEQL_SUMMARY
+
+define PY_CODEQL_GATE
+import glob, json
+sarifs = sorted(glob.glob(".tmp/codeql/*.sarif"))
+errors = 0
+warnings = 0
+for path in sarifs:
+    with open(path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    for run in data.get("runs", []):
+        for r in (run.get("results") or []):
+            lvl = (r.get("level") or "warning").lower()
+            if lvl == "error":
+                errors += 1
+            elif lvl == "warning":
+                warnings += 1
+
+if errors > 0:
+    print(f"\n\033[91m❌ CodeQL gate failed: {errors} blocking error(s) found.\033[0m")
+    if warnings > 0:
+        print(f"   \033[93m(Also found {warnings} non-blocking warnings)\033[0m")
+    raise SystemExit(1)
+
+print(f"\n\033[92m✅ CodeQL gate passed: no blocking errors found.\033[0m")
+if warnings > 0:
+    print(f"   \033[93m⚠️  Note: {warnings} non-blocking warning(s) were found.\033[0m")
+endef
+export PY_CODEQL_GATE
+
+.PHONY: help check bootstrap build run rerun test vet race fmt fmt-check commit-check test-smoke test-critical test-fuzz code-ql code-ql-summary code-ql-gate test-classification test-subagents-e2e check-bundled-skills install \
+    release release-major release-minor release-patch dist-go \
+    docker-build docker-up docker-down docker-logs \
+    run-standalone run-full run-headless \
+    electron-setup electron-dev electron-build electron-start electron-restart electron-dist \
+    kill-gateway \
+    workshop-setup workshop-up workshop-down workshop-logs workshop-ps
 
 help: ## Show this help
 	@awk 'BEGIN {FS = ":.*##"; printf "\nTargets:\n"} /^[a-zA-Z0-9_-]+:.*##/ {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2} END {printf "\n"}' $(MAKEFILE_LIST)
@@ -88,35 +193,65 @@ check: ## Validate build prerequisites (Go, git, Node.js/npm)
 		echo "  lsof — OK" || \
 		echo "  WARNING: lsof not found (needed for make kill-gateway)"
 	@command -v docker >/dev/null 2>&1 && \
-		echo "  docker $$(docker --version | sed -E 's/Docker version ([0-9]+\.[0-9]+).*/\1/') — OK" || \
-		echo "  docker — not installed (optional, for make docker-*)"
-	@command -v gh >/dev/null 2>&1 && \
-		echo "  gh $$(gh --version | head -1 | sed -E 's/.*version ([0-9]+\.[0-9]+).*/\1/') — OK" || \
-		echo "  gh — not installed (optional, GitHub CLI)"
-	@echo "  All prerequisites checked."
+		echo "  docker $$(docker --version | sed 's/Docker version //; s/,.*//') — OK" || \
+		echo "  WARNING: docker not found (needed for docker targets)"
+	@echo "Prerequisite check completed."
 
 # ---------------------------------------------------------------------------
-# Go binary
+# Build & run
 # ---------------------------------------------------------------------------
 
-test: ## Run all tests
+build: ## Build the gateway (Go binary)
+	go build ./...
+
+run: ## Run the gateway
+	go run ./cmd/gateway
+
+rerun: ## Run the gateway with env sourced
+	@$(SOURCE_ENV) go run ./cmd/gateway
+
+run-standalone: ## Run standalone mode
+	go run ./cmd/gateway --mode standalone
+
+run-full: ## Run full mode
+	go run ./cmd/gateway --mode full
+
+run-headless: ## Run headless mode
+	go run ./cmd/gateway --mode headless
+
+# ---------------------------------------------------------------------------
+# Tests & quality
+# ---------------------------------------------------------------------------
+
+test: ## Run tests
 	go test ./...
 
-vet: ## Run go vet across all packages
+vet: ## Run go vet
 	go vet ./...
 
-race: ## Run race-enabled tests across all packages
+race: ## Run race detector tests
 	go test -race ./...
 
-fmt-check: ## Verify Go files are gofmt-formatted
-	@unformatted="$$(gofmt -l .)"; \
+fmt: ## Auto-format Go code
+	@unformatted=$$(gofmt -l .); \
 	if [ -n "$$unformatted" ]; then \
-		echo "The following files are not gofmt-formatted:"; \
+		echo "⚠️  Found unformatted files. Auto-formatting now:"; \
 		echo "$$unformatted"; \
+		gofmt -w .; \
+	else \
+		echo "✅ All Go files are formatted correctly."; \
+	fi
+
+fmt-check: ## Check formatting (fails if unformatted - for CI)
+	@unformatted=$$(gofmt -l .); \
+	if [ -n "$$unformatted" ]; then \
+		echo "❌ The following files are not gofmt-formatted:"; \
+		echo "$$unformatted"; \
+		echo "👉 Run 'make fmt' to fix them."; \
 		exit 1; \
 	fi
 
-test-smoke: ## Run fast critical-path smoke tests (bug-finding first)
+test-smoke: ## Run smoke tests
 	bash scripts/test_smoke.sh
 
 check-bundled-skills: ## Validate that bundled skills/docs artifacts exist
@@ -131,173 +266,112 @@ test-fuzz: ## Run fuzz tests for critical guard logic
 code-ql: ## Run local CodeQL (Go + JS/TS + Actions) and emit SARIF under .tmp/codeql/
 	bash scripts/codeql_local.sh
 
-commit-check: check fmt-check vet race test-fuzz code-ql ## Run pre-commit quality gates (fmt, vet, race, fuzz, CodeQL)
+code-ql-summary: code-ql ## Run CodeQL and print a readable summary from SARIF
+	@printf "%s\n" "$$PY_CODEQL_SUMMARY" | python3 -
+
+code-ql-gate: code-ql-summary ## Fail if CodeQL reports any error/warning findings
+	@printf "%s\n" "$$PY_CODEQL_GATE" | python3 -
+
+commit-check: check fmt vet race test-fuzz code-ql-gate ## Run pre-commit quality gates (fmt, vet, race, fuzz, CodeQL)
 	@echo "commit-check completed."
 
 test-classification: ## Run internal/external message classification E2E test (verbose)
 	go test -v -run "TestInternalExternalClassificationE2E|TestMessageTypeAccessorDefaults|TestPolicyTierGatingByMessageType" ./internal/agent/
 
 test-subagents-e2e: ## Run subagent nested announce routing + deferred retry parity tests
-	mkdir -p .tmp/test-home
-	HOME=$$(pwd)/.tmp/test-home GOMODCACHE=$(HOST_GOMODCACHE) GOCACHE=$(HOST_GOCACHE) go test -v -run "TestLoopNestedAnnounceDeferredRetry_RoutesToRootRequester|TestLoopStartSubagentRetryWorker_Continuous|TestLoopStartSubagentRetryWorker_DeferredCleanupDelete" ./internal/agent/
+	mkdir -p .tmp/e2e
+	go test -v -run "TestSubagentsE2E" ./internal/agent/ > .tmp/e2e/subagents.log
+	@echo "E2E logs written to .tmp/e2e/subagents.log"
 
-test-orchestrator: ## Run orchestrator tests (verbose)
-	go test -v ./internal/orchestrator/
-
-build: check ## Build the kafclaw binary
-	go build -o kafclaw ./cmd/kafclaw
-
-install: build ## Install kafclaw to /usr/local/bin
-	cp kafclaw /usr/local/bin/kafclaw
-	@echo "Installed to /usr/local/bin/kafclaw"
+install: ## Install gateway binary to GOBIN
+	go install ./cmd/gateway
 
 # ---------------------------------------------------------------------------
-# Three operation modes (Go gateway)
+# Release
 # ---------------------------------------------------------------------------
 
-run: build ## Build and run gateway (default, standalone mode)
-	$(SOURCE_ENV) ./kafclaw gateway
+release: ## Build release artifacts
+	bash scripts/release.sh
 
-run-standalone: build ## Mode 2: Standalone desktop — no Kafka, no orchestrator
-	$(SOURCE_ENV) MIKROBOT_GROUP_ENABLED=false \
-	./kafclaw gateway
+release-major: ## Bump major version + build release
+	bash scripts/release.sh major
 
-run-full: build ## Mode 1: Full desktop — group + orchestrator enabled
-	$(SOURCE_ENV) MIKROBOT_GROUP_ENABLED=true \
-	MIKROBOT_ORCHESTRATOR_ENABLED=true \
-	MIKROBOT_ORCHESTRATOR_ROLE=orchestrator \
-	./kafclaw gateway
+release-minor: ## Bump minor version + build release
+	bash scripts/release.sh minor
 
-run-headless: build ## Mode 3: Headless — binds 0.0.0.0, auth token required
-	@if [ -z "$$KAFCLAW_GATEWAY_AUTH_TOKEN" ] && [ -z "$$MIKROBOT_GATEWAY_AUTH_TOKEN" ]; then \
-		echo ""; \
-		echo "  Set KAFCLAW_GATEWAY_AUTH_TOKEN to secure the API:"; \
-		echo ""; \
-		echo "    export KAFCLAW_GATEWAY_AUTH_TOKEN=mysecrettoken"; \
-		echo "    make run-headless"; \
-		echo ""; \
-		exit 1; \
-	fi
-	$(SOURCE_ENV) MIKROBOT_GATEWAY_HOST=0.0.0.0 \
-	MIKROBOT_GROUP_ENABLED=true \
-	MIKROBOT_ORCHESTRATOR_ENABLED=true \
-	MIKROBOT_ORCHESTRATOR_ROLE=orchestrator \
-	./kafclaw gateway
+release-patch: ## Bump patch version + build release
+	bash scripts/release.sh patch
 
-kill-gateway: ## Kill any running gateway on ports 18790/18791
-	@set -euo pipefail; \
-	pids=""; \
-	for port in 18790 18791; do \
-	  pid=$$(lsof -ti tcp:$$port -sTCP:LISTEN || true); \
-	  if [[ -n "$$pid" ]]; then \
-	    pids="$$pids $$pid"; \
-	  fi; \
-	done; \
-	if [[ -n "$$pids" ]]; then \
-	  echo "Killing gateway PIDs:$$pids"; \
-	  kill $$pids; \
-	else \
-	  echo "No gateway processes found"; \
-	fi
+dist-go: ## Build Go distribution artifacts
+	bash scripts/dist_go.sh
 
-rerun: kill-gateway run ## Restart the gateway (kill + build + run)
+# ---------------------------------------------------------------------------
+# Docker
+# ---------------------------------------------------------------------------
 
-rerun-full: kill-gateway run-full ## Restart in full mode (kill + build + run)
+docker-build: ## Build Docker image
+	docker build -t gateway .
 
-rerun-headless: kill-gateway run-headless ## Restart in headless mode (kill + build + run)
+docker-up: ## Start docker compose stack
+	docker compose up -d
+
+docker-down: ## Stop docker compose stack
+	docker compose down
+
+docker-logs: ## Tail docker compose logs
+	docker compose logs -f
 
 # ---------------------------------------------------------------------------
 # Electron desktop app
 # ---------------------------------------------------------------------------
 
 electron-setup: ## Install Electron app dependencies
-	cd electron && npm install
+	cd desktop && npm install
 
-electron-dev: build electron-setup ## Dev mode: Vite + Electron (hot reload renderer)
-	cd electron && npm run dev
+electron-dev: ## Run Electron app in dev mode
+	cd desktop && npm run dev
 
-electron-build: build electron-setup ## Build Electron app (main + renderer)
-	cd electron && npm run build
+electron-build: ## Build Electron app
+	cd desktop && npm run build
 
-electron-start: electron-build ## Build and launch Electron app
-	cd electron && npm start
+electron-start: ## Start Electron app
+	cd desktop && npm run start
 
-electron-restart: kill-gateway electron-build ## Rebuild Go + Electron, reset mode selection, and launch
-	cd electron && npx electron . --reset-mode
+electron-restart: ## Restart Electron app
+	cd desktop && npm run restart
 
-electron-start-standalone: build electron-setup ## Launch Electron in standalone mode
-	cd electron && npm run build && npx electron . --mode=standalone
-
-electron-start-full: build electron-setup ## Launch Electron in full mode
-	cd electron && npm run build && npx electron . --mode=full
-
-electron-start-remote: electron-setup ## Launch Electron in remote client mode (no local binary)
-	cd electron && npm run build && npx electron . --mode=remote
-
-electron-dist: electron-build ## Package Electron app for current platform
-	cd electron && npm run dist
-
-electron-dist-mac: electron-build ## Package Electron .dmg for macOS
-	cd electron && npm run dist:mac
-
-electron-dist-linux: electron-build ## Package Electron .AppImage for Linux
-	cd electron && npm run dist:linux
+electron-dist: ## Package Electron app
+	cd desktop && npm run dist
 
 # ---------------------------------------------------------------------------
-# Releases — `make release-patch` bumps, commits, tags, pushes → CI builds
+# Utility
 # ---------------------------------------------------------------------------
 
-release: release-patch ## Default: bump patch and release
-
-release-major: ## Bump major version, commit, tag, push → triggers CI release
-	@bash ./scripts/release.sh major
-
-release-minor: ## Bump minor version, commit, tag, push → triggers CI release
-	@bash ./scripts/release.sh minor
-
-release-patch: ## Bump patch version, commit, tag, push → triggers CI release
-	@bash ./scripts/release.sh patch
-
-dist-go: ## Cross-compile Go binaries locally (all platforms)
-	@mkdir -p dist
-	GOOS=darwin  GOARCH=arm64 go build -o dist/kafclaw-darwin-arm64  ./cmd/kafclaw
-	GOOS=darwin  GOARCH=amd64 go build -o dist/kafclaw-darwin-amd64  ./cmd/kafclaw
-	GOOS=linux   GOARCH=amd64 go build -o dist/kafclaw-linux-amd64   ./cmd/kafclaw
-	GOOS=linux   GOARCH=arm64 go build -o dist/kafclaw-linux-arm64   ./cmd/kafclaw
-	@echo "Built 4 binaries in dist/"
-	@ls -lh dist/kafclaw-*
+kill-gateway: ## Kill any process listening on the gateway port (default 8080)
+	@PORT=8080; \
+	PIDS=$$(lsof -ti tcp:$$PORT || true); \
+	if [ -z "$$PIDS" ]; then \
+		echo "No process found listening on port $$PORT"; \
+	else \
+		echo "Killing processes on port $$PORT: $$PIDS"; \
+		kill -9 $$PIDS; \
+	fi
 
 # ---------------------------------------------------------------------------
-# Docker
+# Workshop (Docker-based dev env)
 # ---------------------------------------------------------------------------
 
-docker-build: ## Build local Docker image (kafclaw:local) — multi-stage, no host binary needed
-	docker build -t kafclaw:local -f Dockerfile .
+workshop-setup: ## Setup workshop env
+	bash scripts/workshop_setup.sh
 
-docker-up: docker-build ## Start docker-compose using local image only
-	SYSTEM_REPO_PATH=$${SYSTEM_REPO_PATH:-$$(pwd)} WORK_REPO_PATH=$${WORK_REPO_PATH:-$${HOME}/KafClaw-Workspace} docker compose -f docker-compose.yml up -d --no-build
-
-docker-down: ## Stop docker-compose
-	docker compose -f docker-compose.yml down
-
-docker-logs: ## Tail docker-compose logs
-	docker compose -f docker-compose.yml logs -f
-
-# ---------------------------------------------------------------------------
-# Workshop (group deployment: Kafka + 3 headless agents)
-# ---------------------------------------------------------------------------
-
-workshop-setup: ## Interactive setup for the 4-agent workshop
-	@bash scripts/setup-workshop.sh
-
-workshop-up: ## Start workshop stack (Kafka + 3 headless agents)
-	docker compose -f docker-compose.group.yml up -d
+workshop-up: ## Start workshop stack
+	docker compose -f workshop/docker-compose.yml up -d
 
 workshop-down: ## Stop workshop stack
-	docker compose -f docker-compose.group.yml down
+	docker compose -f workshop/docker-compose.yml down
 
 workshop-logs: ## Tail workshop logs
-	docker compose -f docker-compose.group.yml logs -f
+	docker compose -f workshop/docker-compose.yml logs -f
 
-workshop-ps: ## Show workshop container status
-	docker compose -f docker-compose.group.yml ps
+workshop-ps: ## Show workshop containers
+	docker compose -f workshop/docker-compose.yml ps

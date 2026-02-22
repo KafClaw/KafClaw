@@ -3,6 +3,7 @@ package provider
 
 import (
 	"context"
+	"time"
 )
 
 // LLMProvider is the interface for LLM API clients.
@@ -86,11 +87,17 @@ type FunctionDef struct {
 	Parameters  map[string]any `json:"parameters"`
 }
 
-// Usage contains token usage information.
+// Usage contains token usage information and optional rate limit data.
 type Usage struct {
 	PromptTokens     int `json:"prompt_tokens"`
 	CompletionTokens int `json:"completion_tokens"`
 	TotalTokens      int `json:"total_tokens"`
+	// Populated from HTTP response headers where the provider exposes them.
+	// nil means the provider did not report this value.
+	RemainingTokens   *int       `json:"remaining_tokens,omitempty"`
+	RemainingRequests *int       `json:"remaining_requests,omitempty"`
+	LimitTokens       *int       `json:"limit_tokens,omitempty"`
+	ResetAt           *time.Time `json:"reset_at,omitempty"`
 }
 
 // Embedder is an optional interface for providers that support embedding.

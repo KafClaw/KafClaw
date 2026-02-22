@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/KafClaw/KafClaw/internal/provider"
 	skillruntime "github.com/KafClaw/KafClaw/internal/skills"
 )
 
@@ -452,6 +453,232 @@ func TestEndpointLooksRemote(t *testing.T) {
 		if got != tc.remote {
 			t.Fatalf("endpointLooksRemote(%q)=%v, want %v", tc.endpoint, got, tc.remote)
 		}
+	}
+}
+
+func TestAppendProviderDoctorChecksWithModel(t *testing.T) {
+	tmpDir := t.TempDir()
+	cfgDir := filepath.Join(tmpDir, ".kafclaw")
+	if err := os.MkdirAll(cfgDir, 0o755); err != nil {
+		t.Fatalf("mkdir config dir: %v", err)
+	}
+	cfg := `{
+	  "gateway": {"host": "127.0.0.1"},
+	  "model": {"name": "claude/claude-sonnet-4-5"},
+	  "providers": {
+	    "anthropic": {"apiKey": "sk-ant-test"},
+	    "openai": {"apiKey": "sk-test"},
+	    "scalyticsCopilot": {"apiKey": "tok", "apiBase": ""},
+	    "vllm": {"apiKey": "tok", "apiBase": ""}
+	  }
+	}`
+	if err := os.WriteFile(filepath.Join(cfgDir, "config.json"), []byte(cfg), 0o600); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	origHome := os.Getenv("HOME")
+	defer os.Setenv("HOME", origHome)
+	_ = os.Setenv("HOME", tmpDir)
+
+	report, err := RunDoctor()
+	if err != nil {
+		t.Fatalf("run doctor: %v", err)
+	}
+	var modelPass, configuredPass, copilotFail, vllmFail bool
+	for _, c := range report.Checks {
+		switch c.Name {
+		case "provider_model":
+			if c.Status == DoctorPass && strings.Contains(c.Message, "claude/claude-sonnet") {
+				modelPass = true
+			}
+		case "provider_configured":
+			if c.Status == DoctorPass {
+				configuredPass = true
+			}
+		case "provider_scalytics_copilot_base":
+			if c.Status == DoctorFail {
+				copilotFail = true
+			}
+		case "provider_vllm_base":
+			if c.Status == DoctorFail {
+				vllmFail = true
+			}
+		}
+	}
+	if !modelPass {
+		t.Fatalf("expected provider_model pass, got %#v", report.Checks)
+	}
+	if !configuredPass {
+		t.Fatalf("expected provider_configured pass, got %#v", report.Checks)
+	}
+	if !copilotFail {
+		t.Fatalf("expected provider_scalytics_copilot_base fail, got %#v", report.Checks)
+	}
+	if !vllmFail {
+		t.Fatalf("expected provider_vllm_base fail, got %#v", report.Checks)
+	}
+}
+
+func clearProviderEnvVars(t *testing.T) {
+	t.Helper()
+	vars := []string{
+		"OPENAI_API_KEY", "OPENROUTER_API_KEY", "ANTHROPIC_API_KEY",
+		"GEMINI_API_KEY", "XAI_API_KEY", "DEEPSEEK_API_KEY", "GROQ_API_KEY",
+		"KAFCLAW_MODEL",
+	}
+	for _, v := range vars {
+		orig := os.Getenv(v)
+		t.Cleanup(func() { _ = os.Setenv(v, orig) })
+		_ = os.Unsetenv(v)
+	}
+}
+
+func TestAppendProviderDoctorChecksNoModel(t *testing.T) {
+	clearProviderEnvVars(t)
+	tmpDir := t.TempDir()
+	cfgDir := filepath.Join(tmpDir, ".kafclaw")
+	if err := os.MkdirAll(cfgDir, 0o755); err != nil {
+		t.Fatalf("mkdir config dir: %v", err)
+	}
+	// Explicit empty model.name, no OpenAI key → should warn + fail
+	cfg := `{"gateway": {"host": "127.0.0.1"}, "model": {"name": ""}}`
+	if err := os.WriteFile(filepath.Join(cfgDir, "config.json"), []byte(cfg), 0o600); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	origHome := os.Getenv("HOME")
+	defer os.Setenv("HOME", origHome)
+	_ = os.Setenv("HOME", tmpDir)
+
+	report, err := RunDoctor()
+	if err != nil {
+		t.Fatalf("run doctor: %v", err)
+	}
+	var modelWarn, openaiNoKey bool
+	for _, c := range report.Checks {
+		if c.Name == "provider_model" && c.Status == DoctorWarn {
+			modelWarn = true
+		}
+		if c.Name == "provider_openai" && c.Status == DoctorFail {
+			openaiNoKey = true
+		}
+	}
+	if !modelWarn {
+		t.Fatalf("expected provider_model warn for empty model, got %#v", report.Checks)
+	}
+	if !openaiNoKey {
+		t.Fatalf("expected provider_openai fail for missing key, got %#v", report.Checks)
+	}
+}
+
+func TestAppendProviderDoctorChecksNoModelWithOpenAIKey(t *testing.T) {
+	clearProviderEnvVars(t)
+	tmpDir := t.TempDir()
+	cfgDir := filepath.Join(tmpDir, ".kafclaw")
+	if err := os.MkdirAll(cfgDir, 0o755); err != nil {
+		t.Fatalf("mkdir config dir: %v", err)
+	}
+	cfg := `{
+	  "gateway": {"host": "127.0.0.1"},
+	  "model": {"name": ""},
+	  "providers": {"openai": {"apiKey": "sk-test"}}
+	}`
+	if err := os.WriteFile(filepath.Join(cfgDir, "config.json"), []byte(cfg), 0o600); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	origHome := os.Getenv("HOME")
+	defer os.Setenv("HOME", origHome)
+	_ = os.Setenv("HOME", tmpDir)
+
+	report, err := RunDoctor()
+	if err != nil {
+		t.Fatalf("run doctor: %v", err)
+	}
+	var openaiPass bool
+	for _, c := range report.Checks {
+		if c.Name == "provider_openai" && c.Status == DoctorPass {
+			openaiPass = true
+		}
+	}
+	if !openaiPass {
+		t.Fatalf("expected provider_openai pass with key, got %#v", report.Checks)
+	}
+}
+
+func TestAppendProviderDoctorChecksNoProviderKeys(t *testing.T) {
+	clearProviderEnvVars(t)
+	tmpDir := t.TempDir()
+	cfgDir := filepath.Join(tmpDir, ".kafclaw")
+	if err := os.MkdirAll(cfgDir, 0o755); err != nil {
+		t.Fatalf("mkdir config dir: %v", err)
+	}
+	cfg := `{
+	  "gateway": {"host": "127.0.0.1"},
+	  "model": {"name": "claude/claude-sonnet-4-5"}
+	}`
+	if err := os.WriteFile(filepath.Join(cfgDir, "config.json"), []byte(cfg), 0o600); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	origHome := os.Getenv("HOME")
+	defer os.Setenv("HOME", origHome)
+	_ = os.Setenv("HOME", tmpDir)
+
+	report, err := RunDoctor()
+	if err != nil {
+		t.Fatalf("run doctor: %v", err)
+	}
+	var noProvidersWarn bool
+	for _, c := range report.Checks {
+		if c.Name == "provider_configured" && c.Status == DoctorWarn {
+			noProvidersWarn = true
+		}
+	}
+	if !noProvidersWarn {
+		t.Fatalf("expected provider_configured warn, got %#v", report.Checks)
+	}
+}
+
+func TestAppendRateLimitDoctorChecks(t *testing.T) {
+	// Seed the rate limit cache with a low-remaining provider.
+	remaining := 400
+	limit := 50000
+	provider.UpdateRateLimitCache("test-provider", &provider.Usage{
+		RemainingTokens: &remaining,
+		LimitTokens:     &limit,
+	})
+	t.Cleanup(func() {
+		// Clear by setting nil values.
+		provider.UpdateRateLimitCache("test-provider", &provider.Usage{})
+	})
+
+	tmpDir := t.TempDir()
+	cfgDir := filepath.Join(tmpDir, ".kafclaw")
+	if err := os.MkdirAll(cfgDir, 0o755); err != nil {
+		t.Fatalf("mkdir config dir: %v", err)
+	}
+	cfg := `{"gateway": {"host": "127.0.0.1"}}`
+	if err := os.WriteFile(filepath.Join(cfgDir, "config.json"), []byte(cfg), 0o600); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	origHome := os.Getenv("HOME")
+	defer os.Setenv("HOME", origHome)
+	_ = os.Setenv("HOME", tmpDir)
+
+	report, err := RunDoctor()
+	if err != nil {
+		t.Fatalf("run doctor: %v", err)
+	}
+	var rateLimitWarn bool
+	for _, c := range report.Checks {
+		if c.Name == "rate_limit_test-provider" && c.Status == DoctorWarn {
+			rateLimitWarn = true
+		}
+	}
+	if !rateLimitWarn {
+		t.Fatalf("expected rate_limit_test-provider warn, got %#v", report.Checks)
 	}
 }
 

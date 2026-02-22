@@ -106,7 +106,7 @@ Onboarding does three things:
 You will be asked for:
 
 - runtime mode: `local`, `local-kafka`, or `remote`
-- LLM setup: `cli-token`, `openai-compatible`, or `skip`
+- LLM setup: `claude`, `openai`, `gemini`, `gemini-cli`, `openai-codex`, `xai`, `scalytics-copilot`, `openrouter`, `deepseek`, `groq`, `openai-compatible`, `cli-token`, or `skip`
 
 Before writing config, onboarding shows a summary and asks for confirmation.
 
@@ -161,26 +161,52 @@ Remote + Ollama/vLLM:
 
 ### LLM Provider Setup (Interactive)
 
-Yes, token setup is supported interactively via onboarding.
-
 Run:
 
 ```bash
 ./kafclaw onboard
 ```
 
-Then choose one of:
+Then choose your LLM provider:
 
-- `cli-token`:
-  - prompts for API token (interactive)
-  - uses OpenAI-compatible provider path
-  - defaults API base to `https://openrouter.ai/api/v1`
-- `openai-compatible`:
-  - prompts for API base (required)
-  - prompts for API token (optional)
-  - useful for Ollama/vLLM/self-hosted gateways
-- `skip`:
-  - keeps current provider settings
+**API key providers** — prompts for API key, sets model and base URL automatically:
+- `claude` — Anthropic Claude (default model: `claude/claude-sonnet-4-5`)
+- `openai` — OpenAI (default model: `openai/gpt-4o`)
+- `gemini` — Google Gemini via API key (default model: `gemini/gemini-2.5-pro`)
+- `xai` — xAI/Grok (default model: `xai/grok-3`)
+- `openrouter` — OpenRouter (default model: `openrouter/anthropic/claude-sonnet-4-5`)
+- `deepseek` — DeepSeek (default model: `deepseek/deepseek-chat`)
+- `groq` — Groq (default model: `groq/llama-3.3-70b-versatile`)
+- `scalytics-copilot` — Scalytics Copilot (prompts for base URL)
+
+**OAuth providers** — delegates to CLI auth flow:
+- `gemini-cli` — Google Gemini via CLI OAuth
+- `openai-codex` — OpenAI Codex via CLI OAuth
+
+**Generic / Legacy:**
+- `cli-token` — prompts for API token, defaults to OpenRouter base
+- `openai-compatible` — prompts for API base and token (Ollama/vLLM/self-hosted)
+- `skip` — keeps current provider settings
+
+### Post-Onboarding Provider Management
+
+After onboarding, manage providers with the `models` command:
+
+```bash
+# List configured providers
+kafclaw models list
+
+# Add another provider
+kafclaw models auth set-key --provider groq --key gsk_...
+
+# OAuth login
+kafclaw models auth login --provider gemini
+
+# Check usage
+kafclaw models stats
+```
+
+See [LLM Providers](../reference/providers/) and [Models CLI](../reference/models-cli/) for full details.
 
 To reconfigure provider/token later, run onboarding again (interactive) or use:
 

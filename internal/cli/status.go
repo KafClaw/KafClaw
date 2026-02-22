@@ -9,6 +9,7 @@ import (
 
 	"github.com/KafClaw/KafClaw/internal/channels"
 	"github.com/KafClaw/KafClaw/internal/config"
+	"github.com/KafClaw/KafClaw/internal/provider"
 	"github.com/spf13/cobra"
 )
 
@@ -48,6 +49,11 @@ var statusCmd = &cobra.Command{
 			}
 		} else {
 			fmt.Println("API Key: ? Unable to load config")
+		}
+
+		// Provider / model info
+		if cfg != nil {
+			printProviderStatus(cfg)
 		}
 
 		// WhatsApp status + QR location
@@ -201,6 +207,100 @@ func issuesForAccount(channel, account string, diags []channels.AccountDiagnosti
 		}
 	}
 	return nil
+}
+
+func printProviderStatus(cfg *config.Config) {
+	// Active model
+	modelName := cfg.Model.Name
+	if modelName == "" {
+		modelName = "(legacy openai fallback)"
+	}
+	fmt.Printf("Model:    %s\n", modelName)
+
+	// Configured providers
+	var configured []string
+	if cfg.Providers.OpenAI.APIKey != "" {
+		configured = append(configured, "openai")
+	}
+	if cfg.Providers.Anthropic.APIKey != "" {
+		configured = append(configured, "claude")
+	}
+	if cfg.Providers.Gemini.APIKey != "" {
+		configured = append(configured, "gemini")
+	}
+	if cfg.Providers.XAI.APIKey != "" {
+		configured = append(configured, "xai")
+	}
+	if cfg.Providers.ScalyticsCopilot.APIKey != "" {
+		configured = append(configured, "scalytics-copilot")
+	}
+	if cfg.Providers.OpenRouter.APIKey != "" {
+		configured = append(configured, "openrouter")
+	}
+	if cfg.Providers.DeepSeek.APIKey != "" {
+		configured = append(configured, "deepseek")
+	}
+	if cfg.Providers.Groq.APIKey != "" {
+		configured = append(configured, "groq")
+	}
+	if cfg.Providers.VLLM.APIBase != "" {
+		configured = append(configured, "vllm")
+	}
+	if len(configured) > 0 {
+		sort.Strings(configured)
+		fmt.Printf("Providers: %s\n", strings.Join(configured, ", "))
+	} else {
+		fmt.Println("Providers: none configured")
+	}
+
+	// Today's token usage from timeline
+	if timeSvc, err := openTimelineService(); err == nil {
+		if usage, err := timeSvc.GetDailyTokenUsage(); err == nil {
+			fmt.Printf("Tokens:   %d today\n", usage)
+		}
+		_ = timeSvc.Close()
+	}
+
+	// Rate limit snapshots
+	snapshots := provider.AllRateLimitSnapshots()
+	if len(snapshots) > 0 {
+		keys := make([]string, 0, len(snapshots))
+		for k := range snapshots {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for _, k := range keys {
+			snap := snapshots[k]
+			parts := []string{}
+			if snap.RemainingTokens != nil {
+				parts = append(parts, fmt.Sprintf("tokens=%d", *snap.RemainingTokens))
+			}
+			if snap.RemainingRequests != nil {
+				parts = append(parts, fmt.Sprintf("requests=%d", *snap.RemainingRequests))
+			}
+			if len(parts) > 0 {
+				fmt.Printf("Rate [%s]: %s\n", k, strings.Join(parts, " "))
+			}
+		}
+	}
+
+	// Middleware status
+	var active []string
+	if cfg.ContentClassification.Enabled {
+		active = append(active, "classifier")
+	}
+	if cfg.PromptGuard.Enabled {
+		active = append(active, "prompt-guard")
+	}
+	if cfg.OutputSanitization.Enabled {
+		active = append(active, "sanitizer")
+	}
+	if cfg.FinOps.Enabled {
+		active = append(active, "finops")
+	}
+	if len(active) > 0 {
+		fmt.Printf("Middleware: %s\n", strings.Join(active, ", "))
+	}
 }
 
 func sessionScopeHint(channel, mode string) string {

@@ -114,27 +114,59 @@ func TestApplyLLMOpenAICompatible(t *testing.T) {
 	}
 }
 
-func TestApplyLLMCLITokenDefaultBase(t *testing.T) {
+func TestApplyLLMCLITokenSetsKey(t *testing.T) {
 	cfg := config.DefaultConfig()
 	err := applyLLM(cfg, LLMPresetCLIToken, bufio.NewReader(strings.NewReader("")), &bytes.Buffer{}, WizardParams{
 		LLMToken:       "abc123",
-		LLMModel:       "anthropic/claude-sonnet-4-5",
+		LLMModel:       "openai/gpt-4.1",
 		NonInteractive: true,
 	})
 	if err != nil {
 		t.Fatalf("apply llm token: %v", err)
 	}
-	if cfg.Providers.OpenAI.APIBase != "https://openrouter.ai/api/v1" {
-		t.Fatalf("expected openrouter base, got %q", cfg.Providers.OpenAI.APIBase)
-	}
 	if cfg.Providers.OpenAI.APIKey != "abc123" {
 		t.Fatalf("expected token set, got %q", cfg.Providers.OpenAI.APIKey)
+	}
+	if cfg.Model.Name != "openai/gpt-4.1" {
+		t.Fatalf("expected model set, got %q", cfg.Model.Name)
+	}
+}
+
+func TestApplyLLMClaudePreset(t *testing.T) {
+	cfg := config.DefaultConfig()
+	err := applyLLM(cfg, LLMPresetClaude, bufio.NewReader(strings.NewReader("")), &bytes.Buffer{}, WizardParams{
+		LLMToken:       "sk-ant-key",
+		LLMModel:       "claude/claude-sonnet-4-5-20250514",
+		NonInteractive: true,
+	})
+	if err != nil {
+		t.Fatalf("apply llm claude: %v", err)
+	}
+	if cfg.Providers.Anthropic.APIKey != "sk-ant-key" {
+		t.Fatalf("expected anthropic key set, got %q", cfg.Providers.Anthropic.APIKey)
+	}
+	if cfg.Model.Name != "claude/claude-sonnet-4-5-20250514" {
+		t.Fatalf("expected model set, got %q", cfg.Model.Name)
+	}
+}
+
+func TestApplyLLMGeminiCLIPreset(t *testing.T) {
+	cfg := config.DefaultConfig()
+	err := applyLLM(cfg, LLMPresetGeminiCLI, bufio.NewReader(strings.NewReader("")), &bytes.Buffer{}, WizardParams{
+		NonInteractive: true,
+	})
+	if err != nil {
+		t.Fatalf("apply llm gemini-cli: %v", err)
+	}
+	if cfg.Model.Name != "gemini-cli/gemini-2.5-pro" {
+		t.Fatalf("expected gemini-cli model, got %q", cfg.Model.Name)
 	}
 }
 
 func TestRunProfileWizardInteractive(t *testing.T) {
 	cfg := config.DefaultConfig()
-	input := strings.NewReader("2\n2\nhttp://localhost:8000/v1\n\nmistral-small\n")
+	// Mode choice 2 = local+kafka, LLM choice 11 = openai-compatible, then base/token/model
+	input := strings.NewReader("2\n11\nhttp://localhost:8000/v1\n\nmistral-small\n")
 	out := &bytes.Buffer{}
 
 	err := RunProfileWizard(cfg, input, out, WizardParams{})
@@ -211,7 +243,7 @@ func TestResolveModeInvalidChoice(t *testing.T) {
 }
 
 func TestResolveLLMPresetInvalidChoice(t *testing.T) {
-	_, err := resolveLLMPreset(bufio.NewReader(strings.NewReader("7\n")), &bytes.Buffer{}, WizardParams{})
+	_, err := resolveLLMPreset(bufio.NewReader(strings.NewReader("99\n")), &bytes.Buffer{}, WizardParams{})
 	if err == nil {
 		t.Fatal("expected invalid llm choice error")
 	}

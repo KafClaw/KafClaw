@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -99,6 +100,87 @@ func TestRunGitAndRunGhRepoValidation(t *testing.T) {
 	if _, err := runGh(""); err == nil {
 		t.Fatal("expected runGh to reject empty repo")
 	}
+}
+
+func TestRunGitDisallowedSubcommand(t *testing.T) {
+	repo := t.TempDir()
+	_, err := runGit(repo, "rebase")
+	if err == nil {
+		t.Fatal("expected runGit to reject disallowed subcommand")
+	}
+	if !strings.Contains(err.Error(), "not allowed") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestRunGitNoArgs(t *testing.T) {
+	repo := t.TempDir()
+	_, err := runGit(repo)
+	if err == nil {
+		t.Fatal("expected runGit to reject empty args")
+	}
+}
+
+func TestRunGitUnsafeArg(t *testing.T) {
+	repo := t.TempDir()
+	_, err := runGit(repo, "status", "$(rm -rf /)")
+	if err == nil {
+		t.Fatal("expected runGit to reject unsafe arg")
+	}
+	if !strings.Contains(err.Error(), "unsafe") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestRunGitGitNotFound(t *testing.T) {
+	repo := t.TempDir()
+	origPath := os.Getenv("PATH")
+	t.Cleanup(func() { _ = os.Setenv("PATH", origPath) })
+	_ = os.Setenv("PATH", t.TempDir()) // empty dir, no git binary
+	_, err := runGit(repo, "status")
+	if err == nil {
+		t.Fatal("expected runGit to fail when git is not in PATH")
+	}
+	if !strings.Contains(err.Error(), "git not found") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestRunGitCmdFailure(t *testing.T) {
+	repo := t.TempDir() // not a git repo, so git status will fail
+	_, err := runGit(repo, "status")
+	if err == nil {
+		t.Fatal("expected runGit to fail on non-git directory")
+	}
+	if !strings.Contains(err.Error(), "failed") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestRunGitHappyPath(t *testing.T) {
+	repo := t.TempDir()
+	// Init a real git repo so the happy path works.
+	initCmd := &exec.Cmd{Path: gitBinPath(t), Args: []string{"git", "init"}, Dir: repo}
+	if out, err := initCmd.CombinedOutput(); err != nil {
+		t.Fatalf("git init: %s: %v", out, err)
+	}
+
+	out, err := runGit(repo, "status", "-sb")
+	if err != nil {
+		t.Fatalf("expected runGit success, got: %v", err)
+	}
+	if out == "" {
+		t.Fatal("expected non-empty output from git status")
+	}
+}
+
+func gitBinPath(t *testing.T) string {
+	t.Helper()
+	p, err := exec.LookPath("git")
+	if err != nil {
+		t.Skip("git not found in PATH")
+	}
+	return p
 }
 
 func TestRunGhSuccessAndFailureWithFakeBinary(t *testing.T) {

@@ -197,3 +197,134 @@ func TestListTasks(t *testing.T) {
 		t.Fatalf("expected 2 whatsapp tasks, got %d", len(wa))
 	}
 }
+
+func TestUpdateTaskTokensWithProvider(t *testing.T) {
+	svc := newTestTimeline(t)
+	task, err := svc.CreateTask(&AgentTask{Channel: "cli", ChatID: "test", ContentIn: "hi"})
+	if err != nil {
+		t.Fatalf("create task: %v", err)
+	}
+
+	if err := svc.UpdateTaskTokensWithProvider(task.TaskID, 100, 50, 150, "claude", "claude-sonnet-4-6"); err != nil {
+		t.Fatalf("update tokens: %v", err)
+	}
+
+	got, err := svc.GetTask(task.TaskID)
+	if err != nil {
+		t.Fatalf("get task: %v", err)
+	}
+	if got.PromptTokens != 100 || got.CompletionTokens != 50 || got.TotalTokens != 150 {
+		t.Errorf("tokens mismatch: prompt=%d completion=%d total=%d", got.PromptTokens, got.CompletionTokens, got.TotalTokens)
+	}
+
+	// Second update should accumulate tokens but keep provider/model from first.
+	if err := svc.UpdateTaskTokensWithProvider(task.TaskID, 200, 100, 300, "openai", "gpt-4o"); err != nil {
+		t.Fatalf("update tokens 2: %v", err)
+	}
+	got, _ = svc.GetTask(task.TaskID)
+	if got.TotalTokens != 450 {
+		t.Errorf("expected accumulated tokens 450, got %d", got.TotalTokens)
+	}
+}
+
+func TestUpdateTaskCost(t *testing.T) {
+	svc := newTestTimeline(t)
+	task, _ := svc.CreateTask(&AgentTask{Channel: "cli", ChatID: "test", ContentIn: "cost test"})
+
+	if err := svc.UpdateTaskCost(task.TaskID, 0.0123); err != nil {
+		t.Fatalf("update cost: %v", err)
+	}
+	if err := svc.UpdateTaskCost(task.TaskID, 0.0050); err != nil {
+		t.Fatalf("update cost 2: %v", err)
+	}
+	// Cost should accumulate (0.0123 + 0.005 = 0.0173)
+}
+
+func TestGetDailyTokenUsageByProvider(t *testing.T) {
+	svc := newTestTimeline(t)
+
+	t1, _ := svc.CreateTask(&AgentTask{Channel: "cli", ChatID: "a", ContentIn: "1"})
+	t2, _ := svc.CreateTask(&AgentTask{Channel: "cli", ChatID: "b", ContentIn: "2"})
+	t3, _ := svc.CreateTask(&AgentTask{Channel: "cli", ChatID: "c", ContentIn: "3"})
+
+	_ = svc.UpdateTaskTokensWithProvider(t1.TaskID, 100, 50, 150, "claude", "sonnet")
+	_ = svc.UpdateTaskTokensWithProvider(t2.TaskID, 200, 100, 300, "claude", "sonnet")
+	_ = svc.UpdateTaskTokensWithProvider(t3.TaskID, 50, 25, 75, "openai", "gpt-4o")
+
+	byProv, err := svc.GetDailyTokenUsageByProvider()
+	if err != nil {
+		t.Fatalf("get by provider: %v", err)
+	}
+	if byProv["claude"] != 450 {
+		t.Errorf("expected claude=450, got %d", byProv["claude"])
+	}
+	if byProv["openai"] != 75 {
+		t.Errorf("expected openai=75, got %d", byProv["openai"])
+	}
+}
+
+func TestGetDailyCostByProvider(t *testing.T) {
+	svc := newTestTimeline(t)
+
+	t1, _ := svc.CreateTask(&AgentTask{Channel: "cli", ChatID: "a", ContentIn: "1"})
+	t2, _ := svc.CreateTask(&AgentTask{Channel: "cli", ChatID: "b", ContentIn: "2"})
+
+	_ = svc.UpdateTaskTokensWithProvider(t1.TaskID, 100, 50, 150, "claude", "sonnet")
+	_ = svc.UpdateTaskCost(t1.TaskID, 0.05)
+	_ = svc.UpdateTaskTokensWithProvider(t2.TaskID, 200, 100, 300, "openai", "gpt-4o")
+	_ = svc.UpdateTaskCost(t2.TaskID, 0.02)
+
+	costs, err := svc.GetDailyCostByProvider()
+	if err != nil {
+		t.Fatalf("get cost by provider: %v", err)
+	}
+	if costs["claude"] < 0.049 || costs["claude"] > 0.051 {
+		t.Errorf("expected claude cost ~0.05, got %f", costs["claude"])
+	}
+	if costs["openai"] < 0.019 || costs["openai"] > 0.021 {
+		t.Errorf("expected openai cost ~0.02, got %f", costs["openai"])
+	}
+}
+
+func TestGetDailyTokenUsage(t *testing.T) {
+	svc := newTestTimeline(t)
+
+	task, _ := svc.CreateTask(&AgentTask{Channel: "cli", ChatID: "a", ContentIn: "1"})
+	_ = svc.UpdateTaskTokens(task.TaskID, 100, 50, 150)
+
+	total, err := svc.GetDailyTokenUsage()
+	if err != nil {
+		t.Fatalf("get daily usage: %v", err)
+	}
+	if total != 150 {
+		t.Errorf("expected 150, got %d", total)
+	}
+}
+
+func TestGetTokenUsageSummary(t *testing.T) {
+	svc := newTestTimeline(t)
+
+	t1, _ := svc.CreateTask(&AgentTask{Channel: "cli", ChatID: "a", ContentIn: "1"})
+	t2, _ := svc.CreateTask(&AgentTask{Channel: "cli", ChatID: "b", ContentIn: "2"})
+
+	_ = svc.UpdateTaskTokensWithProvider(t1.TaskID, 100, 50, 150, "claude", "sonnet")
+	_ = svc.UpdateTaskCost(t1.TaskID, 0.01)
+	_ = svc.UpdateTaskTokensWithProvider(t2.TaskID, 200, 100, 300, "openai", "gpt-4o")
+	_ = svc.UpdateTaskCost(t2.TaskID, 0.03)
+
+	summary, err := svc.GetTokenUsageSummary(1)
+	if err != nil {
+		t.Fatalf("get summary: %v", err)
+	}
+	if len(summary) < 2 {
+		t.Fatalf("expected at least 2 entries, got %d", len(summary))
+	}
+	// Verify cost is included
+	totalCost := 0.0
+	for _, s := range summary {
+		totalCost += s.CostUSD
+	}
+	if totalCost < 0.03 {
+		t.Errorf("expected total cost >= 0.03, got %f", totalCost)
+	}
+}

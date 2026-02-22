@@ -13,6 +13,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -125,11 +126,16 @@ func runGatewayMain(cmd *cobra.Command, args []string) {
 	msgBus := bus.NewMessageBus()
 
 	// 4. Setup Providers
-	oaProv := provider.NewOpenAIProvider(cfg.Providers.OpenAI.APIKey, cfg.Providers.OpenAI.APIBase, cfg.Model.Name)
-	var prov provider.LLMProvider = oaProv
+	prov, provErr := provider.Resolve(cfg, "main")
+	if provErr != nil {
+		fmt.Printf("Provider error: %v\n", provErr)
+		os.Exit(1)
+	}
 
 	if cfg.Providers.LocalWhisper.Enabled {
-		prov = provider.NewLocalWhisperProvider(cfg.Providers.LocalWhisper, oaProv)
+		if oaProv, ok := prov.(*provider.OpenAIProvider); ok {
+			prov = provider.NewLocalWhisperProvider(cfg.Providers.LocalWhisper, oaProv)
+		}
 	}
 
 	// 4b. Setup Policy Engine
@@ -417,6 +423,7 @@ func runGatewayMain(cmd *cobra.Command, args []string) {
 		SubagentThinking:      cfg.Tools.Subagents.Thinking,
 		SubagentToolsAllow:    cfg.Tools.Subagents.Tools.Allow,
 		SubagentToolsDeny:     cfg.Tools.Subagents.Tools.Deny,
+		Config:                cfg,
 	})
 
 	// 5b. Index soul files (non-blocking background)
@@ -659,6 +666,7 @@ func runGatewayMain(cmd *cobra.Command, args []string) {
 				Metadata:       string(outMeta),
 			})
 			fmt.Printf("📤 Local outbound status=sent session=%s\n", session)
+			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 			fmt.Fprint(w, resp)
 		})
 
@@ -2541,13 +2549,13 @@ func runGatewayMain(cmd *cobra.Command, args []string) {
 			w.Header().Set("Content-Type", "application/json")
 
 			repo := resolveRepo(r)
-			rel := strings.TrimSpace(r.URL.Query().Get("path"))
-			if rel == "" {
+			rel := filepath.Clean(strings.TrimSpace(r.URL.Query().Get("path")))
+			if rel == "" || rel == "." || strings.Contains(rel, "..") {
 				http.Error(w, "path required", http.StatusBadRequest)
 				return
 			}
 			full := filepath.Join(repo, rel)
-			if !isWithin(repo, full) {
+			if verified, err := filepath.Rel(repo, full); err != nil || strings.HasPrefix(verified, "..") {
 				http.Error(w, "path outside repo", http.StatusBadRequest)
 				return
 			}
@@ -2668,8 +2676,8 @@ func runGatewayMain(cmd *cobra.Command, args []string) {
 				return
 			}
 			branch := strings.TrimSpace(body.Branch)
-			if branch == "" {
-				http.Error(w, "branch required", http.StatusBadRequest)
+			if branch == "" || strings.HasPrefix(branch, "-") {
+				http.Error(w, "invalid branch name", http.StatusBadRequest)
 				return
 			}
 			out, err := runGit(resolveRepo(r), "checkout", branch)
@@ -2687,6 +2695,10 @@ func runGatewayMain(cmd *cobra.Command, args []string) {
 			limit := strings.TrimSpace(r.URL.Query().Get("limit"))
 			if limit == "" {
 				limit = "20"
+			}
+			if n, err := strconv.Atoi(limit); err != nil || n < 1 || n > 500 {
+				http.Error(w, "limit must be a number between 1 and 500", http.StatusBadRequest)
+				return
 			}
 			out, err := runGit(resolveRepo(r), "log", "--oneline", "-n", limit)
 			if err != nil {
@@ -2707,9 +2719,9 @@ func runGatewayMain(cmd *cobra.Command, args []string) {
 		mux.HandleFunc("/api/v1/repo/diff-file", func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Access-Control-Allow-Origin", "*")
 			w.Header().Set("Content-Type", "application/json")
-			rel := strings.TrimSpace(r.URL.Query().Get("path"))
-			if rel == "" {
-				http.Error(w, "path required", http.StatusBadRequest)
+			rel := filepath.Clean(strings.TrimSpace(r.URL.Query().Get("path")))
+			if rel == "" || rel == "." || strings.HasPrefix(rel, "-") {
+				http.Error(w, "invalid path", http.StatusBadRequest)
 				return
 			}
 			out, err := runGit(resolveRepo(r), "diff", "--", rel)
@@ -2724,9 +2736,9 @@ func runGatewayMain(cmd *cobra.Command, args []string) {
 		mux.HandleFunc("/api/v1/repo/diff", func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Access-Control-Allow-Origin", "*")
 			w.Header().Set("Content-Type", "application/json")
-			rel := strings.TrimSpace(r.URL.Query().Get("path"))
+			rel := filepath.Clean(strings.TrimSpace(r.URL.Query().Get("path")))
 			args := []string{"diff"}
-			if rel != "" {
+			if rel != "" && rel != "." && !strings.HasPrefix(rel, "-") {
 				args = append(args, "--", rel)
 			}
 			out, err := runGit(resolveRepo(r), args...)
@@ -2828,9 +2840,10 @@ func runGatewayMain(cmd *cobra.Command, args []string) {
 			} else if warn != "" {
 				fmt.Printf("Work repo warning: %s\n", warn)
 			}
-			if strings.TrimSpace(body.RemoteURL) != "" {
+			remoteURL := strings.TrimSpace(body.RemoteURL)
+			if remoteURL != "" && !strings.HasPrefix(remoteURL, "-") {
 				_, _ = runGit(repo, "remote", "remove", "origin")
-				if _, err := runGit(repo, "remote", "add", "origin", strings.TrimSpace(body.RemoteURL)); err != nil {
+				if _, err := runGit(repo, "remote", "add", "origin", remoteURL); err != nil {
 					http.Error(w, err.Error(), http.StatusInternalServerError)
 					return
 				}
@@ -3455,15 +3468,40 @@ func listRepoTree(root, repoRoot string) ([]RepoItem, error) {
 	return items, err
 }
 
+// gitSubcommands is the allowlist of git subcommands accepted by runGit.
+var gitSubcommands = map[string]bool{
+	"status": true, "branch": true, "checkout": true, "log": true,
+	"diff": true, "add": true, "commit": true, "pull": true,
+	"push": true, "remote": true, "init": true,
+}
+
+// safeGitArg matches characters safe for git arguments.
+var safeGitArg = regexp.MustCompile(`^[a-zA-Z0-9_./:@=, +\-~^]+$`)
+
 func runGit(repo string, args ...string) (string, error) {
 	if repo == "" {
 		return "", fmt.Errorf("work repo not configured")
 	}
-	cmd := exec.Command("git", args...)
-	cmd.Dir = repo
+	if len(args) == 0 || !gitSubcommands[args[0]] {
+		return "", fmt.Errorf("git subcommand not allowed: %v", args)
+	}
+	for _, a := range args[1:] {
+		if !safeGitArg.MatchString(a) {
+			return "", fmt.Errorf("git arg contains unsafe characters: %q", a)
+		}
+	}
+	gitBin, err := exec.LookPath("git")
+	if err != nil {
+		return "", fmt.Errorf("git not found: %w", err)
+	}
+	cmd := &exec.Cmd{
+		Path: gitBin,
+		Args: append([]string{gitBin}, args...),
+		Dir:  repo,
+	}
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		return "", fmt.Errorf("git %s failed: %s", strings.Join(args, " "), strings.TrimSpace(string(out)))
+		return "", fmt.Errorf("git %s failed: %s", args[0], strings.TrimSpace(string(out)))
 	}
 	return string(out), nil
 }

@@ -14,14 +14,17 @@ func EnsureWorkRepo(path string) (string, error) {
 	if path == "" {
 		return "", fmt.Errorf("work repo path is empty")
 	}
+	path, err := sanitizeRepoPath(path)
+	if err != nil {
+		return "", err
+	}
 	if err := os.MkdirAll(path, 0755); err != nil {
 		return "", err
 	}
 	// Ensure standard artifact directories exist.
-	_ = os.MkdirAll(filepath.Join(path, "requirements"), 0755)
-	_ = os.MkdirAll(filepath.Join(path, "tasks"), 0755)
-	_ = os.MkdirAll(filepath.Join(path, "docs"), 0755)
-	_ = os.MkdirAll(filepath.Join(path, "memory"), 0755)
+	for _, sub := range []string{"requirements", "tasks", "docs", "memory"} {
+		_ = os.MkdirAll(filepath.Join(path, sub), 0755)
+	}
 
 	gitDir := filepath.Join(path, ".git")
 	if _, err := os.Stat(gitDir); err == nil {
@@ -59,4 +62,16 @@ func ResolveArtifactPath(workRepoPath, kind, filename string) (string, error) {
 		filename = "artifact.md"
 	}
 	return filepath.Join(workRepoPath, k, filename), nil
+}
+
+// sanitizeRepoPath resolves the path to an absolute form and rejects traversal.
+func sanitizeRepoPath(p string) (string, error) {
+	abs, err := filepath.Abs(filepath.Clean(p))
+	if err != nil {
+		return "", fmt.Errorf("invalid repo path: %w", err)
+	}
+	if strings.Contains(abs, "..") {
+		return "", fmt.Errorf("path traversal in repo path")
+	}
+	return abs, nil
 }

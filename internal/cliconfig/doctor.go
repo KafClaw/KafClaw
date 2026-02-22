@@ -14,6 +14,7 @@ import (
 
 	"github.com/KafClaw/KafClaw/internal/channels"
 	"github.com/KafClaw/KafClaw/internal/config"
+	"github.com/KafClaw/KafClaw/internal/provider"
 	skillruntime "github.com/KafClaw/KafClaw/internal/skills"
 )
 
@@ -224,6 +225,8 @@ func RunDoctorWithOptions(opts DoctorOptions) (DoctorReport, error) {
 		})
 	}
 
+	appendProviderDoctorChecks(&report, cfg)
+
 	mode := detectRuntimeMode(cfg)
 	report.Checks = append(report.Checks, DoctorCheck{
 		Name:    "runtime_mode",
@@ -300,6 +303,7 @@ func RunDoctorWithOptions(opts DoctorOptions) (DoctorReport, error) {
 		})
 	}
 
+	appendRateLimitDoctorChecks(&report)
 	appendSkillsDoctorChecks(&report, cfg, opts)
 
 	return report, nil
@@ -765,6 +769,136 @@ func endpointLooksRemote(endpoint string) bool {
 		host = strings.TrimSpace(e)
 	}
 	return !isLoopbackHost(host)
+}
+
+func appendProviderDoctorChecks(report *DoctorReport, cfg *config.Config) {
+	if cfg == nil {
+		return
+	}
+
+	// Determine which provider is needed from model.name
+	modelStr := cfg.Model.Name
+	if modelStr == "" {
+		report.Checks = append(report.Checks, DoctorCheck{
+			Name:    "provider_model",
+			Status:  DoctorWarn,
+			Message: "model.name is empty — using legacy OpenAI fallback",
+		})
+		// Check if legacy OpenAI is configured
+		if cfg.Providers.OpenAI.APIKey == "" {
+			report.Checks = append(report.Checks, DoctorCheck{
+				Name:    "provider_openai",
+				Status:  DoctorFail,
+				Message: "no model configured and providers.openai.apiKey is empty",
+			})
+		} else {
+			report.Checks = append(report.Checks, DoctorCheck{
+				Name:    "provider_openai",
+				Status:  DoctorPass,
+				Message: "legacy OpenAI fallback: API key is configured",
+			})
+		}
+		return
+	}
+
+	report.Checks = append(report.Checks, DoctorCheck{
+		Name:    "provider_model",
+		Status:  DoctorPass,
+		Message: fmt.Sprintf("model.name: %s", modelStr),
+	})
+
+	// Check each configured provider's readiness
+	type provCheck struct {
+		id      string
+		hasKey  bool
+		hasBase bool
+		needKey bool
+	}
+	checks := []provCheck{
+		{"claude", cfg.Providers.Anthropic.APIKey != "", cfg.Providers.Anthropic.APIBase != "", true},
+		{"openai", cfg.Providers.OpenAI.APIKey != "", cfg.Providers.OpenAI.APIBase != "", true},
+		{"gemini", cfg.Providers.Gemini.APIKey != "", false, true},
+		{"xai", cfg.Providers.XAI.APIKey != "", false, true},
+		{"openrouter", cfg.Providers.OpenRouter.APIKey != "", cfg.Providers.OpenRouter.APIBase != "", true},
+		{"deepseek", cfg.Providers.DeepSeek.APIKey != "", cfg.Providers.DeepSeek.APIBase != "", true},
+		{"groq", cfg.Providers.Groq.APIKey != "", cfg.Providers.Groq.APIBase != "", true},
+		{"scalytics-copilot", cfg.Providers.ScalyticsCopilot.APIKey != "", cfg.Providers.ScalyticsCopilot.APIBase != "", true},
+		{"vllm", cfg.Providers.VLLM.APIKey != "", cfg.Providers.VLLM.APIBase != "", false},
+	}
+
+	configured := 0
+	for _, pc := range checks {
+		if pc.hasKey || (pc.id == "vllm" && pc.hasBase) {
+			configured++
+		}
+	}
+
+	if configured == 0 {
+		report.Checks = append(report.Checks, DoctorCheck{
+			Name:    "provider_configured",
+			Status:  DoctorWarn,
+			Message: "no API-key providers configured — only CLI-OAuth providers (gemini-cli, openai-codex) may work",
+		})
+	} else {
+		report.Checks = append(report.Checks, DoctorCheck{
+			Name:    "provider_configured",
+			Status:  DoctorPass,
+			Message: fmt.Sprintf("%d provider(s) with credentials configured", configured),
+		})
+	}
+
+	// Validate scalytics-copilot requires base URL
+	if cfg.Providers.ScalyticsCopilot.APIKey != "" && cfg.Providers.ScalyticsCopilot.APIBase == "" {
+		report.Checks = append(report.Checks, DoctorCheck{
+			Name:    "provider_scalytics_copilot_base",
+			Status:  DoctorFail,
+			Message: "scalytics-copilot has API key but missing apiBase (required)",
+		})
+	}
+
+	// Validate vLLM requires base URL
+	if cfg.Providers.VLLM.APIKey != "" && cfg.Providers.VLLM.APIBase == "" {
+		report.Checks = append(report.Checks, DoctorCheck{
+			Name:    "provider_vllm_base",
+			Status:  DoctorFail,
+			Message: "vllm has API key but missing apiBase (required)",
+		})
+	}
+
+	// Check CLI tools for OAuth providers
+	if skillruntime.HasBinary("gemini") {
+		report.Checks = append(report.Checks, DoctorCheck{
+			Name:    "provider_gemini_cli",
+			Status:  DoctorPass,
+			Message: "gemini CLI found in PATH",
+		})
+	}
+	if skillruntime.HasBinary("codex") {
+		report.Checks = append(report.Checks, DoctorCheck{
+			Name:    "provider_codex_cli",
+			Status:  DoctorPass,
+			Message: "codex CLI found in PATH",
+		})
+	}
+}
+
+func appendRateLimitDoctorChecks(report *DoctorReport) {
+	snapshots := provider.AllRateLimitSnapshots()
+	if len(snapshots) == 0 {
+		return
+	}
+	for provID, snap := range snapshots {
+		if snap.RemainingTokens != nil && snap.LimitTokens != nil && *snap.LimitTokens > 0 {
+			pct := float64(*snap.RemainingTokens) / float64(*snap.LimitTokens) * 100
+			if pct < 10 {
+				report.Checks = append(report.Checks, DoctorCheck{
+					Name:    fmt.Sprintf("rate_limit_%s", provID),
+					Status:  DoctorWarn,
+					Message: fmt.Sprintf("%s: only %d/%d tokens remaining (%.0f%%)", provID, *snap.RemainingTokens, *snap.LimitTokens, pct),
+				})
+			}
+		}
+	}
 }
 
 func detectRuntimeMode(cfg *config.Config) RuntimeMode {

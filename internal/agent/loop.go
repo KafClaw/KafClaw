@@ -23,6 +23,7 @@ import (
 	"github.com/KafClaw/KafClaw/internal/memory"
 	"github.com/KafClaw/KafClaw/internal/policy"
 	"github.com/KafClaw/KafClaw/internal/provider"
+	"github.com/KafClaw/KafClaw/internal/provider/middleware"
 	"github.com/KafClaw/KafClaw/internal/session"
 	"github.com/KafClaw/KafClaw/internal/timeline"
 	"github.com/KafClaw/KafClaw/internal/tools"
@@ -65,6 +66,7 @@ type LoopOptions struct {
 	SubagentThinking      string
 	SubagentToolsAllow    []string
 	SubagentToolsDeny     []string
+	Config                *config.Config // for middleware chain setup
 }
 
 // Loop is the core agent processing engine.
@@ -99,6 +101,8 @@ type Loop struct {
 	activeThreadID    string
 	activeTraceID     string
 	activeMessageType string
+	chain             *middleware.Chain
+	cfg               *config.Config
 	subagents         *subagentManager
 	agentID           string
 	subagentAllowList []string
@@ -171,6 +175,25 @@ func NewLoop(opts LoopOptions) *Loop {
 			Deny:  append([]string{}, opts.SubagentToolsDeny...),
 		},
 		announceSent: make(map[string]time.Time),
+	}
+
+	loop.cfg = opts.Config
+
+	// Build middleware chain.
+	loop.chain = middleware.NewChain(opts.Provider)
+	if opts.Config != nil {
+		if opts.Config.ContentClassification.Enabled {
+			loop.chain.Use(middleware.NewContentClassifier(opts.Config.ContentClassification))
+		}
+		if opts.Config.PromptGuard.Enabled {
+			loop.chain.Use(middleware.NewPromptGuard(opts.Config.PromptGuard))
+		}
+		if opts.Config.OutputSanitization.Enabled {
+			loop.chain.Use(middleware.NewOutputSanitizer(opts.Config.OutputSanitization))
+		}
+		if opts.Config.FinOps.Enabled {
+			loop.chain.Use(middleware.NewFinOpsRecorder(opts.Config.FinOps))
+		}
 	}
 
 	// Register default tools
@@ -329,6 +352,36 @@ func (l *Loop) ProcessDirectWithTrace(ctx context.Context, content, sessionKey, 
 		sess.AddMessage("assistant", response)
 		l.sessions.Save(sess)
 		return response, nil
+	}
+
+	// Task-type model routing: assess the message and swap provider if routing matches.
+	if l.cfg != nil && len(l.cfg.Model.TaskRouting) > 0 {
+		assessment := AssessTask(content)
+		if routed, err := provider.ResolveWithTaskType(l.cfg, l.agentID, assessment.Category); err == nil && routed != l.provider {
+			slog.Info("Task-type routing applied", "category", assessment.Category, "agent", l.agentID)
+			if l.timeline != nil && l.activeTraceID != "" {
+				routeMeta, _ := json.Marshal(map[string]string{
+					"category":       assessment.Category,
+					"cognitive_mode": assessment.CognitiveMode,
+					"agent_id":       l.agentID,
+				})
+				_ = l.timeline.AddEvent(&timeline.TimelineEvent{
+					EventID:        fmt.Sprintf("ROUTE_%s_%d", l.activeTraceID, time.Now().UnixNano()),
+					TraceID:        l.activeTraceID,
+					Timestamp:      time.Now(),
+					SenderID:       "AGENT",
+					SenderName:     "TaskRouter",
+					EventType:      "SYSTEM",
+					ContentText:    fmt.Sprintf("task-type routing: category=%s", assessment.Category),
+					Classification: "ROUTING",
+					Authorized:     true,
+					Metadata:       string(routeMeta),
+				})
+			}
+			origProvider := l.chain.Provider
+			l.chain.Provider = routed
+			defer func() { l.chain.Provider = origProvider }()
+		}
 	}
 
 	// Build messages using the context builder
@@ -1108,15 +1161,20 @@ func (l *Loop) runAgentLoop(ctx context.Context, messages []provider.Message) (s
 			return err.Error(), nil
 		}
 
-		// Call LLM
+		// Call LLM (through middleware chain)
 		llmStart := time.Now()
-		resp, err := l.provider.Chat(ctx, &provider.ChatRequest{
+		chatReq := &provider.ChatRequest{
 			Messages:    messages,
 			Tools:       toolDefs,
 			Model:       l.model,
 			MaxTokens:   4096,
 			Temperature: 0.7,
-		})
+		}
+		meta := middleware.NewRequestMeta("", l.model)
+		meta.SenderID = l.activeSender
+		meta.Channel = l.activeChannel
+		meta.MessageType = l.activeMessageType
+		resp, err := l.chain.Process(ctx, chatReq, meta)
 		llmDuration := time.Since(llmStart)
 		if err != nil {
 			return "", fmt.Errorf("LLM call failed: %w", err)
@@ -1124,6 +1182,9 @@ func (l *Loop) runAgentLoop(ctx context.Context, messages []provider.Message) (s
 
 		// TOKEN TRACKING (H-013): record usage
 		l.trackTokens(resp.Usage)
+
+		// Log middleware security events to timeline
+		l.logMiddlewareEvents(meta, i)
 
 		// Build LLM span summary
 		toolCallSummary := ""
@@ -1470,6 +1531,76 @@ func (l *Loop) approvalTimeout() time.Duration {
 		return 60 * time.Second
 	}
 	return time.Duration(seconds) * time.Second
+}
+
+// logMiddlewareEvents logs security-relevant middleware actions to timeline.
+func (l *Loop) logMiddlewareEvents(meta *middleware.RequestMeta, iteration int) {
+	if meta == nil || l.timeline == nil || l.activeTraceID == "" {
+		return
+	}
+
+	// Prompt guard block
+	if meta.Blocked {
+		slog.Warn("Prompt guard blocked request", "reason", meta.BlockReason, "sender", meta.SenderID, "channel", meta.Channel)
+		eventMeta, _ := json.Marshal(map[string]string{
+			"block_reason": meta.BlockReason,
+			"sender_id":    meta.SenderID,
+			"channel":      meta.Channel,
+			"message_type": meta.MessageType,
+		})
+		_ = l.timeline.AddEvent(&timeline.TimelineEvent{
+			EventID:        fmt.Sprintf("GUARD_%s_%d_%d", l.activeTraceID, iteration, time.Now().UnixNano()),
+			TraceID:        l.activeTraceID,
+			Timestamp:      time.Now(),
+			SenderID:       meta.SenderID,
+			SenderName:     "PromptGuard",
+			EventType:      "SECURITY",
+			ContentText:    fmt.Sprintf("prompt guard blocked: %s", meta.BlockReason),
+			Classification: "BLOCKED",
+			Authorized:     false,
+			Metadata:       string(eventMeta),
+		})
+		return
+	}
+
+	// Prompt guard warnings (tagged but not blocked)
+	if mode, ok := meta.Tags["prompt_guard"]; ok {
+		slog.Info("Prompt guard triggered", "mode", mode, "sender", meta.SenderID)
+		eventMeta, _ := json.Marshal(meta.Tags)
+		_ = l.timeline.AddEvent(&timeline.TimelineEvent{
+			EventID:        fmt.Sprintf("GUARD_%s_%d_%d", l.activeTraceID, iteration, time.Now().UnixNano()),
+			TraceID:        l.activeTraceID,
+			Timestamp:      time.Now(),
+			SenderID:       meta.SenderID,
+			SenderName:     "PromptGuard",
+			EventType:      "SECURITY",
+			ContentText:    fmt.Sprintf("prompt guard: mode=%s", mode),
+			Classification: "GUARD",
+			Authorized:     true,
+			Metadata:       string(eventMeta),
+		})
+	}
+
+	// Output sanitizer actions
+	if action, ok := meta.Tags["output_sanitized"]; ok {
+		slog.Info("Output sanitized", "action", action)
+		eventMeta, _ := json.Marshal(map[string]string{
+			"action":  action,
+			"channel": meta.Channel,
+		})
+		_ = l.timeline.AddEvent(&timeline.TimelineEvent{
+			EventID:        fmt.Sprintf("SANITIZE_%s_%d_%d", l.activeTraceID, iteration, time.Now().UnixNano()),
+			TraceID:        l.activeTraceID,
+			Timestamp:      time.Now(),
+			SenderID:       "AGENT",
+			SenderName:     "OutputSanitizer",
+			EventType:      "SECURITY",
+			ContentText:    fmt.Sprintf("output sanitized: %s", action),
+			Classification: "SANITIZED",
+			Authorized:     true,
+			Metadata:       string(eventMeta),
+		})
+	}
 }
 
 // trackTokens persists token usage for the active task.

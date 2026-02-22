@@ -6,6 +6,8 @@ export interface RemoteConnection {
   name: string;
   url: string;
   token: string;
+  /** Set to true only for self-signed dev servers. Default: false (certs verified). */
+  allowInsecureTLS?: boolean;
 }
 
 export class RemoteClient {
@@ -62,7 +64,7 @@ export class RemoteClient {
           'Accept': 'application/json',
         },
         timeout: 10000,
-        rejectUnauthorized: false,
+        rejectUnauthorized: conn.allowInsecureTLS !== true,
       }, (res) => {
         let body = '';
         res.on('data', (chunk: Buffer) => { body += chunk.toString(); });

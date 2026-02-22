@@ -49,17 +49,16 @@ func runAgent(cmd *cobra.Command, args []string) {
 
 	// Setup components
 	msgBus := bus.NewMessageBus()
-	oaProv := provider.NewOpenAIProvider(cfg.Providers.OpenAI.APIKey, cfg.Providers.OpenAI.APIBase, cfg.Model.Name)
-	var prov provider.LLMProvider = oaProv
-
-	if cfg.Providers.LocalWhisper.Enabled {
-		prov = provider.NewLocalWhisperProvider(cfg.Providers.LocalWhisper, oaProv)
+	prov, err := provider.Resolve(cfg, "main")
+	if err != nil {
+		fmt.Printf("Provider error: %v\n", err)
+		os.Exit(1)
 	}
 
-	// Check API Key
-	if cfg.Providers.OpenAI.APIKey == "" {
-		fmt.Println("Error: API key not found. Set KAFCLAW_OPENAI_API_KEY / OPENROUTER_API_KEY (legacy: MIKROBOT_OPENAI_API_KEY) or use config.json")
-		os.Exit(1)
+	if cfg.Providers.LocalWhisper.Enabled {
+		if oaProv, ok := prov.(*provider.OpenAIProvider); ok {
+			prov = provider.NewLocalWhisperProvider(cfg.Providers.LocalWhisper, oaProv)
+		}
 	}
 
 	loop := agent.NewLoop(agent.LoopOptions{
@@ -80,6 +79,7 @@ func runAgent(cmd *cobra.Command, args []string) {
 		SubagentThinking:      cfg.Tools.Subagents.Thinking,
 		SubagentToolsAllow:    cfg.Tools.Subagents.Tools.Allow,
 		SubagentToolsDeny:     cfg.Tools.Subagents.Tools.Deny,
+		Config:                cfg,
 	})
 
 	fmt.Printf("🤖 KafClaw (%s)\n", cfg.Model.Name)

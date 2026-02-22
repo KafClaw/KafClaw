@@ -11,6 +11,7 @@ Primary command groups:
 - `kafclaw status` - runtime/config health snapshot
 - `kafclaw doctor` - diagnostics and setup checks
 - `kafclaw security` - security checks, deep audit, and safe remediation (`check|audit|fix`)
+- `kafclaw models` - manage LLM providers and models (`list|stats|auth login|auth set-key`)
 - `kafclaw config` / `kafclaw configure` - low-level and guided config changes
 - `kafclaw agent -m` - one-shot interaction
 - `kafclaw skills` - bundled/external skill lifecycle and auth/prereq flows (`enable|disable|list|status|enable-skill|disable-skill|verify|install|update|exec|prereq|auth`)
@@ -37,6 +38,7 @@ Detailed command examples:
 - [Getting Started](../start-here/getting-started/)
 - [User Manual - CLI Reference section](../start-here/user-manual/#3-cli-reference)
 - [Manage KafClaw](../operations-admin/manage-kafclaw/)
+- [Models CLI Reference](models-cli/) - provider management, auth, usage stats
 
 Skills execution example:
 - `kafclaw skills exec <skill-id> --input '{"text":"..."}'`

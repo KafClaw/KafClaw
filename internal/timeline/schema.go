@@ -57,6 +57,8 @@ type AgentTask struct {
 	PromptTokens     int        `json:"prompt_tokens"`
 	CompletionTokens int        `json:"completion_tokens"`
 	TotalTokens      int        `json:"total_tokens"`
+	ProviderID       string     `json:"provider_id,omitempty"`
+	ModelName        string     `json:"model_name,omitempty"`
 	DeliveryAttempts int        `json:"delivery_attempts"`
 	DeliveryNextAt   *time.Time `json:"delivery_next_at,omitempty"`
 	CreatedAt        time.Time  `json:"created_at"`

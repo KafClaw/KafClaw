@@ -61,11 +61,92 @@ kafclaw status
 kafclaw doctor
 ```
 
+## Model Configuration
+
+```json
+{
+  "model": {
+    "name": "claude/claude-sonnet-4-5",
+    "maxTokens": 8192,
+    "temperature": 0.7,
+    "maxToolIterations": 20,
+    "taskRouting": {
+      "security": "claude/claude-opus-4-6",
+      "coding": "openai-codex/gpt-5.3-codex"
+    }
+  }
+}
+```
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `model.name` | string | Global default model in `provider/model` format |
+| `model.maxTokens` | int | Max output tokens per LLM call |
+| `model.temperature` | float | Sampling temperature (0.0 - 1.0) |
+| `model.maxToolIterations` | int | Max tool-call rounds per request |
+| `model.taskRouting` | map | Category to model string overrides (`security`, `coding`, `tool-heavy`, `creative`) |
+
+## Provider Configuration
+
+```json
+{
+  "providers": {
+    "anthropic": { "apiKey": "sk-ant-...", "apiBase": "" },
+    "openai": { "apiKey": "sk-...", "apiBase": "" },
+    "gemini": { "apiKey": "AIza..." },
+    "xai": { "apiKey": "xai-..." },
+    "openrouter": { "apiKey": "sk-or-...", "apiBase": "https://openrouter.ai/api/v1" },
+    "deepseek": { "apiKey": "sk-...", "apiBase": "https://api.deepseek.com/v1" },
+    "groq": { "apiKey": "gsk_...", "apiBase": "https://api.groq.com/openai/v1" },
+    "vllm": { "apiKey": "", "apiBase": "http://localhost:8000/v1" },
+    "scalyticsCopilot": { "apiKey": "<token>", "apiBase": "https://copilot.scalytics.io/v1" }
+  }
+}
+```
+
+Each provider entry accepts `apiKey` and `apiBase`. See [LLM Providers](providers/) for details.
+
+## Per-Agent Model Configuration
+
+```json
+{
+  "agents": {
+    "list": [
+      {
+        "id": "main",
+        "model": {
+          "primary": "claude/claude-opus-4-6",
+          "fallbacks": ["openai/gpt-4o"]
+        },
+        "subagents": {
+          "model": "groq/llama-3.3-70b"
+        }
+      }
+    ]
+  }
+}
+```
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `agents.list[].model.primary` | string | Primary model for this agent |
+| `agents.list[].model.fallbacks` | []string | Fallback models tried on transient errors |
+| `agents.list[].subagents.model` | string | Model for subagents spawned by this agent |
+
+## Middleware Configuration
+
+| Section | Reference |
+|---------|-----------|
+| `contentClassification` | [Content Classification](middleware/#content-classification) |
+| `promptGuard` | [Prompt Guard](middleware/#prompt-guard) |
+| `outputSanitization` | [Output Sanitizer](middleware/#output-sanitizer) |
+| `finops` | [FinOps Cost Attribution](middleware/#finops-cost-attribution) |
+
 ## Common Environment Variables
 
 - `OPENAI_API_KEY`
 - `OPENROUTER_API_KEY`
-- `KAFCLAW_AGENTS_MODEL`
+- `KAFCLAW_MODEL` — global model (e.g. `claude/claude-sonnet-4-5`)
 - `KAFCLAW_AGENTS_WORKSPACE`
 - `KAFCLAW_AGENTS_WORK_REPO_PATH`
 - `KAFCLAW_GATEWAY_HOST`
@@ -82,6 +163,9 @@ kafclaw doctor
 
 ## Related Docs
 
+- [LLM Providers](providers/)
+- [Models CLI](models-cli/)
+- [Chat Middleware](middleware/)
 - [Getting Started Guide](../start-here/getting-started/)
 - [KafClaw Administration Guide](../operations-admin/admin-guide/)
 - [Workspace Policy](../architecture-security/workspace-policy/)

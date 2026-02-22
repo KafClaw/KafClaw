@@ -26,6 +26,15 @@ const (
 	LLMPresetSkip             LLMPreset = "skip"
 	LLMPresetCLIToken         LLMPreset = "cli-token"
 	LLMPresetOpenAICompatible LLMPreset = "openai-compatible"
+	LLMPresetClaude           LLMPreset = "claude"
+	LLMPresetGemini           LLMPreset = "gemini"
+	LLMPresetGeminiCLI        LLMPreset = "gemini-cli"
+	LLMPresetCodex            LLMPreset = "openai-codex"
+	LLMPresetXAI              LLMPreset = "xai"
+	LLMPresetScalyticsCopilot LLMPreset = "scalytics-copilot"
+	LLMPresetOpenRouter       LLMPreset = "openrouter"
+	LLMPresetDeepSeek         LLMPreset = "deepseek"
+	LLMPresetGroq             LLMPreset = "groq"
 )
 
 type WizardParams struct {
@@ -140,23 +149,50 @@ func resolveLLMPreset(reader *bufio.Reader, out io.Writer, p WizardParams) (LLMP
 	if p.NonInteractive {
 		return LLMPresetSkip, nil
 	}
-	fmt.Fprintln(out, "\nSelect LLM setup:")
-	fmt.Fprintln(out, "1) cli-token (OpenRouter/OpenAI-compatible token)")
-	fmt.Fprintln(out, "2) openai-compatible (vLLM/Ollama/custom endpoint)")
-	fmt.Fprintln(out, "3) skip (keep current)")
-	choice, err := prompt(reader, out, "LLM setup [1/2/3]", "3")
+	fmt.Fprintln(out, "\nSelect LLM provider:")
+	fmt.Fprintln(out, " 1) claude          (Anthropic API key)")
+	fmt.Fprintln(out, " 2) openai          (OpenAI API key)")
+	fmt.Fprintln(out, " 3) gemini          (Google Gemini API key)")
+	fmt.Fprintln(out, " 4) gemini-cli      (Google Gemini via OAuth CLI)")
+	fmt.Fprintln(out, " 5) openai-codex    (OpenAI Codex via OAuth CLI)")
+	fmt.Fprintln(out, " 6) xai             (xAI/Grok API key)")
+	fmt.Fprintln(out, " 7) openrouter      (OpenRouter API key)")
+	fmt.Fprintln(out, " 8) deepseek        (DeepSeek API key)")
+	fmt.Fprintln(out, " 9) groq            (Groq API key)")
+	fmt.Fprintln(out, "10) scalytics-copilot (Scalytics Copilot API key + URL)")
+	fmt.Fprintln(out, "11) openai-compatible (vLLM/Ollama/custom endpoint)")
+	fmt.Fprintln(out, "12) skip            (keep current)")
+	choice, err := prompt(reader, out, "LLM provider [1-12]", "12")
 	if err != nil {
 		return "", err
 	}
 	switch strings.TrimSpace(choice) {
 	case "1":
-		return LLMPresetCLIToken, nil
+		return LLMPresetClaude, nil
 	case "2":
-		return LLMPresetOpenAICompatible, nil
+		return LLMPresetCLIToken, nil
 	case "3":
+		return LLMPresetGemini, nil
+	case "4":
+		return LLMPresetGeminiCLI, nil
+	case "5":
+		return LLMPresetCodex, nil
+	case "6":
+		return LLMPresetXAI, nil
+	case "7":
+		return LLMPresetOpenRouter, nil
+	case "8":
+		return LLMPresetDeepSeek, nil
+	case "9":
+		return LLMPresetGroq, nil
+	case "10":
+		return LLMPresetScalyticsCopilot, nil
+	case "11":
+		return LLMPresetOpenAICompatible, nil
+	case "12":
 		return LLMPresetSkip, nil
 	default:
-		return "", fmt.Errorf("invalid llm preset choice: %s", choice)
+		return "", fmt.Errorf("invalid llm provider choice: %s", choice)
 	}
 }
 
@@ -241,33 +277,129 @@ func applyLLM(cfg *config.Config, preset LLMPreset, reader *bufio.Reader, out io
 	switch preset {
 	case LLMPresetSkip:
 		return nil
+
 	case LLMPresetCLIToken:
 		token := strings.TrimSpace(p.LLMToken)
-		base := strings.TrimSpace(p.LLMAPIBase)
 		model := strings.TrimSpace(p.LLMModel)
 		if token == "" && !p.NonInteractive {
-			val, err := prompt(reader, out, "API token", os.Getenv("OPENROUTER_API_KEY"))
+			val, err := prompt(reader, out, "OpenAI API key", os.Getenv("OPENAI_API_KEY"))
 			if err != nil {
 				return err
 			}
 			token = strings.TrimSpace(val)
 		}
-		if base == "" {
-			base = "https://openrouter.ai/api/v1"
-		}
 		if model == "" && !p.NonInteractive {
-			val, err := prompt(reader, out, "Model", cfg.Model.Name)
+			val, err := prompt(reader, out, "Model", "openai/gpt-4.1")
 			if err != nil {
 				return err
 			}
 			model = strings.TrimSpace(val)
 		}
 		cfg.Providers.OpenAI.APIKey = token
-		cfg.Providers.OpenAI.APIBase = base
 		if model != "" {
 			cfg.Model.Name = model
 		}
 		return nil
+
+	case LLMPresetClaude:
+		return applyAPIKeyPreset(cfg, reader, out, p, applyAPIKeyOpts{
+			providerLabel: "Claude/Anthropic",
+			envVar:        "ANTHROPIC_API_KEY",
+			defaultModel:  "claude/claude-sonnet-4-5-20250514",
+			setKey:        func(c *config.Config, k string) { c.Providers.Anthropic.APIKey = k },
+			modelPrefix:   "claude",
+		})
+
+	case LLMPresetGemini:
+		return applyAPIKeyPreset(cfg, reader, out, p, applyAPIKeyOpts{
+			providerLabel: "Gemini",
+			envVar:        "GEMINI_API_KEY",
+			defaultModel:  "gemini/gemini-2.5-pro",
+			setKey:        func(c *config.Config, k string) { c.Providers.Gemini.APIKey = k },
+			modelPrefix:   "gemini",
+		})
+
+	case LLMPresetGeminiCLI:
+		cfg.Model.Name = firstNonEmpty(strings.TrimSpace(p.LLMModel), "gemini-cli/gemini-2.5-pro")
+		fmt.Fprintln(out, "Gemini CLI uses OAuth — run 'kafclaw models auth login --provider gemini' to authenticate.")
+		return nil
+
+	case LLMPresetCodex:
+		cfg.Model.Name = firstNonEmpty(strings.TrimSpace(p.LLMModel), "openai-codex/gpt-5.3-codex")
+		fmt.Fprintln(out, "Codex uses OAuth — run 'kafclaw models auth login --provider openai-codex' to authenticate.")
+		return nil
+
+	case LLMPresetXAI:
+		return applyAPIKeyPreset(cfg, reader, out, p, applyAPIKeyOpts{
+			providerLabel: "xAI/Grok",
+			envVar:        "XAI_API_KEY",
+			defaultModel:  "xai/grok-3",
+			setKey:        func(c *config.Config, k string) { c.Providers.XAI.APIKey = k },
+			modelPrefix:   "xai",
+		})
+
+	case LLMPresetOpenRouter:
+		return applyAPIKeyPreset(cfg, reader, out, p, applyAPIKeyOpts{
+			providerLabel: "OpenRouter",
+			envVar:        "OPENROUTER_API_KEY",
+			defaultModel:  "openrouter/anthropic/claude-sonnet-4-5",
+			setKey:        func(c *config.Config, k string) { c.Providers.OpenRouter.APIKey = k },
+			modelPrefix:   "openrouter",
+		})
+
+	case LLMPresetDeepSeek:
+		return applyAPIKeyPreset(cfg, reader, out, p, applyAPIKeyOpts{
+			providerLabel: "DeepSeek",
+			envVar:        "DEEPSEEK_API_KEY",
+			defaultModel:  "deepseek/deepseek-chat",
+			setKey:        func(c *config.Config, k string) { c.Providers.DeepSeek.APIKey = k },
+			modelPrefix:   "deepseek",
+		})
+
+	case LLMPresetGroq:
+		return applyAPIKeyPreset(cfg, reader, out, p, applyAPIKeyOpts{
+			providerLabel: "Groq",
+			envVar:        "GROQ_API_KEY",
+			defaultModel:  "groq/llama-3.3-70b-versatile",
+			setKey:        func(c *config.Config, k string) { c.Providers.Groq.APIKey = k },
+			modelPrefix:   "groq",
+		})
+
+	case LLMPresetScalyticsCopilot:
+		token := strings.TrimSpace(p.LLMToken)
+		base := strings.TrimSpace(p.LLMAPIBase)
+		model := strings.TrimSpace(p.LLMModel)
+		if token == "" && !p.NonInteractive {
+			val, err := prompt(reader, out, "Scalytics Copilot API key", "")
+			if err != nil {
+				return err
+			}
+			token = strings.TrimSpace(val)
+		}
+		if base == "" && !p.NonInteractive {
+			val, err := prompt(reader, out, "Scalytics Copilot API base URL", "https://copilot.scalytics.io/v1")
+			if err != nil {
+				return err
+			}
+			base = strings.TrimSpace(val)
+		}
+		if base == "" {
+			return fmt.Errorf("scalytics-copilot requires API base URL")
+		}
+		if model == "" && !p.NonInteractive {
+			val, err := prompt(reader, out, "Model", "scalytics-copilot/default")
+			if err != nil {
+				return err
+			}
+			model = strings.TrimSpace(val)
+		}
+		cfg.Providers.ScalyticsCopilot.APIKey = token
+		cfg.Providers.ScalyticsCopilot.APIBase = base
+		if model != "" {
+			cfg.Model.Name = model
+		}
+		return nil
+
 	case LLMPresetOpenAICompatible:
 		token := strings.TrimSpace(p.LLMToken)
 		base := strings.TrimSpace(p.LLMAPIBase)
@@ -302,9 +434,46 @@ func applyLLM(cfg *config.Config, preset LLMPreset, reader *bufio.Reader, out io
 			cfg.Model.Name = model
 		}
 		return nil
+
 	default:
 		return fmt.Errorf("unsupported llm preset: %s", preset)
 	}
+}
+
+// applyAPIKeyOpts holds parameters for the common API-key preset pattern.
+type applyAPIKeyOpts struct {
+	providerLabel string
+	envVar        string
+	defaultModel  string
+	setKey        func(*config.Config, string)
+	modelPrefix   string
+}
+
+// applyAPIKeyPreset handles the common flow: prompt for API key, prompt for model, set config.
+func applyAPIKeyPreset(cfg *config.Config, reader *bufio.Reader, out io.Writer, p WizardParams, opts applyAPIKeyOpts) error {
+	token := strings.TrimSpace(p.LLMToken)
+	model := strings.TrimSpace(p.LLMModel)
+	if token == "" && !p.NonInteractive {
+		val, err := prompt(reader, out, opts.providerLabel+" API key", os.Getenv(opts.envVar))
+		if err != nil {
+			return err
+		}
+		token = strings.TrimSpace(val)
+	}
+	if model == "" && !p.NonInteractive {
+		val, err := prompt(reader, out, "Model", opts.defaultModel)
+		if err != nil {
+			return err
+		}
+		model = strings.TrimSpace(val)
+	}
+	if token != "" {
+		opts.setKey(cfg, token)
+	}
+	if model != "" {
+		cfg.Model.Name = model
+	}
+	return nil
 }
 
 func prompt(r *bufio.Reader, out io.Writer, label, def string) (string, error) {
@@ -343,10 +512,28 @@ func normalizeLLMPreset(v string) LLMPreset {
 		return ""
 	case "skip":
 		return LLMPresetSkip
-	case "cli-token", "token":
+	case "cli-token", "token", "openai":
 		return LLMPresetCLIToken
 	case "openai-compatible", "compatible", "vllm", "ollama":
 		return LLMPresetOpenAICompatible
+	case "claude", "anthropic":
+		return LLMPresetClaude
+	case "gemini", "google":
+		return LLMPresetGemini
+	case "gemini-cli":
+		return LLMPresetGeminiCLI
+	case "openai-codex", "codex":
+		return LLMPresetCodex
+	case "xai", "grok":
+		return LLMPresetXAI
+	case "scalytics-copilot", "copilot":
+		return LLMPresetScalyticsCopilot
+	case "openrouter":
+		return LLMPresetOpenRouter
+	case "deepseek":
+		return LLMPresetDeepSeek
+	case "groq":
+		return LLMPresetGroq
 	default:
 		return ""
 	}
@@ -377,19 +564,12 @@ func isAllowedKafkaSASLMechanism(v string) bool {
 
 func BuildProfileSummary(cfg *config.Config) string {
 	mode := detectModeFromConfig(cfg)
-	llmBase := cfg.Providers.OpenAI.APIBase
-	if strings.TrimSpace(llmBase) == "" {
-		llmBase = "(default)"
-	}
-	tokenState := "not set"
-	if strings.TrimSpace(cfg.Providers.OpenAI.APIKey) != "" {
-		tokenState = "set"
-	}
 	authState := "not set"
 	if strings.TrimSpace(cfg.Gateway.AuthToken) != "" {
 		authState = "set"
 	}
-	return strings.Join([]string{
+
+	lines := []string{
 		"",
 		"Planned configuration:",
 		fmt.Sprintf("- mode: %s", mode),
@@ -405,8 +585,35 @@ func BuildProfileSummary(cfg *config.Config) string {
 		fmt.Sprintf("- kafka.tls.certFile: %s", firstNonEmpty(strings.TrimSpace(cfg.Group.KafkaTLSCertFile), "(none)")),
 		fmt.Sprintf("- kafka.tls.keyFile: %s", firstNonEmpty(strings.TrimSpace(cfg.Group.KafkaTLSKeyFile), "(none)")),
 		fmt.Sprintf("- llm.model: %s", firstNonEmpty(strings.TrimSpace(cfg.Model.Name), "(empty)")),
-		fmt.Sprintf("- llm.apiBase: %s", llmBase),
-		fmt.Sprintf("- llm.apiKey: %s", tokenState),
+	}
+
+	// Show configured providers
+	providerEntries := []struct {
+		id     string
+		hasKey bool
+	}{
+		{"anthropic/claude", cfg.Providers.Anthropic.APIKey != ""},
+		{"openai", cfg.Providers.OpenAI.APIKey != ""},
+		{"gemini", cfg.Providers.Gemini.APIKey != ""},
+		{"xai", cfg.Providers.XAI.APIKey != ""},
+		{"openrouter", cfg.Providers.OpenRouter.APIKey != ""},
+		{"deepseek", cfg.Providers.DeepSeek.APIKey != ""},
+		{"groq", cfg.Providers.Groq.APIKey != ""},
+		{"scalytics-copilot", cfg.Providers.ScalyticsCopilot.APIKey != ""},
+		{"vllm", cfg.Providers.VLLM.APIBase != ""},
+	}
+	var configured []string
+	for _, pe := range providerEntries {
+		if pe.hasKey {
+			configured = append(configured, pe.id)
+		}
+	}
+	if len(configured) == 0 {
+		configured = []string{"(none)"}
+	}
+	lines = append(lines, fmt.Sprintf("- llm.providers: %s", strings.Join(configured, ", ")))
+
+	lines = append(lines,
 		fmt.Sprintf("- subagents.maxSpawnDepth: %d", cfg.Tools.Subagents.MaxSpawnDepth),
 		fmt.Sprintf("- subagents.maxChildrenPerAgent: %d", cfg.Tools.Subagents.MaxChildrenPerAgent),
 		fmt.Sprintf("- subagents.maxConcurrent: %d", cfg.Tools.Subagents.MaxConcurrent),
@@ -415,7 +622,8 @@ func BuildProfileSummary(cfg *config.Config) string {
 		fmt.Sprintf("- subagents.model: %s", firstNonEmpty(strings.TrimSpace(cfg.Tools.Subagents.Model), "(inherit main model)")),
 		fmt.Sprintf("- subagents.thinking: %s", firstNonEmpty(strings.TrimSpace(cfg.Tools.Subagents.Thinking), "(inherit/default)")),
 		"",
-	}, "\n")
+	)
+	return strings.Join(lines, "\n")
 }
 
 func parseCSV(raw string) []string {

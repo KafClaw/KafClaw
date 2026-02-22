@@ -45,18 +45,26 @@ Configuration values are resolved in this precedence (highest wins):
 
 ```go
 type Config struct {
-    Agents       AgentsConfig       `json:"agents"`
-    Channels     ChannelsConfig     `json:"channels"`
-    Providers    ProvidersConfig    `json:"providers"`
-    Gateway      GatewayConfig      `json:"gateway"`
-    Tools        ToolsConfig        `json:"tools"`
-    Group        GroupConfig        `json:"group"`
-    Orchestrator OrchestratorConfig `json:"orchestrator"`
-    Scheduler    SchedulerConfig    `json:"scheduler"`
-    ER1          ER1Config          `json:"er1"`
-    Observer     ObserverConfig     `json:"observer"`
+    Paths                 PathsConfig                 `json:"paths"`
+    Model                 ModelConfig                 `json:"model"`
+    Agents                AgentsConfig                `json:"agents"`
+    Channels              ChannelsConfig              `json:"channels"`
+    Providers             ProvidersConfig             `json:"providers"`
+    Gateway               GatewayConfig               `json:"gateway"`
+    Tools                 ToolsConfig                 `json:"tools"`
+    Group                 GroupConfig                 `json:"group"`
+    Orchestrator          OrchestratorConfig          `json:"orchestrator"`
+    Scheduler             SchedulerConfig             `json:"scheduler"`
+    ER1                   ER1IntegrationConfig        `json:"er1"`
+    Observer              ObserverMemoryConfig        `json:"observer"`
+    ContentClassification ContentClassificationConfig `json:"contentClassification"`
+    PromptGuard           PromptGuardConfig           `json:"promptGuard"`
+    OutputSanitization    OutputSanitizationConfig    `json:"outputSanitization"`
+    FinOps                FinOpsConfig                `json:"finops"`
 }
 ```
+
+New sections added in this release: `Model`, `Paths`, `ContentClassification`, `PromptGuard`, `OutputSanitization`, `FinOps`. See [Configuration Keys](../reference/config-keys/) for details.
 
 ### Agent Configuration
 
@@ -354,7 +362,7 @@ Isolation guarantees:
 
 ### Provider Architecture
 
-All providers use the OpenAI-compatible API format via a single `OpenAIProvider` implementation.
+KafClaw supports 11 LLM providers through a unified `LLMProvider` interface. Most use the OpenAI-compatible API format. Providers are identified by canonical IDs and selected via model strings in the format `provider-id/model-name`.
 
 ```go
 type LLMProvider interface {
@@ -363,26 +371,66 @@ type LLMProvider interface {
     Speak(ctx, *TTSRequest) (*TTSResponse, error)
     DefaultModel() string
 }
-
-type Embedder interface {
-    Embed(ctx, *EmbeddingRequest) (*EmbeddingResponse, error)
-}
 ```
 
-### Capabilities
+### Supported Providers
 
-| Capability | Endpoint | Default Model |
-|------------|----------|---------------|
-| Chat completion | `/chat/completions` | `anthropic/claude-sonnet-4-5` |
-| Audio transcription | `/audio/transcriptions` | `whisper-1` |
-| Text-to-speech | `/audio/speech` | `tts-1` (voice: nova, format: opus) |
-| Embeddings | `/embeddings` | `text-embedding-3-small` |
+| Provider ID | Auth | Default Base |
+|---|---|---|
+| `claude` | API key | `https://api.anthropic.com/v1` |
+| `openai` | API key | _(configured)_ |
+| `gemini` | API key | Google AI Studio |
+| `gemini-cli` | OAuth | _(via Gemini CLI)_ |
+| `openai-codex` | OAuth | _(via Codex CLI)_ |
+| `xai` | API key | `https://api.x.ai/v1` |
+| `scalytics-copilot` | API key + base | _(configured)_ |
+| `openrouter` | API key | `https://openrouter.ai/api/v1` |
+| `deepseek` | API key | `https://api.deepseek.com/v1` |
+| `groq` | API key | `https://api.groq.com/openai/v1` |
+| `vllm` | optional key + base | _(configured)_ |
 
-### API Key Fallback Chain
+For full provider setup, see [LLM Providers Reference](../reference/providers/).
 
-1. `cfg.Providers.OpenAI.APIKey` (config or `KAFCLAW_OPENAI_API_KEY`)
-2. `OPENAI_API_KEY` environment variable
-3. `OPENROUTER_API_KEY` environment variable
+### Provider Resolution Order
+
+1. Per-agent model (`agents.list[].model.primary`)
+2. Task-type routing (`model.taskRouting[category]`)
+3. Global model (`model.name`)
+4. Legacy OpenAI fallback
+
+### Managing Credentials
+
+```bash
+# API key providers
+kafclaw models auth set-key --provider claude --key sk-ant-...
+
+# OAuth providers (Gemini, Codex)
+kafclaw models auth login --provider gemini
+```
+
+See [Models CLI Reference](../reference/models-cli/) for all auth commands.
+
+### Middleware Chain
+
+A configurable middleware chain runs between the agent loop and the LLM provider:
+
+- **Content Classifier** — sensitivity tagging and model rerouting
+- **Prompt Guard** — PII/secret scanning (warn, redact, or block)
+- **Output Sanitizer** — response redaction and deny pattern filtering
+- **FinOps Recorder** — per-request cost calculation and budget warnings
+
+See [Chat Middleware Reference](../reference/middleware/) for configuration.
+
+### Token & Cost Tracking
+
+Token usage and cost are tracked per request, per provider, per day in the timeline database.
+
+```bash
+kafclaw models stats           # today's usage
+kafclaw models stats --days 7  # 7-day trend
+kafclaw status                 # includes provider info
+kafclaw doctor                 # warns on low rate limits
+```
 
 ---
 
