@@ -20,6 +20,14 @@ For env hygiene and permissions:
 ./kafclaw doctor --fix
 ```
 
+Memory + knowledge quick checks:
+
+```bash
+./kafclaw knowledge status --json
+curl -s http://127.0.0.1:18791/api/v1/memory/embedding/healthz
+curl -s http://127.0.0.1:18791/api/v1/memory/embedding/status
+```
+
 ## Runtime Modes and Expectations
 
 - `local`
@@ -126,6 +134,22 @@ Then restart runtime/service.
   - use `kafclaw kshark` for diagnostics
 - LLM errors:
   - verify API base, model, token in config/env
+- Embedding runtime unhealthy / memory recall degraded:
+  - run `kafclaw doctor` and confirm `memory_embedding_configured` passes
+  - trigger bootstrap: `curl -X POST http://127.0.0.1:18791/api/v1/memory/embedding/install -d '{"model":"BAAI/bge-small-en-v1.5"}' -H 'Content-Type: application/json'`
+  - verify `/api/v1/memory/embedding/healthz` reports `ready=true`
+- Embedding model switched and recall quality dropped:
+  - expected behavior: vector index must be reset when fingerprint changes
+  - reindex explicitly (destructive): `curl -X POST http://127.0.0.1:18791/api/v1/memory/embedding/reindex -d '{"confirmWipe":true,"reason":"embedding_switch"}' -H 'Content-Type: application/json'`
+  - monitor `memory_chunks` refill and `knowledge facts` consistency
+- Shared knowledge not converging across claws:
+  - confirm presence/capability heartbeats by checking runtime settings:
+    - `kafclaw config get knowledge.enabled`
+    - `kafclaw config get knowledge.topics.presence`
+    - `kafclaw config get knowledge.topics.capabilities`
+  - validate envelope dedup and voting outcomes with:
+    - `kafclaw knowledge decisions --status approved --json`
+    - `kafclaw knowledge facts --json`
 - Subagent spawn denied:
   - check `tools.subagents.maxSpawnDepth`
   - check `tools.subagents.maxChildrenPerAgent`
