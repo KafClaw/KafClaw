@@ -28,6 +28,7 @@ func TestKnowledgeHandlerProcess_ValidAndIdempotent(t *testing.T) {
 		InstanceID:     "inst-1",
 		Payload: map[string]any{
 			"proposalId": "p1",
+			"group":      "g1",
 			"statement":  "Runbook v2",
 		},
 	}
@@ -138,5 +139,98 @@ func TestKnowledgeHandlerProcess_FactVersionPolicy(t *testing.T) {
 	}
 	if cur == nil || cur.Version != 2 || cur.Object != "v2" {
 		t.Fatalf("unexpected fact latest after v2: %+v", cur)
+	}
+}
+
+func TestKnowledgeHandlerProcess_ProposalDecisionFactEndToEnd(t *testing.T) {
+	tl, err := timeline.NewTimelineService(filepath.Join(t.TempDir(), "timeline.db"))
+	if err != nil {
+		t.Fatalf("open timeline: %v", err)
+	}
+	defer tl.Close()
+
+	h := NewKnowledgeHandler(tl, "local-claw")
+	now := time.Now()
+
+	makeRaw := func(idem string, msgType string, payload any) []byte {
+		env := knowledge.Envelope{
+			SchemaVersion:  knowledge.CurrentSchemaVersion,
+			Type:           msgType,
+			TraceID:        "trace-e2e",
+			Timestamp:      now,
+			IdempotencyKey: idem,
+			ClawID:         "remote-claw",
+			InstanceID:     "inst-1",
+			Payload:        payload,
+		}
+		raw, _ := json.Marshal(env)
+		return raw
+	}
+
+	if err := h.Process("group.g1.knowledge.proposals", makeRaw("idem-p1", knowledge.TypeProposal, knowledge.ProposalPayload{
+		ProposalID: "p-e2e",
+		Group:      "g1",
+		Title:      "Runbook update",
+		Statement:  "Adopt runbook v2",
+		Tags:       []string{"ops"},
+	})); err != nil {
+		t.Fatalf("process proposal: %v", err)
+	}
+
+	if err := h.Process("group.g1.knowledge.votes", makeRaw("idem-v1", knowledge.TypeVote, knowledge.VotePayload{
+		ProposalID: "p-e2e",
+		Vote:       "yes",
+		Reason:     "approved by team",
+	})); err != nil {
+		t.Fatalf("process vote: %v", err)
+	}
+
+	if err := h.Process("group.g1.knowledge.decisions", makeRaw("idem-d1", knowledge.TypeDecision, knowledge.DecisionPayload{
+		ProposalID: "p-e2e",
+		Outcome:    "approved",
+		Yes:        3,
+		No:         0,
+		Reason:     "quorum reached",
+	})); err != nil {
+		t.Fatalf("process decision: %v", err)
+	}
+
+	if err := h.Process("group.g1.knowledge.facts", makeRaw("idem-f1", knowledge.TypeFact, knowledge.FactPayload{
+		FactID:     "fact-e2e-1",
+		Group:      "g1",
+		Subject:    "service",
+		Predicate:  "runbook",
+		Object:     "v2",
+		Version:    1,
+		Source:     "decision:p-e2e",
+		ProposalID: "p-e2e",
+		DecisionID: "decision:p-e2e",
+		Tags:       []string{"ops"},
+	})); err != nil {
+		t.Fatalf("process fact: %v", err)
+	}
+
+	prop, err := tl.GetKnowledgeProposal("p-e2e")
+	if err != nil {
+		t.Fatalf("get proposal: %v", err)
+	}
+	if prop == nil || prop.Status != "approved" || prop.YesVotes != 3 || prop.NoVotes != 0 {
+		t.Fatalf("unexpected proposal state: %+v", prop)
+	}
+
+	votes, err := tl.ListKnowledgeVotes("p-e2e")
+	if err != nil {
+		t.Fatalf("list votes: %v", err)
+	}
+	if len(votes) != 1 || votes[0].Vote != "yes" {
+		t.Fatalf("unexpected votes: %+v", votes)
+	}
+
+	fact, err := tl.GetKnowledgeFactLatest("fact-e2e-1")
+	if err != nil {
+		t.Fatalf("get fact latest: %v", err)
+	}
+	if fact == nil || fact.Version != 1 || fact.Object != "v2" || fact.ProposalID != "p-e2e" {
+		t.Fatalf("unexpected fact state: %+v", fact)
 	}
 }

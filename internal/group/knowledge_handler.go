@@ -56,7 +56,20 @@ func (h *defaultKnowledgeHandler) Process(topic string, raw []byte) error {
 		}
 		applyStatus := "accepted"
 		applyReason := ""
-		if env.Type == knowledge.TypeFact {
+		switch env.Type {
+		case knowledge.TypeProposal:
+			if err := h.applyProposalPayload(env); err != nil {
+				return err
+			}
+		case knowledge.TypeVote:
+			if err := h.applyVotePayload(env); err != nil {
+				return err
+			}
+		case knowledge.TypeDecision:
+			if err := h.applyDecisionPayload(env); err != nil {
+				return err
+			}
+		case knowledge.TypeFact:
 			status, reason, err := h.applyFactPayload(env)
 			if err != nil {
 				return err
@@ -80,6 +93,80 @@ func (h *defaultKnowledgeHandler) Process(topic string, raw []byte) error {
 	}
 	slog.Debug("Knowledge envelope accepted", "type", env.Type, "claw_id", env.ClawID, "topic", topic)
 	return nil
+}
+
+func (h *defaultKnowledgeHandler) applyProposalPayload(env knowledge.Envelope) error {
+	data, err := json.Marshal(env.Payload)
+	if err != nil {
+		return fmt.Errorf("marshal proposal payload: %w", err)
+	}
+	var p knowledge.ProposalPayload
+	if err := json.Unmarshal(data, &p); err != nil {
+		return fmt.Errorf("unmarshal proposal payload: %w", err)
+	}
+	if err := p.Validate(); err != nil {
+		return fmt.Errorf("validate proposal payload: %w", err)
+	}
+	existing, err := h.timeline.GetKnowledgeProposal(p.ProposalID)
+	if err != nil {
+		return err
+	}
+	if existing != nil {
+		return nil
+	}
+	return h.timeline.CreateKnowledgeProposal(&timeline.KnowledgeProposalRecord{
+		ProposalID:         p.ProposalID,
+		GroupName:          p.Group,
+		Title:              strings.TrimSpace(p.Title),
+		Statement:          strings.TrimSpace(p.Statement),
+		Tags:               mustJSONTags(p.Tags),
+		ProposerClawID:     strings.TrimSpace(env.ClawID),
+		ProposerInstanceID: strings.TrimSpace(env.InstanceID),
+		Status:             "pending",
+	})
+}
+
+func (h *defaultKnowledgeHandler) applyVotePayload(env knowledge.Envelope) error {
+	data, err := json.Marshal(env.Payload)
+	if err != nil {
+		return fmt.Errorf("marshal vote payload: %w", err)
+	}
+	var p knowledge.VotePayload
+	if err := json.Unmarshal(data, &p); err != nil {
+		return fmt.Errorf("unmarshal vote payload: %w", err)
+	}
+	if err := p.Validate(); err != nil {
+		return fmt.Errorf("validate vote payload: %w", err)
+	}
+	return h.timeline.UpsertKnowledgeVote(&timeline.KnowledgeVoteRecord{
+		ProposalID: p.ProposalID,
+		ClawID:     strings.TrimSpace(env.ClawID),
+		InstanceID: strings.TrimSpace(env.InstanceID),
+		Vote:       strings.ToLower(strings.TrimSpace(p.Vote)),
+		Reason:     strings.TrimSpace(p.Reason),
+		TraceID:    strings.TrimSpace(env.TraceID),
+	})
+}
+
+func (h *defaultKnowledgeHandler) applyDecisionPayload(env knowledge.Envelope) error {
+	data, err := json.Marshal(env.Payload)
+	if err != nil {
+		return fmt.Errorf("marshal decision payload: %w", err)
+	}
+	var p knowledge.DecisionPayload
+	if err := json.Unmarshal(data, &p); err != nil {
+		return fmt.Errorf("unmarshal decision payload: %w", err)
+	}
+	if err := p.Validate(); err != nil {
+		return fmt.Errorf("validate decision payload: %w", err)
+	}
+	return h.timeline.UpdateKnowledgeProposalDecision(
+		strings.TrimSpace(p.ProposalID),
+		strings.ToLower(strings.TrimSpace(p.Outcome)),
+		p.Yes,
+		p.No,
+		strings.TrimSpace(p.Reason),
+	)
 }
 
 func (h *defaultKnowledgeHandler) applyFactPayload(env knowledge.Envelope) (status string, reason string, err error) {
