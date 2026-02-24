@@ -126,6 +126,13 @@ When `knowledge.enabled=true`, knowledge topics (`knowledge.topics.*`) consume/p
 | `knowledge.voting.timeoutSec` | int | Proposal timeout window (seconds) |
 | `knowledge.voting.allowSelfVote` | bool | Allow proposer to cast a vote on own proposal |
 
+Shared fact version policy:
+- New `factId` must start at `version=1`.
+- Existing facts accept only strictly sequential updates (`currentVersion + 1`).
+- Same/lower versions with identical content are treated as `stale` (ignored safely).
+- Same/lower versions with different content are `conflict`.
+- Version gaps (`incoming > currentVersion + 1`) are `conflict` (out-of-order).
+
 ## Model Configuration
 
 ```json

@@ -206,6 +206,22 @@ func NewTimelineService(dbPath string) (*TimelineService, error) {
 		processed_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 	)`)
 	_, _ = db.Exec(`CREATE INDEX IF NOT EXISTS idx_knowledge_idempotency_processed ON knowledge_idempotency(processed_at)`)
+	// Best-effort migration: knowledge facts latest-state table.
+	_, _ = db.Exec(`CREATE TABLE IF NOT EXISTS knowledge_facts (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		fact_id TEXT UNIQUE NOT NULL,
+		group_name TEXT NOT NULL,
+		subject TEXT NOT NULL,
+		predicate TEXT NOT NULL,
+		object TEXT NOT NULL,
+		version INTEGER NOT NULL,
+		source TEXT NOT NULL,
+		proposal_id TEXT DEFAULT '',
+		decision_id TEXT DEFAULT '',
+		tags TEXT DEFAULT '[]',
+		updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+	)`)
+	_, _ = db.Exec(`CREATE INDEX IF NOT EXISTS idx_knowledge_facts_group ON knowledge_facts(group_name)`)
 	// Best-effort migration: group skill channels table.
 	_, _ = db.Exec(`CREATE TABLE IF NOT EXISTS group_skill_channels (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -449,6 +465,70 @@ func (s *TimelineService) RecordKnowledgeIdempotency(idempotencyKey, clawID, ins
 		return true, nil
 	}
 	return rows > 0, nil
+}
+
+// GetKnowledgeFactLatest returns the current accepted state for a fact ID.
+func (s *TimelineService) GetKnowledgeFactLatest(factID string) (*KnowledgeFactRecord, error) {
+	row := s.db.QueryRow(`SELECT fact_id, group_name, subject, predicate, object, version, source,
+		COALESCE(proposal_id,''), COALESCE(decision_id,''), COALESCE(tags,'[]'), updated_at
+		FROM knowledge_facts WHERE fact_id = ?`, factID)
+	var rec KnowledgeFactRecord
+	err := row.Scan(
+		&rec.FactID,
+		&rec.GroupName,
+		&rec.Subject,
+		&rec.Predicate,
+		&rec.Object,
+		&rec.Version,
+		&rec.Source,
+		&rec.ProposalID,
+		&rec.DecisionID,
+		&rec.Tags,
+		&rec.UpdatedAt,
+	)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("get knowledge fact latest: %w", err)
+	}
+	return &rec, nil
+}
+
+// UpsertKnowledgeFactLatest stores the accepted latest state for a fact.
+func (s *TimelineService) UpsertKnowledgeFactLatest(rec *KnowledgeFactRecord) error {
+	if rec == nil {
+		return fmt.Errorf("knowledge fact record is nil")
+	}
+	_, err := s.db.Exec(`INSERT INTO knowledge_facts
+		(fact_id, group_name, subject, predicate, object, version, source, proposal_id, decision_id, tags, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+		ON CONFLICT(fact_id) DO UPDATE SET
+			group_name = excluded.group_name,
+			subject = excluded.subject,
+			predicate = excluded.predicate,
+			object = excluded.object,
+			version = excluded.version,
+			source = excluded.source,
+			proposal_id = excluded.proposal_id,
+			decision_id = excluded.decision_id,
+			tags = excluded.tags,
+			updated_at = datetime('now')`,
+		rec.FactID,
+		rec.GroupName,
+		rec.Subject,
+		rec.Predicate,
+		rec.Object,
+		rec.Version,
+		rec.Source,
+		rec.ProposalID,
+		rec.DecisionID,
+		rec.Tags,
+	)
+	if err != nil {
+		return fmt.Errorf("upsert knowledge fact latest: %w", err)
+	}
+	return nil
 }
 
 // IsSilentMode checks if silent mode is enabled. Defaults to true (safe default).

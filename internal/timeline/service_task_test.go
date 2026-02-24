@@ -261,6 +261,53 @@ func TestRecordKnowledgeIdempotency(t *testing.T) {
 	}
 }
 
+func TestKnowledgeFactLatestCRUD(t *testing.T) {
+	svc := newTestTimeline(t)
+	got, err := svc.GetKnowledgeFactLatest("fact-1")
+	if err != nil {
+		t.Fatalf("get missing fact latest: %v", err)
+	}
+	if got != nil {
+		t.Fatalf("expected nil for missing fact, got %+v", got)
+	}
+
+	rec := &KnowledgeFactRecord{
+		FactID:     "fact-1",
+		GroupName:  "g",
+		Subject:    "service",
+		Predicate:  "runbook",
+		Object:     "v1",
+		Version:    1,
+		Source:     "decision:d1",
+		ProposalID: "p1",
+		DecisionID: "d1",
+		Tags:       `["ops"]`,
+	}
+	if err := svc.UpsertKnowledgeFactLatest(rec); err != nil {
+		t.Fatalf("upsert fact v1: %v", err)
+	}
+	got, err = svc.GetKnowledgeFactLatest("fact-1")
+	if err != nil {
+		t.Fatalf("get fact v1: %v", err)
+	}
+	if got == nil || got.Version != 1 || got.Object != "v1" {
+		t.Fatalf("unexpected fact v1: %+v", got)
+	}
+
+	rec.Object = "v2"
+	rec.Version = 2
+	if err := svc.UpsertKnowledgeFactLatest(rec); err != nil {
+		t.Fatalf("upsert fact v2: %v", err)
+	}
+	got, err = svc.GetKnowledgeFactLatest("fact-1")
+	if err != nil {
+		t.Fatalf("get fact v2: %v", err)
+	}
+	if got == nil || got.Version != 2 || got.Object != "v2" {
+		t.Fatalf("unexpected fact v2: %+v", got)
+	}
+}
+
 func TestListTasks(t *testing.T) {
 	svc := newTestTimeline(t)
 

@@ -311,6 +311,7 @@ SQLite with WAL mode, foreign keys, 5-second busy timeout.
 | `group_memory_items` | Shared memory |
 | `group_skill_channels` | Skill registry |
 | `knowledge_idempotency` | Dedup ledger for knowledge envelopes (`idempotency_key`, `claw_id`, `instance_id`) |
+| `knowledge_facts` | Latest accepted shared fact state with versioned conflict policy |
 
 ### Key Settings
 

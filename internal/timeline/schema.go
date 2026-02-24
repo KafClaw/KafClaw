@@ -284,6 +284,21 @@ type TopicMessageLogRecord struct {
 	CreatedAt     time.Time `json:"created_at"`
 }
 
+// KnowledgeFactRecord is the latest accepted state of a shared knowledge fact.
+type KnowledgeFactRecord struct {
+	FactID     string    `json:"fact_id"`
+	GroupName  string    `json:"group_name"`
+	Subject    string    `json:"subject"`
+	Predicate  string    `json:"predicate"`
+	Object     string    `json:"object"`
+	Version    int       `json:"version"`
+	Source     string    `json:"source"`
+	ProposalID string    `json:"proposal_id,omitempty"`
+	DecisionID string    `json:"decision_id,omitempty"`
+	Tags       string    `json:"tags"` // JSON array
+	UpdatedAt  time.Time `json:"updated_at"`
+}
+
 // TopicStat holds per-topic aggregated statistics.
 type TopicStat struct {
 	TopicName      string  `json:"topic_name"`
