@@ -196,6 +196,7 @@ Operational notes:
 | `Subagents.MaxSpawnDepth` | `1` | `KAFCLAW_TOOLS_SUBAGENTS_MAX_SPAWN_DEPTH` | Max spawn depth (default prevents nested child spawning) |
 | `Subagents.MaxChildrenPerAgent` | `5` | `KAFCLAW_TOOLS_SUBAGENTS_MAX_CHILDREN_PER_AGENT` | Max active child runs per parent session |
 | `Subagents.ArchiveAfterMinutes` | `60` | `KAFCLAW_TOOLS_SUBAGENTS_ARCHIVE_AFTER_MINUTES` | Subagent retention/archive window |
+| `Subagents.MemoryShareMode` | `handoff` | `KAFCLAW_TOOLS_SUBAGENTS_MEMORY_SHARE_MODE` | Memory sharing mode: `isolated`, `handoff`, `inherit-readonly` |
 | `Subagents.AllowAgents` | *(current agent only)* | `KAFCLAW_TOOLS_SUBAGENTS_ALLOW_AGENTS` | Allowed `agentId` values for `sessions_spawn` (`*` allows any) |
 | `Subagents.Model` | *(inherit main model)* | `KAFCLAW_TOOLS_SUBAGENTS_MODEL` | Default model for spawned subagents |
 | `Subagents.Thinking` | *(empty)* | `KAFCLAW_TOOLS_SUBAGENTS_THINKING` | Default thinking level for spawned subagents |
@@ -212,6 +213,7 @@ Subagent control operations:
 - `subagents(action=kill_all)`: stop all active child runs for current root session scope
 - `subagents(action=steer,target=<selector>,input=<text>)`: stop target and spawn a steered replacement run
 - child loop policy is depth-aware: `sessions_spawn` is denied at/after max depth
+- child memory writes are isolated from parent private scope; parent ingest uses explicit handoff path when enabled
 - optional child allow/deny policy via `tools.subagents.tools.allow` and `tools.subagents.tools.deny` (wildcard suffix `*` supported)
 - selectors for `target`: run ID, `last`, numeric index, label prefix, or child session key
 - `sessions_spawn` supports `runTimeoutSeconds` for per-run timeout

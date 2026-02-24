@@ -36,6 +36,9 @@ func TestDefaultConfig(t *testing.T) {
 	if cfg.Tools.Subagents.ArchiveAfterMinutes != 60 {
 		t.Errorf("expected subagents archiveAfterMinutes 60, got %d", cfg.Tools.Subagents.ArchiveAfterMinutes)
 	}
+	if cfg.Tools.Subagents.MemoryShareMode != "handoff" {
+		t.Errorf("expected subagents memoryShareMode handoff, got %s", cfg.Tools.Subagents.MemoryShareMode)
+	}
 	if cfg.Node.ClawID == "" {
 		t.Error("expected default node.clawId to be set")
 	}
@@ -218,6 +221,7 @@ func TestLoadAgentsDefaultsSubagentsCompatibility(t *testing.T) {
 					"maxSpawnDepth": 2,
 					"maxChildrenPerAgent": 4,
 					"archiveAfterMinutes": 15,
+					"memoryShareMode": "inherit-readonly",
 					"model": "openai/gpt-4.1",
 					"thinking": "medium",
 					"allowAgents": ["agent-main","agent-research"]
@@ -248,6 +252,9 @@ func TestLoadAgentsDefaultsSubagentsCompatibility(t *testing.T) {
 	if len(cfg.Tools.Subagents.AllowAgents) != 2 {
 		t.Fatalf("expected allowAgents inherited, got %+v", cfg.Tools.Subagents.AllowAgents)
 	}
+	if cfg.Tools.Subagents.MemoryShareMode != "inherit-readonly" {
+		t.Fatalf("expected memoryShareMode inherited, got %+v", cfg.Tools.Subagents)
+	}
 }
 
 func TestLoadToolsSubagentsPrecedenceOverAgentsDefaults(t *testing.T) {
@@ -270,7 +277,8 @@ func TestLoadToolsSubagentsPrecedenceOverAgentsDefaults(t *testing.T) {
 			"subagents": {
 				"maxConcurrent": 9,
 				"maxSpawnDepth": 1,
-				"maxChildrenPerAgent": 7
+				"maxChildrenPerAgent": 7,
+				"memoryShareMode": "isolated"
 			}
 		}
 	}`
@@ -286,6 +294,9 @@ func TestLoadToolsSubagentsPrecedenceOverAgentsDefaults(t *testing.T) {
 	}
 	if cfg.Tools.Subagents.MaxConcurrent != 9 || cfg.Tools.Subagents.MaxSpawnDepth != 1 || cfg.Tools.Subagents.MaxChildrenPerAgent != 7 {
 		t.Fatalf("expected tools.subagents to override agents.defaults.subagents, got %+v", cfg.Tools.Subagents)
+	}
+	if cfg.Tools.Subagents.MemoryShareMode != "isolated" {
+		t.Fatalf("expected tools.subagents.memoryShareMode to override defaults, got %+v", cfg.Tools.Subagents)
 	}
 }
 

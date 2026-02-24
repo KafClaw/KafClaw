@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -14,6 +15,39 @@ import (
 	"github.com/KafClaw/KafClaw/internal/timeline"
 	"github.com/KafClaw/KafClaw/internal/tools"
 )
+
+type capturingProvider struct {
+	mu       sync.Mutex
+	lastReq  *provider.ChatRequest
+	response string
+}
+
+func (p *capturingProvider) Chat(_ context.Context, req *provider.ChatRequest) (*provider.ChatResponse, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	cp := *req
+	cp.Messages = append([]provider.Message{}, req.Messages...)
+	p.lastReq = &cp
+	out := strings.TrimSpace(p.response)
+	if out == "" {
+		out = "captured"
+	}
+	return &provider.ChatResponse{Content: out, Usage: provider.Usage{TotalTokens: 1}}, nil
+}
+
+func (p *capturingProvider) Transcribe(_ context.Context, _ *provider.AudioRequest) (*provider.AudioResponse, error) {
+	return &provider.AudioResponse{Text: ""}, nil
+}
+func (p *capturingProvider) Speak(_ context.Context, _ *provider.TTSRequest) (*provider.TTSResponse, error) {
+	return &provider.TTSResponse{}, nil
+}
+func (p *capturingProvider) DefaultModel() string { return "capture-model" }
+
+func (p *capturingProvider) LastRequest() *provider.ChatRequest {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.lastReq
+}
 
 type slowProvider struct{}
 
@@ -221,6 +255,17 @@ func TestLoopSpawnSubagentFromTool_Success(t *testing.T) {
 	if !gotCompleted {
 		t.Fatal("timed out waiting for subagent completion")
 	}
+	parent := loop.sessions.GetOrCreate("whatsapp:owner@s.whatsapp.net")
+	foundHandoff := false
+	for _, m := range parent.Messages {
+		if strings.Contains(m.Content, "[subagent handoff "+res.RunID+"]") && strings.Contains(m.Content, "Status: completed") {
+			foundHandoff = true
+			break
+		}
+	}
+	if !foundHandoff {
+		t.Fatalf("expected parent session handoff message for run %s", res.RunID)
+	}
 
 	select {
 	case msg := <-outbound:
@@ -236,6 +281,81 @@ func TestLoopSpawnSubagentFromTool_Success(t *testing.T) {
 	case <-time.After(2 * time.Second):
 		t.Fatal("expected subagent completion outbound message")
 	}
+}
+
+func TestLoopSpawnSubagentFromTool_IsolatedModeSkipsParentHandoff(t *testing.T) {
+	mock := &mockProvider{
+		responses: []provider.ChatResponse{
+			{Content: "child isolated done", Usage: provider.Usage{TotalTokens: 10}},
+		},
+	}
+	loop := NewLoop(LoopOptions{
+		Provider:                mock,
+		Workspace:               t.TempDir(),
+		WorkRepo:                t.TempDir(),
+		Model:                   "mock-model",
+		MaxIterations:           1,
+		MaxSubagentSpawnDepth:   1,
+		MaxSubagentChildren:     2,
+		SubagentMemoryShareMode: "isolated",
+	})
+	loop.activeChannel = "cli"
+	loop.activeChatID = "default"
+	res, err := loop.spawnSubagentFromTool(context.Background(), tools.SpawnRequest{Task: "isolated child"})
+	if err != nil {
+		t.Fatalf("spawn err: %v", err)
+	}
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		list := loop.listSubagentsForTool()
+		if len(list) == 1 && list[0].Status == "completed" {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	parent := loop.sessions.GetOrCreate("cli:default")
+	for _, m := range parent.Messages {
+		if strings.Contains(m.Content, "[subagent handoff "+res.RunID+"]") {
+			t.Fatalf("did not expect handoff in isolated mode, got: %s", m.Content)
+		}
+	}
+}
+
+func TestLoopSpawnSubagentFromTool_InheritReadonlySeedsChildContext(t *testing.T) {
+	prov := &capturingProvider{response: "done"}
+	loop := NewLoop(LoopOptions{
+		Provider:                prov,
+		Workspace:               t.TempDir(),
+		WorkRepo:                t.TempDir(),
+		Model:                   "capture-model",
+		MaxIterations:           1,
+		MaxSubagentSpawnDepth:   1,
+		MaxSubagentChildren:     2,
+		SubagentMemoryShareMode: "inherit-readonly",
+	})
+	loop.activeChannel = "cli"
+	loop.activeChatID = "default"
+	parent := loop.sessions.GetOrCreate("cli:default")
+	parent.AddMessage("user", "Parent context: bug reproduced in parser")
+	if err := loop.sessions.Save(parent); err != nil {
+		t.Fatalf("save parent session err: %v", err)
+	}
+	_, err := loop.spawnSubagentFromTool(context.Background(), tools.SpawnRequest{Task: "fix parser bug"})
+	if err != nil {
+		t.Fatalf("spawn err: %v", err)
+	}
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		if req := prov.LastRequest(); req != nil {
+			for _, m := range req.Messages {
+				if strings.Contains(m.Content, "Read-only parent context snapshot") && strings.Contains(m.Content, "Parent context: bug reproduced in parser") {
+					return
+				}
+			}
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	t.Fatal("expected child request to include readonly parent context snapshot")
 }
 
 func TestLoopSpawnSubagentFromTool_DepthDenied(t *testing.T) {

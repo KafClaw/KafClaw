@@ -241,6 +241,27 @@ Each provider entry accepts `apiKey` and `apiBase`. See [LLM Providers](/referen
 | `agents.list[].model.fallbacks` | []string | Fallback models tried on transient errors |
 | `agents.list[].subagents.model` | string | Model for subagents spawned by this agent |
 
+## Subagent Memory Share Mode
+
+```json
+{
+  "tools": {
+    "subagents": {
+      "memoryShareMode": "handoff"
+    }
+  }
+}
+```
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `tools.subagents.memoryShareMode` | string | Subagent memory mode: `isolated`, `handoff` (default), `inherit-readonly` |
+
+Mode behavior:
+- `isolated`: child session is isolated; no automatic parent-session handoff write.
+- `handoff`: child stays isolated; completion handoff is appended to parent session.
+- `inherit-readonly`: child receives read-only parent snapshot and still writes completion handoff to parent session.
+
 ## Middleware Configuration
 
 | Section | Reference |

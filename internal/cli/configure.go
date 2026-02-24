@@ -17,6 +17,7 @@ import (
 
 var configureSubagentsAllowAgents string
 var configureClearSubagentsAllowAgents bool
+var configureSubagentsMemoryShareMode string
 var configureNonInteractive bool
 var configureSkillsEnabled bool
 var configureSkillsNodeManager string
@@ -49,6 +50,7 @@ var configureCmd = &cobra.Command{
 func init() {
 	configureCmd.Flags().StringVar(&configureSubagentsAllowAgents, "subagents-allow-agents", "", "Comma-separated agent IDs allowed for sessions_spawn agentId (use '*' for any)")
 	configureCmd.Flags().BoolVar(&configureClearSubagentsAllowAgents, "clear-subagents-allow-agents", false, "Clear subagent allowlist (default behavior: current agent only)")
+	configureCmd.Flags().StringVar(&configureSubagentsMemoryShareMode, "subagents-memory-share-mode", "", "Set subagent memory share mode (isolated|handoff|inherit-readonly)")
 	configureCmd.Flags().BoolVar(&configureSkillsEnabled, "skills-enabled", false, "Enable or disable global skills system (with --skills-enabled-set)")
 	configureCmd.Flags().StringVar(&configureSkillsNodeManager, "skills-node-manager", "", "Set skills node manager (npm|pnpm|bun)")
 	configureCmd.Flags().StringVar(&configureSkillsScope, "skills-scope", "", "Set skills scope (all|selected)")
@@ -110,6 +112,15 @@ func runConfigure(cmd *cobra.Command, args []string) error {
 	}
 
 	cfg.Tools.Subagents.AllowAgents = updatedAllowAgents
+	if strings.TrimSpace(configureSubagentsMemoryShareMode) != "" {
+		mode := strings.ToLower(strings.TrimSpace(configureSubagentsMemoryShareMode))
+		switch mode {
+		case "isolated", "handoff", "inherit-readonly":
+			cfg.Tools.Subagents.MemoryShareMode = mode
+		default:
+			return fmt.Errorf("invalid --subagents-memory-share-mode: %s (expected isolated|handoff|inherit-readonly)", mode)
+		}
+	}
 
 	if cmd.Flags().Changed("skills-enabled-set") {
 		cfg.Skills.Enabled = configureSkillsEnabled
@@ -266,17 +277,18 @@ func runConfigure(cmd *cobra.Command, args []string) error {
 			"status":  "ok",
 			"command": "configure",
 			"result": map[string]any{
-				"allowAgents":           cfg.Tools.Subagents.AllowAgents,
-				"skillsEnabled":         cfg.Skills.Enabled,
-				"skillsNodeManager":     cfg.Skills.NodeManager,
-				"skillsScope":           cfg.Skills.Scope,
-				"kafkaBrokers":          cfg.Group.KafkaBrokers,
-				"kafkaSecurityProtocol": cfg.Group.KafkaSecurityProto,
-				"kafkaSaslMechanism":    cfg.Group.KafkaSASLMechanism,
-				"kafkaSaslUsername":     cfg.Group.KafkaSASLUsername,
-				"kafkaTlsCAFile":        cfg.Group.KafkaTLSCAFile,
-				"kafkaTlsCertFile":      cfg.Group.KafkaTLSCertFile,
-				"kafkaTlsKeyFile":       cfg.Group.KafkaTLSKeyFile,
+				"allowAgents":              cfg.Tools.Subagents.AllowAgents,
+				"subagentsMemoryShareMode": cfg.Tools.Subagents.MemoryShareMode,
+				"skillsEnabled":            cfg.Skills.Enabled,
+				"skillsNodeManager":        cfg.Skills.NodeManager,
+				"skillsScope":              cfg.Skills.Scope,
+				"kafkaBrokers":             cfg.Group.KafkaBrokers,
+				"kafkaSecurityProtocol":    cfg.Group.KafkaSecurityProto,
+				"kafkaSaslMechanism":       cfg.Group.KafkaSASLMechanism,
+				"kafkaSaslUsername":        cfg.Group.KafkaSASLUsername,
+				"kafkaTlsCAFile":           cfg.Group.KafkaTLSCAFile,
+				"kafkaTlsCertFile":         cfg.Group.KafkaTLSCertFile,
+				"kafkaTlsKeyFile":          cfg.Group.KafkaTLSKeyFile,
 				"memoryEmbedding": map[string]any{
 					"enabled":   cfg.Memory.Embedding.Enabled,
 					"provider":  cfg.Memory.Embedding.Provider,
@@ -296,6 +308,7 @@ func runConfigure(cmd *cobra.Command, args []string) error {
 		state = strings.Join(cfg.Tools.Subagents.AllowAgents, ",")
 	}
 	fmt.Fprintf(cmd.OutOrStdout(), "Updated tools.subagents.allowAgents: %s\n", state)
+	fmt.Fprintf(cmd.OutOrStdout(), "Updated tools.subagents.memoryShareMode: %s\n", cfg.Tools.Subagents.MemoryShareMode)
 	fmt.Fprintf(cmd.OutOrStdout(), "Updated skills.enabled: %v\n", cfg.Skills.Enabled)
 	fmt.Fprintf(cmd.OutOrStdout(), "Updated skills.nodeManager: %s\n", cfg.Skills.NodeManager)
 	fmt.Fprintf(cmd.OutOrStdout(), "Updated skills.scope: %s\n", cfg.Skills.Scope)

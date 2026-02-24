@@ -462,6 +462,7 @@ type SubagentsToolConfig struct {
 	MaxSpawnDepth       int                `json:"maxSpawnDepth" envconfig:"MAX_SPAWN_DEPTH"`
 	MaxChildrenPerAgent int                `json:"maxChildrenPerAgent" envconfig:"MAX_CHILDREN_PER_AGENT"`
 	ArchiveAfterMinutes int                `json:"archiveAfterMinutes" envconfig:"ARCHIVE_AFTER_MINUTES"`
+	MemoryShareMode     string             `json:"memoryShareMode" envconfig:"MEMORY_SHARE_MODE"` // isolated|handoff|inherit-readonly
 	AllowAgents         []string           `json:"allowAgents" envconfig:"ALLOW_AGENTS"`
 	Model               string             `json:"model" envconfig:"MODEL"`
 	Thinking            string             `json:"thinking" envconfig:"THINKING"`
@@ -660,6 +661,7 @@ func DefaultConfig() *Config {
 				MaxSpawnDepth:       1,
 				MaxChildrenPerAgent: 5,
 				ArchiveAfterMinutes: 60,
+				MemoryShareMode:     "handoff",
 			},
 		},
 		Skills: SkillsConfig{

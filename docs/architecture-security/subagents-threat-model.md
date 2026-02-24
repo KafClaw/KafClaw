@@ -30,6 +30,12 @@ This document defines security boundaries for subagent orchestration (`sessions_
   - `tools.subagents.maxSpawnDepth`
   - `tools.subagents.maxChildrenPerAgent`
   - `tools.subagents.maxConcurrent`
+- Memory boundary controls:
+  - `tools.subagents.memoryShareMode=isolated|handoff|inherit-readonly`
+  - child sessions run on isolated session keys (`subagent:<id>`)
+  - no direct child writes into parent private working-memory scope
+  - parent memory ingestion is explicit via completion handoff path
+  - `inherit-readonly` passes parent snapshot as read-only context only
 - Tool policy guardrails:
   - depth-aware `sessions_spawn` denial at leaf depth
   - optional child allow/deny lists via `tools.subagents.tools.{allow,deny}`
@@ -47,6 +53,7 @@ This document defines security boundaries for subagent orchestration (`sessions_
 ## Known Limitations
 
 - Duplicate suppression is deterministic at runtime/state level, but does not yet use a dedicated external idempotency cache across independent gateways.
+- `inherit-readonly` snapshot quality depends on parent session quality; large noisy parent sessions can still reduce child prompt precision.
 
 ## Operational Recommendations
 

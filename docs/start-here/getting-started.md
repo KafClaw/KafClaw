@@ -328,6 +328,7 @@ Optional defaults for spawned children:
 
 - `tools.subagents.model` (pin a default child model)
 - `tools.subagents.thinking` (default thinking level tag)
+- `tools.subagents.memoryShareMode` (`isolated|handoff|inherit-readonly`)
 - `tools.subagents.tools.allow` / `tools.subagents.tools.deny` (child tool policy)
 
 Onboarding supports direct subagent tuning flags:
@@ -351,6 +352,7 @@ Use guided configuration updates:
 ```bash
 ./kafclaw configure
 ./kafclaw configure --subagents-allow-agents agent-main,agent-research --non-interactive
+./kafclaw configure --subagents-memory-share-mode handoff --non-interactive
 ```
 
 Clear allowlist (back to current-agent-only default):

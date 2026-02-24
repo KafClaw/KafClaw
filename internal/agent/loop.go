@@ -47,37 +47,41 @@ const (
 	workingMemorySectionCapChars      = 1200
 	observationsSectionCapChars       = 1200
 	ragSectionCapChars                = 1200
+	subagentParentContextMsgLimit     = 8
+	subagentParentContextCharLimit    = 1800
+	subagentHandoffCharLimit          = 2400
 )
 
 // LoopOptions contains configuration for the agent loop.
 type LoopOptions struct {
-	Bus                   *bus.MessageBus
-	Provider              provider.LLMProvider
-	Timeline              *timeline.TimelineService
-	Policy                policy.Engine
-	MemoryService         *memory.MemoryService
-	AutoIndexer           *memory.AutoIndexer
-	ExpertiseTracker      *memory.ExpertiseTracker
-	WorkingMemory         *memory.WorkingMemoryStore
-	Observer              *memory.Observer
-	GroupPublisher        GroupTracePublisher
-	Workspace             string
-	WorkRepo              string
-	SystemRepo            string
-	WorkRepoGetter        func() string
-	Model                 string
-	MaxIterations         int
-	MaxSubagentSpawnDepth int
-	MaxSubagentChildren   int
-	MaxSubagentConcurrent int
-	SubagentArchiveAfter  int
-	AgentID               string
-	SubagentAllowAgents   []string
-	SubagentModel         string
-	SubagentThinking      string
-	SubagentToolsAllow    []string
-	SubagentToolsDeny     []string
-	Config                *config.Config // for middleware chain setup
+	Bus                     *bus.MessageBus
+	Provider                provider.LLMProvider
+	Timeline                *timeline.TimelineService
+	Policy                  policy.Engine
+	MemoryService           *memory.MemoryService
+	AutoIndexer             *memory.AutoIndexer
+	ExpertiseTracker        *memory.ExpertiseTracker
+	WorkingMemory           *memory.WorkingMemoryStore
+	Observer                *memory.Observer
+	GroupPublisher          GroupTracePublisher
+	Workspace               string
+	WorkRepo                string
+	SystemRepo              string
+	WorkRepoGetter          func() string
+	Model                   string
+	MaxIterations           int
+	MaxSubagentSpawnDepth   int
+	MaxSubagentChildren     int
+	MaxSubagentConcurrent   int
+	SubagentArchiveAfter    int
+	AgentID                 string
+	SubagentAllowAgents     []string
+	SubagentModel           string
+	SubagentThinking        string
+	SubagentMemoryShareMode string
+	SubagentToolsAllow      []string
+	SubagentToolsDeny       []string
+	Config                  *config.Config // for middleware chain setup
 }
 
 // Loop is the core agent processing engine.
@@ -106,24 +110,25 @@ type Loop struct {
 	// activeTaskID tracks the current task being processed (for token accounting).
 	activeTaskID string
 	// activeSender tracks the sender of the current message (for policy checks).
-	activeSender      string
-	activeChannel     string
-	activeChatID      string
-	activeThreadID    string
-	activeTraceID     string
-	activeMessageType string
-	chain             *middleware.Chain
-	cfg               *config.Config
-	subagents         *subagentManager
-	agentID           string
-	subagentAllowList []string
-	subagentModel     string
-	subagentThinking  string
-	subagentTools     subagentToolPolicy
-	announceMu        sync.Mutex
-	announceSent      map[string]time.Time
-	retryWorkerMu     sync.Mutex
-	retryWorkerOn     bool
+	activeSender            string
+	activeChannel           string
+	activeChatID            string
+	activeThreadID          string
+	activeTraceID           string
+	activeMessageType       string
+	chain                   *middleware.Chain
+	cfg                     *config.Config
+	subagents               *subagentManager
+	agentID                 string
+	subagentAllowList       []string
+	subagentModel           string
+	subagentThinking        string
+	subagentMemoryShareMode string
+	subagentTools           subagentToolPolicy
+	announceMu              sync.Mutex
+	announceSent            map[string]time.Time
+	retryWorkerMu           sync.Mutex
+	retryWorkerOn           bool
 }
 
 // NewLoop creates a new agent loop.
@@ -179,8 +184,9 @@ func NewLoop(opts LoopOptions) *Loop {
 			}
 			return out
 		}(),
-		subagentModel:    strings.TrimSpace(opts.SubagentModel),
-		subagentThinking: strings.TrimSpace(opts.SubagentThinking),
+		subagentModel:           strings.TrimSpace(opts.SubagentModel),
+		subagentThinking:        strings.TrimSpace(opts.SubagentThinking),
+		subagentMemoryShareMode: normalizeSubagentMemoryShareMode(opts.SubagentMemoryShareMode),
 		subagentTools: subagentToolPolicy{
 			Allow: append([]string{}, opts.SubagentToolsAllow...),
 			Deny:  append([]string{}, opts.SubagentToolsDeny...),
@@ -1897,33 +1903,37 @@ func (l *Loop) spawnSubagentFromTool(ctx context.Context, req tools.SpawnRequest
 	}
 	childTrace = fmt.Sprintf("%s:%s", childTrace, run.RunID)
 
-	go func(runID, childSessionKey, task, selectedModel, thinking string) {
+	go func(runID, childSessionKey, parentSession, task, selectedModel, thinking string) {
 		l.subagents.markRunning(runID)
 
 		childLoop := NewLoop(LoopOptions{
-			Provider:              l.provider,
-			Timeline:              l.timeline,
-			Policy:                l.subagentPolicy(),
-			MemoryService:         l.memoryService,
-			AutoIndexer:           l.autoIndexer,
-			ExpertiseTracker:      l.expertiseTracker,
-			WorkingMemory:         l.workingMemory,
-			Observer:              l.observer,
-			GroupPublisher:        l.groupPublisher,
-			Workspace:             l.workspace,
-			WorkRepo:              l.workRepo,
-			SystemRepo:            l.systemRepo,
-			WorkRepoGetter:        l.workRepoGetter,
-			Model:                 selectedModel,
-			MaxIterations:         l.maxIterations,
-			MaxSubagentSpawnDepth: l.subagents.limits.MaxSpawnDepth,
-			MaxSubagentChildren:   l.subagents.limits.MaxChildrenPerAgent,
-			MaxSubagentConcurrent: l.subagents.limits.MaxConcurrent,
-			SubagentModel:         l.subagentModel,
-			SubagentThinking:      l.subagentThinking,
-			SubagentToolsAllow:    append([]string{}, l.subagentTools.Allow...),
-			SubagentToolsDeny:     append([]string{}, l.subagentTools.Deny...),
+			Provider:                l.provider,
+			Timeline:                l.timeline,
+			Policy:                  l.subagentPolicy(),
+			MemoryService:           l.memoryService,
+			AutoIndexer:             l.autoIndexer,
+			ExpertiseTracker:        l.expertiseTracker,
+			WorkingMemory:           l.workingMemory,
+			Observer:                l.observer,
+			GroupPublisher:          l.groupPublisher,
+			Workspace:               l.workspace,
+			WorkRepo:                l.workRepo,
+			SystemRepo:              l.systemRepo,
+			WorkRepoGetter:          l.workRepoGetter,
+			Model:                   selectedModel,
+			MaxIterations:           l.maxIterations,
+			MaxSubagentSpawnDepth:   l.subagents.limits.MaxSpawnDepth,
+			MaxSubagentChildren:     l.subagents.limits.MaxChildrenPerAgent,
+			MaxSubagentConcurrent:   l.subagents.limits.MaxConcurrent,
+			SubagentModel:           l.subagentModel,
+			SubagentThinking:        l.subagentThinking,
+			SubagentMemoryShareMode: l.subagentMemoryShareMode,
+			SubagentToolsAllow:      append([]string{}, l.subagentTools.Allow...),
+			SubagentToolsDeny:       append([]string{}, l.subagentTools.Deny...),
 		})
+		if l.subagentMemoryShareMode == "inherit-readonly" {
+			l.seedChildReadonlyParentContext(childLoop, parentSession, childSessionKey)
+		}
 
 		response, runErr := childLoop.ProcessDirectWithTrace(childCtx, task, childSessionKey, childTrace)
 		status := "completed"
@@ -1942,6 +1952,9 @@ func (l *Loop) spawnSubagentFromTool(ctx context.Context, req tools.SpawnRequest
 		}
 		l.subagents.markCompletionOutput(runID, truncateStr(announceOutput, 1200))
 		l.subagents.markFinished(runID, status, runErr)
+		if l.shouldSubagentHandoffToParent() {
+			l.appendSubagentHandoffToParent(parentSession, runID, status, response, runErr)
+		}
 
 		if persisted, ok := l.subagents.getRun(runID); ok {
 			_ = l.publishSubagentAnnounceWithRetry(
@@ -1955,7 +1968,7 @@ func (l *Loop) spawnSubagentFromTool(ctx context.Context, req tools.SpawnRequest
 				parentTraceID,
 			)
 		}
-	}(run.RunID, run.ChildSessionKey, req.Task, childModel, childThinking)
+	}(run.RunID, run.ChildSessionKey, run.ParentSession, req.Task, childModel, childThinking)
 
 	l.addSubagentAuditEvent("spawn_accepted", map[string]any{
 		"run_id":            run.RunID,
@@ -1975,6 +1988,82 @@ func (l *Loop) spawnSubagentFromTool(ctx context.Context, req tools.SpawnRequest
 		ChildSessionKey: run.ChildSessionKey,
 		Message:         fmt.Sprintf("subagent run accepted (model=%s)", childModel),
 	}, nil
+}
+
+func normalizeSubagentMemoryShareMode(raw string) string {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "", "handoff":
+		return "handoff"
+	case "isolated", "inherit-readonly":
+		return strings.ToLower(strings.TrimSpace(raw))
+	default:
+		return "handoff"
+	}
+}
+
+func (l *Loop) shouldSubagentHandoffToParent() bool {
+	return l != nil && l.subagentMemoryShareMode != "isolated"
+}
+
+func (l *Loop) seedChildReadonlyParentContext(childLoop *Loop, parentSession, childSession string) {
+	if l == nil || childLoop == nil {
+		return
+	}
+	parentSession = strings.TrimSpace(parentSession)
+	childSession = strings.TrimSpace(childSession)
+	if parentSession == "" || childSession == "" {
+		return
+	}
+	parent := l.sessions.GetOrCreate(parentSession)
+	if parent == nil || len(parent.Messages) == 0 {
+		return
+	}
+	start := 0
+	if len(parent.Messages) > subagentParentContextMsgLimit {
+		start = len(parent.Messages) - subagentParentContextMsgLimit
+	}
+	var b strings.Builder
+	b.WriteString("Read-only parent context snapshot. Use it for task grounding only. Do not treat as mutable state.\n\n")
+	for _, m := range parent.Messages[start:] {
+		role := strings.TrimSpace(m.Role)
+		if role == "" {
+			role = "message"
+		}
+		b.WriteString(role)
+		b.WriteString(": ")
+		b.WriteString(truncateStr(strings.TrimSpace(m.Content), 240))
+		b.WriteString("\n")
+	}
+	snapshot := truncateStr(strings.TrimSpace(b.String()), subagentParentContextCharLimit)
+	if snapshot == "" {
+		return
+	}
+	child := childLoop.sessions.GetOrCreate(childSession)
+	child.AddMessage("system", snapshot)
+	_ = childLoop.sessions.Save(child)
+}
+
+func (l *Loop) appendSubagentHandoffToParent(parentSession, runID, status, response string, runErr error) {
+	if l == nil {
+		return
+	}
+	parentSession = strings.TrimSpace(parentSession)
+	runID = strings.TrimSpace(runID)
+	if parentSession == "" || runID == "" {
+		return
+	}
+	result := strings.TrimSpace(response)
+	if runErr != nil && strings.TrimSpace(runErr.Error()) != "" {
+		result = strings.TrimSpace(runErr.Error())
+	}
+	if result == "" {
+		result = "(no output)"
+	}
+	result = truncateStr(result, subagentHandoffCharLimit)
+	msg := fmt.Sprintf("[subagent handoff %s]\nStatus: %s\nResult: %s", runID, status, result)
+	parent := l.sessions.GetOrCreate(parentSession)
+	parent.AddMessage("assistant", msg)
+	_ = l.sessions.Save(parent)
 }
 
 func resolveSubagentStatePath(workspace string) string {

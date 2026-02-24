@@ -16,6 +16,7 @@ type subagentFieldPresence struct {
 	MaxSpawnDepth       bool
 	MaxChildrenPerAgent bool
 	ArchiveAfterMinutes bool
+	MemoryShareMode     bool
 	AllowAgents         bool
 	Model               bool
 	Thinking            bool
@@ -293,6 +294,14 @@ func Load() (*Config, error) {
 	if cfg.Tools.Subagents.ArchiveAfterMinutes <= 0 {
 		cfg.Tools.Subagents.ArchiveAfterMinutes = 60
 	}
+	switch strings.ToLower(strings.TrimSpace(cfg.Tools.Subagents.MemoryShareMode)) {
+	case "", "handoff":
+		cfg.Tools.Subagents.MemoryShareMode = "handoff"
+	case "isolated", "inherit-readonly":
+		cfg.Tools.Subagents.MemoryShareMode = strings.ToLower(strings.TrimSpace(cfg.Tools.Subagents.MemoryShareMode))
+	default:
+		cfg.Tools.Subagents.MemoryShareMode = "handoff"
+	}
 
 	if cfg.Skills.NodeManager == "" {
 		cfg.Skills.NodeManager = "npm"
@@ -510,6 +519,9 @@ func mergeAgentsSubagentDefaults(cfg *Config, toolsPresence subagentFieldPresenc
 	if !toolsPresence.ArchiveAfterMinutes && dst.ArchiveAfterMinutes == def.ArchiveAfterMinutes && src.ArchiveAfterMinutes > 0 {
 		dst.ArchiveAfterMinutes = src.ArchiveAfterMinutes
 	}
+	if !toolsPresence.MemoryShareMode && strings.TrimSpace(dst.MemoryShareMode) == strings.TrimSpace(def.MemoryShareMode) && strings.TrimSpace(src.MemoryShareMode) != "" {
+		dst.MemoryShareMode = src.MemoryShareMode
+	}
 	if !toolsPresence.Model && strings.TrimSpace(dst.Model) == "" && strings.TrimSpace(src.Model) != "" {
 		dst.Model = src.Model
 	}
@@ -532,6 +544,7 @@ func isZeroSubagentsToolConfig(c SubagentsToolConfig) bool {
 		c.MaxSpawnDepth == 0 &&
 		c.MaxChildrenPerAgent == 0 &&
 		c.ArchiveAfterMinutes == 0 &&
+		strings.TrimSpace(c.MemoryShareMode) == "" &&
 		strings.TrimSpace(c.Model) == "" &&
 		strings.TrimSpace(c.Thinking) == "" &&
 		len(c.AllowAgents) == 0 &&
@@ -569,6 +582,7 @@ func readSubagentPresence(node map[string]any) subagentFieldPresence {
 	_, p.MaxSpawnDepth = node["maxSpawnDepth"]
 	_, p.MaxChildrenPerAgent = node["maxChildrenPerAgent"]
 	_, p.ArchiveAfterMinutes = node["archiveAfterMinutes"]
+	_, p.MemoryShareMode = node["memoryShareMode"]
 	_, p.AllowAgents = node["allowAgents"]
 	_, p.Model = node["model"]
 	_, p.Thinking = node["thinking"]
