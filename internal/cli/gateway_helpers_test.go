@@ -11,12 +11,14 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/KafClaw/KafClaw/internal/config"
 	"github.com/KafClaw/KafClaw/internal/group"
 	"github.com/KafClaw/KafClaw/internal/orchestrator"
+	"github.com/KafClaw/KafClaw/internal/timeline"
 )
 
 func TestGatewayHelperFunctions(t *testing.T) {
@@ -163,6 +165,79 @@ func TestEmbeddingCachePresent(t *testing.T) {
 	}
 	if !embeddingCachePresent(cacheDir) {
 		t.Fatal("expected existing cache dir to be detected")
+	}
+}
+
+func TestPublishKnowledgePresenceAndCapabilitiesAnnouncement(t *testing.T) {
+	var mu sync.Mutex
+	topics := make([]string, 0, 2)
+	types := make([]string, 0, 2)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/lfs/produce" {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		topic := r.Header.Get("X-Kafka-Topic")
+		var env map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&env); err == nil {
+			mu.Lock()
+			topics = append(topics, topic)
+			if tv, ok := env["type"].(string); ok {
+				types = append(types, tv)
+			}
+			mu.Unlock()
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"kfs_lfs":1}`))
+	}))
+	defer srv.Close()
+
+	tl, err := timeline.NewTimelineService(filepath.Join(t.TempDir(), "timeline.db"))
+	if err != nil {
+		t.Fatalf("open timeline: %v", err)
+	}
+	defer tl.Close()
+
+	cfg := config.DefaultConfig()
+	cfg.Group.LFSProxyURL = srv.URL
+	cfg.Knowledge.Enabled = true
+	cfg.Knowledge.Group = "g1"
+	cfg.Node.ClawID = "claw-a"
+	cfg.Node.InstanceID = "inst-a"
+	cfg.Knowledge.Topics.Presence = "group.g1.knowledge.presence"
+	cfg.Knowledge.Topics.Capabilities = "group.g1.knowledge.capabilities"
+
+	if err := publishKnowledgeCapabilitiesAnnouncement(cfg, tl); err != nil {
+		t.Fatalf("publish capabilities: %v", err)
+	}
+	if err := publishKnowledgePresenceAnnouncement(cfg, tl, "active"); err != nil {
+		t.Fatalf("publish presence: %v", err)
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+	if len(topics) != 2 {
+		t.Fatalf("expected 2 published envelopes, got %d (%v)", len(topics), topics)
+	}
+	if !strings.Contains(strings.Join(types, ","), "capabilities") || !strings.Contains(strings.Join(types, ","), "presence") {
+		t.Fatalf("expected capabilities and presence types, got %v", types)
+	}
+}
+
+func TestInferNodeCapabilities(t *testing.T) {
+	cfg := config.DefaultConfig()
+	cfg.Knowledge.Voting.Enabled = true
+	cfg.Tools.Subagents.MaxConcurrent = 3
+	cfg.Channels.Slack.Enabled = true
+	cfg.Channels.MSTeams.Enabled = true
+	cfg.Channels.WhatsApp.Enabled = true
+
+	caps := inferNodeCapabilities(cfg)
+	joined := strings.Join(caps, ",")
+	for _, expected := range []string{"memory.search", "memory.semantic", "knowledge.governance", "knowledge.vote", "subagents", "channel.slack", "channel.msteams", "channel.whatsapp"} {
+		if !strings.Contains(joined, expected) {
+			t.Fatalf("expected capability %q in %v", expected, caps)
+		}
 	}
 }
 

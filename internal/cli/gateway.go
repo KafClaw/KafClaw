@@ -27,6 +27,7 @@ import (
 	"github.com/KafClaw/KafClaw/internal/config"
 	"github.com/KafClaw/KafClaw/internal/group"
 	"github.com/KafClaw/KafClaw/internal/identity"
+	"github.com/KafClaw/KafClaw/internal/knowledge"
 	"github.com/KafClaw/KafClaw/internal/memory"
 	"github.com/KafClaw/KafClaw/internal/orchestrator"
 	"github.com/KafClaw/KafClaw/internal/policy"
@@ -3579,6 +3580,7 @@ func runGatewayMain(cmd *cobra.Command, args []string) {
 		kafkaCancel := startGrpKafka(cfg.Group, mgr, ctx, orchDiscoveryHandler(orch))
 		grpState.SetManager(mgr, kafkaCancel)
 	}
+	startKnowledgeAnnouncements(ctx, cfg, timeSvc)
 
 	fmt.Println("Gateway running. Press Ctrl+C to stop.")
 	<-sigChan
@@ -3683,6 +3685,135 @@ func embeddingCachePresent(cacheDir string) bool {
 		return true
 	}
 	return false
+}
+
+func startKnowledgeAnnouncements(ctx context.Context, cfg *config.Config, timeSvc *timeline.TimelineService) {
+	if cfg == nil || timeSvc == nil || !cfg.Knowledge.Enabled {
+		return
+	}
+	if strings.TrimSpace(cfg.Node.ClawID) == "" || strings.TrimSpace(cfg.Node.InstanceID) == "" {
+		return
+	}
+	if strings.TrimSpace(cfg.Knowledge.Topics.Presence) == "" && strings.TrimSpace(cfg.Knowledge.Topics.Capabilities) == "" {
+		return
+	}
+	go func() {
+		_ = publishKnowledgeCapabilitiesAnnouncement(cfg, timeSvc)
+		_ = publishKnowledgePresenceAnnouncement(cfg, timeSvc, "active")
+
+		presenceTicker := time.NewTicker(45 * time.Second)
+		capabilityTicker := time.NewTicker(5 * time.Minute)
+		defer presenceTicker.Stop()
+		defer capabilityTicker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				_ = publishKnowledgePresenceAnnouncement(cfg, timeSvc, "stopping")
+				return
+			case <-presenceTicker.C:
+				_ = publishKnowledgePresenceAnnouncement(cfg, timeSvc, "active")
+			case <-capabilityTicker.C:
+				_ = publishKnowledgeCapabilitiesAnnouncement(cfg, timeSvc)
+			}
+		}
+	}()
+}
+
+func publishKnowledgePresenceAnnouncement(cfg *config.Config, timeSvc *timeline.TimelineService, status string) error {
+	topic := strings.TrimSpace(cfg.Knowledge.Topics.Presence)
+	if topic == "" {
+		return nil
+	}
+	status = strings.ToLower(strings.TrimSpace(status))
+	if status == "" {
+		status = "active"
+	}
+	now := time.Now().UTC()
+	env := knowledge.Envelope{
+		SchemaVersion:  knowledge.CurrentSchemaVersion,
+		Type:           knowledge.TypePresence,
+		TraceID:        newTraceID(),
+		Timestamp:      now,
+		IdempotencyKey: fmt.Sprintf("knowledge:presence:%s:%s:%d", cfg.Node.ClawID, cfg.Node.InstanceID, now.Unix()),
+		ClawID:         strings.TrimSpace(cfg.Node.ClawID),
+		InstanceID:     strings.TrimSpace(cfg.Node.InstanceID),
+		Payload: map[string]any{
+			"group":       strings.TrimSpace(cfg.Knowledge.Group),
+			"status":      status,
+			"displayName": strings.TrimSpace(cfg.Node.DisplayName),
+			"updatedAt":   now.Format(time.RFC3339),
+		},
+	}
+	if err := publishKnowledgeEnvelope(cfg, timeSvc, topic, env); err != nil {
+		return err
+	}
+	_ = timeSvc.SetSetting("knowledge_presence_last_at", now.Format(time.RFC3339))
+	return nil
+}
+
+func publishKnowledgeCapabilitiesAnnouncement(cfg *config.Config, timeSvc *timeline.TimelineService) error {
+	topic := strings.TrimSpace(cfg.Knowledge.Topics.Capabilities)
+	if topic == "" {
+		return nil
+	}
+	now := time.Now().UTC()
+	env := knowledge.Envelope{
+		SchemaVersion:  knowledge.CurrentSchemaVersion,
+		Type:           knowledge.TypeCapabilities,
+		TraceID:        newTraceID(),
+		Timestamp:      now,
+		IdempotencyKey: fmt.Sprintf("knowledge:capabilities:%s:%s:%d", cfg.Node.ClawID, cfg.Node.InstanceID, now.Unix()),
+		ClawID:         strings.TrimSpace(cfg.Node.ClawID),
+		InstanceID:     strings.TrimSpace(cfg.Node.InstanceID),
+		Payload: map[string]any{
+			"group":        strings.TrimSpace(cfg.Knowledge.Group),
+			"displayName":  strings.TrimSpace(cfg.Node.DisplayName),
+			"model":        strings.TrimSpace(cfg.Model.Name),
+			"capabilities": inferNodeCapabilities(cfg),
+			"updatedAt":    now.Format(time.RFC3339),
+		},
+	}
+	if err := publishKnowledgeEnvelope(cfg, timeSvc, topic, env); err != nil {
+		return err
+	}
+	_ = timeSvc.SetSetting("knowledge_capabilities_last_at", now.Format(time.RFC3339))
+	return nil
+}
+
+func inferNodeCapabilities(cfg *config.Config) []string {
+	if cfg == nil {
+		return nil
+	}
+	out := []string{"memory.search", "memory.semantic", "knowledge.governance"}
+	if cfg.Knowledge.Voting.Enabled {
+		out = append(out, "knowledge.vote")
+	}
+	if cfg.Tools.Subagents.MaxConcurrent > 0 {
+		out = append(out, "subagents")
+	}
+	if cfg.Channels.Slack.Enabled {
+		out = append(out, "channel.slack")
+	}
+	if cfg.Channels.MSTeams.Enabled {
+		out = append(out, "channel.msteams")
+	}
+	if cfg.Channels.WhatsApp.Enabled {
+		out = append(out, "channel.whatsapp")
+	}
+	seen := map[string]struct{}{}
+	filtered := make([]string, 0, len(out))
+	for _, v := range out {
+		v = strings.TrimSpace(v)
+		if v == "" {
+			continue
+		}
+		if _, ok := seen[v]; ok {
+			continue
+		}
+		seen[v] = struct{}{}
+		filtered = append(filtered, v)
+	}
+	return filtered
 }
 
 type RepoItem struct {

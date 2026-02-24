@@ -43,6 +43,10 @@ Most-used keys stored in `timeline.db`:
 | `runtime_reconcile_open_tasks` | Open task count (`pending`/`processing`) discovered at startup |
 | `runtime_reconcile_open_group_tasks` | Open group task count (`pending`/`accepted`) discovered at startup |
 | `kafscale_lfs_proxy_url` | LFS proxy URL for shared artifacts |
+| `knowledge_presence_last_at` | Last published knowledge presence announcement (RFC3339 UTC) |
+| `knowledge_capabilities_last_at` | Last published knowledge capabilities announcement (RFC3339 UTC) |
+| `memory_embedding_install_requested_at` | Last embedding install bootstrap request timestamp (RFC3339 UTC) |
+| `memory_embedding_install_model` | Embedding model last requested for install/bootstrap |
 
 ## Useful CLI Commands
 
