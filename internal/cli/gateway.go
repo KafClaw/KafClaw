@@ -146,14 +146,14 @@ func runGatewayMain(cmd *cobra.Command, args []string) {
 	// External users (non-owner) are restricted to read-only tools (tier 0).
 	policyEngine.ExternalMaxTier = 0
 
-	// 4c. Setup Memory System (requires Embedder-capable provider)
+	// 4c. Setup Memory System (uses dedicated embedding resolver, independent from chat provider)
 	var memorySvc *memory.MemoryService
-	if embedder, ok := prov.(provider.Embedder); ok {
+	if embedder, source := resolveMemoryEmbedder(cfg, prov); embedder != nil {
 		vecStore := memory.NewSQLiteVecStore(timeSvc.DB(), 1536)
 		memorySvc = memory.NewMemoryService(vecStore, embedder)
-		fmt.Println("🧠 Memory system initialized")
+		fmt.Println("🧠 Memory system initialized:", source)
 	} else {
-		fmt.Println("ℹ️  Memory system disabled (provider does not support embeddings)")
+		fmt.Println("ℹ️  Memory system disabled (no embedding provider available)")
 	}
 
 	// 4d. Setup Group Collaboration (conditional)

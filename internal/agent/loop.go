@@ -38,6 +38,16 @@ type GroupTracePublisher interface {
 
 var subagentRetryInterval = 8 * time.Second
 
+const (
+	defaultMemoryInjectionBudgetChars = 3600
+	defaultMemoryLaneTopK             = 5
+	defaultMemoryMinScore             = 0.30
+	maxMemoryLaneTopK                 = 20
+	workingMemorySectionCapChars      = 1200
+	observationsSectionCapChars       = 1200
+	ragSectionCapChars                = 1200
+)
+
 // LoopOptions contains configuration for the agent loop.
 type LoopOptions struct {
 	Bus                   *bus.MessageBus
@@ -387,14 +397,16 @@ func (l *Loop) ProcessDirectWithTrace(ctx context.Context, content, sessionKey, 
 	// Build messages using the context builder
 	messages := l.contextBuilder.BuildMessages(sess, content, channel, chatID, l.activeMessageType)
 
+	remainingMemoryBudget := l.memoryInjectionBudgetChars()
+
 	// Inject working memory (scoped per user/thread)
-	messages = l.injectWorkingMemory(messages, chatID, sessionKey)
+	messages, remainingMemoryBudget = l.injectWorkingMemory(messages, chatID, sessionKey, remainingMemoryBudget)
 
 	// Inject observations (compressed session history)
-	messages = l.injectObservations(messages, sessionKey)
+	messages, remainingMemoryBudget = l.injectObservations(messages, sessionKey, remainingMemoryBudget)
 
 	// Inject RAG context from semantic memory
-	messages = l.injectRAGContext(ctx, messages, content)
+	messages, _ = l.injectRAGContext(ctx, messages, content, remainingMemoryBudget)
 
 	// Run the agentic loop
 	response, err := l.runAgentLoop(ctx, messages)
@@ -969,27 +981,28 @@ func (l *Loop) systemRepoPath() string {
 // injectRAGContext searches semantic memory for relevant context and appends
 // it to the system prompt. Returns messages unchanged if memoryService is nil
 // or search returns no relevant results.
-func (l *Loop) injectRAGContext(ctx context.Context, messages []provider.Message, userQuery string) []provider.Message {
+func (l *Loop) injectRAGContext(ctx context.Context, messages []provider.Message, userQuery string, budgetChars int) ([]provider.Message, int) {
 	if l.memoryService == nil || len(messages) == 0 {
-		return messages
+		return messages, budgetChars
 	}
 
-	chunks, err := l.memoryService.Search(ctx, userQuery, 5)
+	chunks, err := l.memoryService.Search(ctx, userQuery, l.memoryLaneTopK())
 	if err != nil {
 		slog.Warn("RAG search failed", "error", err)
-		return messages
+		return messages, budgetChars
 	}
 
 	// Filter out low-relevance results
 	var relevant []memory.MemoryChunk
+	minScore := l.memoryMinScore()
 	for _, c := range chunks {
-		if c.Score >= 0.3 {
+		if c.Score >= minScore {
 			relevant = append(relevant, c)
 		}
 	}
 
 	if len(relevant) == 0 {
-		return messages
+		return messages, budgetChars
 	}
 
 	// Build the memory section
@@ -999,25 +1012,24 @@ func (l *Loop) injectRAGContext(ctx context.Context, messages []provider.Message
 		sb.WriteString(fmt.Sprintf("- [source=%s, relevance=%.0f%%] %s\n", c.Source, c.Score*100, c.Content))
 	}
 
-	// Append to system prompt (first message)
-	messages[0].Content += sb.String()
-	return messages
+	section := sb.String()
+	return appendSectionWithBudget(messages, section, ragSectionCapChars, budgetChars)
 }
 
 // injectWorkingMemory loads scoped working memory and appends it to the system prompt.
-func (l *Loop) injectWorkingMemory(messages []provider.Message, resourceID, threadID string) []provider.Message {
+func (l *Loop) injectWorkingMemory(messages []provider.Message, resourceID, threadID string, budgetChars int) ([]provider.Message, int) {
 	if l.workingMemory == nil || len(messages) == 0 {
-		return messages
+		return messages, budgetChars
 	}
 
 	resContent, thrContent, err := l.workingMemory.LoadBoth(resourceID, threadID)
 	if err != nil {
 		slog.Warn("Working memory load failed", "error", err)
-		return messages
+		return messages, budgetChars
 	}
 
 	if resContent == "" && thrContent == "" {
-		return messages
+		return messages, budgetChars
 	}
 
 	var sb strings.Builder
@@ -1034,29 +1046,103 @@ func (l *Loop) injectWorkingMemory(messages []provider.Message, resourceID, thre
 		sb.WriteString("\n")
 	}
 
-	messages[0].Content += sb.String()
-	return messages
+	return appendSectionWithBudget(messages, sb.String(), workingMemorySectionCapChars, budgetChars)
 }
 
 // injectObservations loads compressed observation notes and appends them to the system prompt.
-func (l *Loop) injectObservations(messages []provider.Message, sessionID string) []provider.Message {
+func (l *Loop) injectObservations(messages []provider.Message, sessionID string, budgetChars int) ([]provider.Message, int) {
 	if l.observer == nil || len(messages) == 0 {
-		return messages
+		return messages, budgetChars
 	}
 
 	observations, err := l.observer.LoadObservations(sessionID)
 	if err != nil {
 		slog.Warn("Observations load failed", "error", err)
-		return messages
+		return messages, budgetChars
 	}
+	observations = trimTailObservations(observations, l.memoryLaneTopK())
 
 	formatted := memory.FormatObservations(observations)
 	if formatted == "" {
-		return messages
+		return messages, budgetChars
 	}
 
-	messages[0].Content += "\n\n---\n\n" + formatted
-	return messages
+	return appendSectionWithBudget(messages, "\n\n---\n\n"+formatted, observationsSectionCapChars, budgetChars)
+}
+
+func (l *Loop) memoryInjectionBudgetChars() int {
+	if l == nil || l.cfg == nil {
+		return defaultMemoryInjectionBudgetChars
+	}
+	// Keep proportional budget from retrieval count while bounded.
+	k := l.memoryLaneTopK()
+	budget := k * 700
+	if budget < 1200 {
+		budget = 1200
+	}
+	if budget > defaultMemoryInjectionBudgetChars {
+		budget = defaultMemoryInjectionBudgetChars
+	}
+	return budget
+}
+
+func (l *Loop) memoryLaneTopK() int {
+	if l == nil || l.cfg == nil || l.cfg.Memory.Search.MaxResults <= 0 {
+		return defaultMemoryLaneTopK
+	}
+	k := l.cfg.Memory.Search.MaxResults
+	if k > maxMemoryLaneTopK {
+		return maxMemoryLaneTopK
+	}
+	return k
+}
+
+func (l *Loop) memoryMinScore() float32 {
+	if l == nil || l.cfg == nil {
+		return defaultMemoryMinScore
+	}
+	score := l.cfg.Memory.Search.MinScore
+	if score < 0 {
+		return 0
+	}
+	if score > 1 {
+		return 1
+	}
+	return float32(score)
+}
+
+func appendSectionWithBudget(messages []provider.Message, section string, sectionCapChars, budgetChars int) ([]provider.Message, int) {
+	if len(messages) == 0 || section == "" || budgetChars <= 0 {
+		return messages, budgetChars
+	}
+	capChars := sectionCapChars
+	if capChars <= 0 || capChars > budgetChars {
+		capChars = budgetChars
+	}
+	section = truncateWithEllipsis(section, capChars)
+	messages[0].Content += section
+	remaining := budgetChars - len(section)
+	return messages, remaining
+}
+
+func truncateWithEllipsis(s string, maxChars int) string {
+	if maxChars <= 0 {
+		return ""
+	}
+	if len(s) <= maxChars {
+		return s
+	}
+	if maxChars <= 3 {
+		return s[:maxChars]
+	}
+	return s[:maxChars-3] + "..."
+}
+
+func trimTailObservations(observations []memory.Observation, max int) []memory.Observation {
+	if max <= 0 || len(observations) <= max {
+		return observations
+	}
+	return observations[len(observations)-max:]
 }
 
 func (l *Loop) processMessage(ctx context.Context, msg *bus.InboundMessage) (response string, taskID string, err error) {
