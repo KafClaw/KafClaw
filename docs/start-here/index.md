@@ -5,3 +5,5 @@ has_children: true
 ---
 
 Start here to install KafClaw, run onboarding, and complete your first working setup.
+
+For guided setup flows, see [Onboarding](/onboarding/).

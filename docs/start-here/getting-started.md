@@ -1,6 +1,6 @@
 ---
 title: Getting Started Guide
-parent: Getting Started
+parent: Onboarding
 nav_order: 1
 ---
 

@@ -52,3 +52,6 @@ docs/vendor/bundle/
 # Keep Node version pins tracked
 !.nvmrc
 !.node-version
+
+# Local docs lockfile
+docs/Gemfile.lock

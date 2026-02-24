@@ -1,6 +1,7 @@
 ---
-parent: Integrations
+parent: Onboarding
 title: WhatsApp Setup (Default Deny)
+nav_order: 3
 ---
 
 # WhatsApp Setup (Default Deny)

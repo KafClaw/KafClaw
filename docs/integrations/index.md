@@ -1,6 +1,6 @@
 ---
 title: Integrations
-parent: Guides
+parent: Collaboration
 nav_order: 2
 has_children: true
 ---

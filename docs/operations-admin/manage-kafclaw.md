@@ -258,64 +258,24 @@ Use `kafclaw security` for consolidated security posture and deep skill audits.
 
 ## 6. Config Management
 
-### Low-level config edits
+This guide stays as the command-surface index. Detailed flows moved to:
+
+- [Memory Governance Operations](/memory-management/memory-governance-operations/)
+- [Group and Kafka Operations](/collaboration/group-kafka-operations/)
+
+Quick examples:
 
 ```bash
 ./kafclaw config get gateway.host
-./kafclaw config set gateway.host 127.0.0.1
-./kafclaw config unset channels.slack.accounts
-```
-
-### Guided update path
-
-```bash
-./kafclaw configure
-./kafclaw configure --subagents-allow-agents agent-main,agent-research --non-interactive
-./kafclaw configure --clear-subagents-allow-agents --non-interactive
-./kafclaw configure --non-interactive --skills-enabled-set --skills-enabled=true --skills-node-manager npm
-./kafclaw configure --non-interactive --skills-scope selected
-./kafclaw configure --non-interactive --enable-skill github --disable-skill weather
-./kafclaw configure --non-interactive --kafka-brokers "broker1:9092,broker2:9092" --kafka-security-protocol SASL_SSL --kafka-sasl-mechanism SCRAM-SHA-512 --kafka-sasl-username "<username>" --kafka-sasl-password "<password>" --kafka-tls-ca-file "/path/to/ca.pem"
 ./kafclaw configure --non-interactive --memory-embedding-enabled-set --memory-embedding-enabled=true --memory-embedding-provider local-hf --memory-embedding-model BAAI/bge-small-en-v1.5 --memory-embedding-dimension 384
-./kafclaw configure --non-interactive --memory-embedding-model BAAI/bge-base-en-v1.5 --confirm-memory-wipe
-```
-
-Memory embedding switch policy:
-- Configure blocks a switch when embedded memory already exists unless `--confirm-memory-wipe` is provided.
-- First-time embedding enable (from disabled to configured) does not wipe existing text-only memory rows.
-- On confirmed switch, `memory_chunks` is wiped so old vectors do not mix with new embedding space.
-
-Skills policy defaults:
-
-- `skills.scope=selected` (least-privilege, recommended)
-- `skills.runtimeIsolation=auto` (use strict if container runtime is mandatory in your environment)
-
-See [Skills](/skills/) for full skill policy details.
-
-### LLM provider and token management
-
-Interactive (recommended):
-
-```bash
-./kafclaw onboard
-```
-
-Provider setup options in onboarding:
-
-- `cli-token` (prompts for token; OpenRouter-style OpenAI-compatible flow)
-- `openai-compatible` (prompts for API base, optional token, model)
-- `skip` (retain current settings)
-
-Direct config edits:
-
-```bash
-./kafclaw config get providers.openai.apiBase
 ./kafclaw config set providers.openai.apiBase "https://openrouter.ai/api/v1"
-./kafclaw config set providers.openai.apiKey "<token>"
-./kafclaw config set model.name "anthropic/claude-sonnet-4-5"
 ```
 
 ## 7. Group Collaboration Operations
+
+See [Group and Kafka Operations](/collaboration/group-kafka-operations/) for full runbook and security config examples.
+
+Quick lifecycle:
 
 ```bash
 ./kafclaw group join mygroup
@@ -324,116 +284,16 @@ Direct config edits:
 ./kafclaw group leave
 ```
 
-Notes:
-
-- Group state is persisted in timeline settings (`group_name`, `group_active`)
-- Heartbeat continuity metadata is persisted in settings (`group_heartbeat_last_attempt_at`, `group_heartbeat_last_success_at`, `group_heartbeat_seq`)
-- On gateway startup, durable runtime reconciliation records counters for open tasks/pending deliveries (`runtime_reconcile_*`) before work intake
-- Knowledge envelope dedup is persisted in `knowledge_idempotency` (idempotency key + claw identity)
-- Quorum voting policy: for pools `>= knowledge.voting.minPoolSize`, approvals require `yes >= quorumYes` and `yes > no`; rejections require `no >= quorumNo`; proposals expire after `timeoutSec`
-- By default (`allowSelfVote=false`), proposer self-votes are ignored in quorum math
-- Shared fact updates are sequentially versioned (`v1`, `v2`, ...); non-sequential updates are treated as conflicts and do not overwrite latest accepted state
-- Governance apply paths are feature-gated by `knowledge.governanceEnabled` (when `false`, proposal/vote/decision/fact write/apply paths are disabled)
-- `group status` also prints resolved topic names and LFS health
-- `group members` reads roster snapshots from timeline DB
-
-Knowledge CLI examples:
-
-```bash
-./kafclaw knowledge status --json
-./kafclaw knowledge propose --proposal-id p1 --group mygroup --statement "Adopt runbook v2"
-./kafclaw knowledge vote --proposal-id p1 --vote yes
-./kafclaw knowledge decisions --status approved --json
-./kafclaw knowledge facts --group mygroup --json
-```
-
-### Configure Kafka broker connection (examples)
-
-Using onboarding profile:
-
-```bash
-./kafclaw onboard --non-interactive --profile local-kafka --kafka-brokers "broker1:9092,broker2:9092" --group-name kafclaw --agent-id agent-ops --role worker --llm skip
-```
-
-Using onboarding profile with broker security:
-
-```bash
-./kafclaw onboard --non-interactive --profile local-kafka --llm skip \
-  --kafka-brokers "broker1:9092,broker2:9092" \
-  --kafka-security-protocol SASL_SSL \
-  --kafka-sasl-mechanism SCRAM-SHA-512 \
-  --kafka-sasl-username "<username>" \
-  --kafka-sasl-password "<password>" \
-  --kafka-tls-ca-file "/path/to/ca.pem"
-```
-
-Using direct config commands:
-
-```bash
-./kafclaw config set group.enabled true
-./kafclaw config set group.groupName "kafclaw"
-./kafclaw config set group.kafkaBrokers "broker1:9092,broker2:9092"
-./kafclaw config set group.consumerGroup "kafclaw-workers"
-./kafclaw config set group.agentId "agent-ops"
-```
-
-Kafka security options are optional. Plaintext/non-mTLS installs continue to work by default.
-
-Direct broker security (Confluent/Redpanda-style SASL/SSL):
-
-```bash
-./kafclaw config set group.kafkaSecurityProtocol "SASL_SSL"
-./kafclaw config set group.kafkaSaslMechanism "PLAIN"
-./kafclaw config set group.kafkaSaslUsername "<username>"
-./kafclaw config set group.kafkaSaslPassword "<password>"
-./kafclaw config set group.kafkaTlsCAFile "/path/to/ca.pem"
-```
-
-Mutual TLS (when required by cluster policy):
-
-```bash
-./kafclaw config set group.kafkaSecurityProtocol "SSL"
-./kafclaw config set group.kafkaTlsCAFile "/path/to/ca.pem"
-./kafclaw config set group.kafkaTlsCertFile "/path/to/client-cert.pem"
-./kafclaw config set group.kafkaTlsKeyFile "/path/to/client-key.pem"
-```
-
-Using KafScale proxy style settings:
-
-```bash
-./kafclaw config set group.lfsProxyUrl "https://your-kafscale-endpoint"
-./kafclaw config set group.lfsProxyApiKey "<kafscale-api-key>"
-```
-
-Verification:
-
-```bash
-./kafclaw group join kafclaw
-./kafclaw group status
-./kafclaw kshark --auto --yes
-```
-
-`kshark --auto` now reads the same group Kafka security settings used by runtime group consumers.
-
 ## 8. Kafka Diagnostics with KShark
 
-Auto-config from current KafClaw group config:
+Detailed diagnostics and options are in [Group and Kafka Operations](/collaboration/group-kafka-operations/).
+
+Quick commands:
 
 ```bash
 ./kafclaw kshark --auto --yes
-```
-
-Using explicit properties:
-
-```bash
 ./kafclaw kshark --props ./client.properties --topic group.mygroup.requests --group mygroup-workers --yes
 ```
-
-Useful options:
-
-- `--json <file>` export report
-- `--diag` include traceroute/MTU diagnostics
-- `--preset` for predefined connection templates
 
 ## 9. Channel Auth and Pairing
 

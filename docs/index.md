@@ -25,20 +25,29 @@ KafClaw is a Go-based agent runtime with three practical deployment modes:
 ## Start Here
 
 - [Getting Started](./start-here/)
-- [Getting Started Guide](./start-here/getting-started/)
 - [User Manual](./start-here/user-manual/)
 
-## Guides
+## Onboarding
 
-- [Guides](./guides/)
-- [Agent Concepts](./agent-concepts/)
-- [How Agents Work](./agent-concepts/how-agents-work/)
-- [Soul and Identity Files](./agent-concepts/soul-identity-tools/)
-- [Runtime Tools and Capabilities](./agent-concepts/runtime-tools/)
+- [Onboarding](./onboarding/)
+- [Getting Started Guide](./start-here/getting-started/)
+- [WhatsApp Onboarding](./integrations/whatsapp-onboarding/)
+- [WhatsApp Setup](./integrations/whatsapp-setup/)
+
+## Memory Management
+
+- [Memory Management](./memory-management/)
+- [Memory Notes](./agent-concepts/memory-notes/)
+- [Timeline and Memory Architecture](./architecture-security/architecture-timeline/)
+- [Knowledge Contracts](./reference/knowledge-contracts/)
+- [Memory Governance Operations](./memory-management/memory-governance-operations/)
+
+## Collaboration
+
+- [Collaboration](./collaboration/)
+- [Group and Kafka Operations](./collaboration/group-kafka-operations/)
 - [Integrations](./integrations/)
 - [Slack and Teams Bridge](./integrations/slack-teams-bridge/)
-- [WhatsApp Setup](./integrations/whatsapp-setup/)
-- [WhatsApp Onboarding](./integrations/whatsapp-onboarding/)
 
 ## Operations and Admin
 

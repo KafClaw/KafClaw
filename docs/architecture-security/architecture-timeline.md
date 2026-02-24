@@ -1,6 +1,7 @@
 ---
-parent: Architecture and Security
+parent: Memory Management
 title: "Architecture: Timeline and Memory"
+nav_order: 3
 ---
 
 # Architecture: Timeline and Memory

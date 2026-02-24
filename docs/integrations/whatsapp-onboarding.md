@@ -1,6 +1,7 @@
 ---
-parent: Integrations
+parent: Onboarding
 title: WhatsApp Onboarding — Buddy Access
+nav_order: 2
 ---
 
 # WhatsApp Onboarding — Buddy Access

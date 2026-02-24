@@ -1,6 +1,6 @@
 ---
 title: Agent Concepts
-parent: Guides
+parent: Memory Management
 nav_order: 1
 has_children: true
 ---

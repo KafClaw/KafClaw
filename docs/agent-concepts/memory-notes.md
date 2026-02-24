@@ -1,6 +1,7 @@
 ---
-parent: Agent Concepts
+parent: Memory Management
 title: Memory Notes
+nav_order: 2
 ---
 
 # Memory Notes
