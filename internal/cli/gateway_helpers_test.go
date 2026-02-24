@@ -93,6 +93,28 @@ func TestGatewayHelperFunctions(t *testing.T) {
 	}
 }
 
+func TestCollectKnowledgeTopics(t *testing.T) {
+	cfg := config.DefaultConfig()
+	cfg.Knowledge.Enabled = true
+	cfg.Knowledge.Topics.Proposals = "group.g.knowledge.proposals"
+	cfg.Knowledge.Topics.Votes = "group.g.knowledge.votes"
+	cfg.Knowledge.Topics.Decisions = "group.g.knowledge.decisions"
+	cfg.Knowledge.Topics.Facts = "group.g.knowledge.facts"
+	cfg.Knowledge.Topics.Presence = "group.g.knowledge.presence"
+	cfg.Knowledge.Topics.Capabilities = "group.g.knowledge.capabilities"
+
+	topics := collectKnowledgeTopics(cfg)
+	if len(topics) != 6 {
+		t.Fatalf("expected 6 knowledge topics, got %d (%v)", len(topics), topics)
+	}
+
+	cfg.Knowledge.Topics.Facts = cfg.Knowledge.Topics.Proposals
+	topics = collectKnowledgeTopics(cfg)
+	if len(topics) != 5 {
+		t.Fatalf("expected deduped topics length 5, got %d (%v)", len(topics), topics)
+	}
+}
+
 func TestRunGitAndRunGhRepoValidation(t *testing.T) {
 	if _, err := runGit(""); err == nil {
 		t.Fatal("expected runGit to reject empty repo")

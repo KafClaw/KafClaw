@@ -12,6 +12,17 @@ import (
 	"github.com/KafClaw/KafClaw/internal/config"
 )
 
+type fakeKnowledgeHandler struct {
+	calls int
+	last  string
+}
+
+func (f *fakeKnowledgeHandler) Process(topic string, _ []byte) error {
+	f.calls++
+	f.last = topic
+	return nil
+}
+
 func TestGroupRouter_RouteAnnounce(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -212,5 +223,41 @@ func TestChannelConsumer(t *testing.T) {
 	}
 	if string(msg.Value) != "hello" {
 		t.Errorf("expected value hello, got %s", string(msg.Value))
+	}
+}
+
+func TestGroupRouter_RouteKnowledgeTopic(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(LFSEnvelope{KfsLFS: 1})
+	}))
+	defer server.Close()
+
+	cfg := config.GroupConfig{Enabled: true, GroupName: "test", LFSProxyURL: server.URL}
+	mgr := NewManager(cfg, nil, AgentIdentity{AgentID: "local-agent"})
+	msgBus := bus.NewMessageBus()
+	consumer := NewChannelConsumer()
+	router := NewGroupRouter(mgr, msgBus, consumer)
+
+	fh := &fakeKnowledgeHandler{}
+	kTopic := "group.test.knowledge.proposals"
+	router.SetKnowledgeHandler(fh, []string{kTopic})
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() { _ = router.Run(ctx) }()
+	time.Sleep(10 * time.Millisecond)
+
+	consumer.Send(ConsumerMessage{
+		Topic: kTopic,
+		Value: []byte(`{"schemaVersion":"v1","type":"proposal","traceId":"t1","timestamp":"2026-02-24T00:00:00Z","idempotencyKey":"i1","clawId":"remote","instanceId":"n1","payload":{"proposalId":"p1","group":"g","statement":"s"}}`),
+	})
+	time.Sleep(50 * time.Millisecond)
+
+	if fh.calls != 1 {
+		t.Fatalf("expected knowledge handler call count 1, got %d", fh.calls)
+	}
+	if fh.last != kTopic {
+		t.Fatalf("expected knowledge handler topic %s, got %s", kTopic, fh.last)
 	}
 }

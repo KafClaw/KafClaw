@@ -194,6 +194,18 @@ func NewTimelineService(dbPath string) (*TimelineService, error) {
 	)`)
 	_, _ = db.Exec(`CREATE INDEX IF NOT EXISTS idx_group_memory_author ON group_memory_items(author_id)`)
 	_, _ = db.Exec(`CREATE INDEX IF NOT EXISTS idx_group_memory_created ON group_memory_items(created_at)`)
+	// Best-effort migration: knowledge idempotency table.
+	_, _ = db.Exec(`CREATE TABLE IF NOT EXISTS knowledge_idempotency (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		idempotency_key TEXT UNIQUE NOT NULL,
+		claw_id TEXT NOT NULL,
+		instance_id TEXT NOT NULL,
+		message_type TEXT NOT NULL,
+		topic_name TEXT NOT NULL,
+		trace_id TEXT NOT NULL,
+		processed_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+	)`)
+	_, _ = db.Exec(`CREATE INDEX IF NOT EXISTS idx_knowledge_idempotency_processed ON knowledge_idempotency(processed_at)`)
 	// Best-effort migration: group skill channels table.
 	_, _ = db.Exec(`CREATE TABLE IF NOT EXISTS group_skill_channels (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -417,6 +429,26 @@ func (s *TimelineService) SetSetting(key, value string) error {
 		ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
 	`, key, value)
 	return err
+}
+
+// RecordKnowledgeIdempotency inserts a knowledge message idempotency marker.
+// Returns inserted=false when the idempotency key already exists.
+func (s *TimelineService) RecordKnowledgeIdempotency(idempotencyKey, clawID, instanceID, messageType, topicName, traceID string) (bool, error) {
+	res, err := s.db.Exec(`INSERT INTO knowledge_idempotency
+		(idempotency_key, claw_id, instance_id, message_type, topic_name, trace_id)
+		VALUES (?, ?, ?, ?, ?, ?)`,
+		idempotencyKey, clawID, instanceID, messageType, topicName, traceID)
+	if err != nil {
+		if strings.Contains(strings.ToLower(err.Error()), "unique") {
+			return false, nil
+		}
+		return false, fmt.Errorf("record knowledge idempotency: %w", err)
+	}
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return true, nil
+	}
+	return rows > 0, nil
 }
 
 // IsSilentMode checks if silent mode is enabled. Defaults to true (safe default).

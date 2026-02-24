@@ -100,6 +100,19 @@ Safety behavior:
 - When confirmed, `configure` wipes `memory_chunks` before saving the new embedding config.
 - `kafclaw doctor --fix` restores default embedding settings if missing/disabled.
 
+## Knowledge Envelope Contract (Kafka)
+
+When `knowledge.enabled=true`, knowledge topics (`knowledge.topics.*`) consume/publish envelopes that must include:
+- `schemaVersion`
+- `type` (`capabilities|presence|proposal|vote|decision|fact`)
+- `traceId`
+- `timestamp`
+- `idempotencyKey`
+- `clawId`
+- `instanceId`
+
+`clawId`/`instanceId` are enforced at validation time, and `idempotencyKey` is persisted in `knowledge_idempotency` to prevent duplicate apply.
+
 ## Model Configuration
 
 ```json

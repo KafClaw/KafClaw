@@ -43,6 +43,8 @@ type GroupRouter struct {
 	extTopics   ExtendedTopicNames
 	skillPrefix string
 	orchHandler OrchestratorHandler
+	knowledge   KnowledgeEnvelopeHandler
+	knTopics    map[string]struct{}
 }
 
 // NewGroupRouter creates a router that bridges Kafka messages into the bus.
@@ -54,6 +56,19 @@ func NewGroupRouter(manager *Manager, msgBus *bus.MessageBus, consumer Consumer)
 		topics:      manager.Topics(),
 		extTopics:   ExtendedTopics(manager.GroupName()),
 		skillPrefix: SkillTopicPrefix(manager.GroupName()),
+	}
+}
+
+// SetKnowledgeHandler registers a knowledge envelope handler and topic allowlist.
+func (r *GroupRouter) SetKnowledgeHandler(h KnowledgeEnvelopeHandler, topics []string) {
+	r.knowledge = h
+	r.knTopics = map[string]struct{}{}
+	for _, t := range topics {
+		t = strings.TrimSpace(t)
+		if t == "" {
+			continue
+		}
+		r.knTopics[t] = struct{}{}
 	}
 }
 
@@ -83,6 +98,15 @@ func (r *GroupRouter) Run(ctx context.Context) error {
 }
 
 func (r *GroupRouter) handleMessage(msg ConsumerMessage) {
+	if r.knowledge != nil {
+		if _, ok := r.knTopics[msg.Topic]; ok {
+			if err := r.knowledge.Process(msg.Topic, msg.Value); err != nil {
+				slog.Warn("GroupRouter: knowledge message rejected", "topic", msg.Topic, "error", err)
+			}
+			return
+		}
+	}
+
 	var env GroupEnvelope
 	if err := json.Unmarshal(msg.Value, &env); err != nil {
 		slog.Warn("GroupRouter: unmarshal envelope", "error", err, "topic", msg.Topic)

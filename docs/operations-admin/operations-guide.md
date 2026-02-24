@@ -310,6 +310,7 @@ SQLite with WAL mode, foreign keys, 5-second busy timeout.
 | `group_traces` | Shared traces |
 | `group_memory_items` | Shared memory |
 | `group_skill_channels` | Skill registry |
+| `knowledge_idempotency` | Dedup ledger for knowledge envelopes (`idempotency_key`, `claw_id`, `instance_id`) |
 
 ### Key Settings
 
@@ -322,6 +323,8 @@ SQLite with WAL mode, foreign keys, 5-second busy timeout.
 | `silent_mode` | Suppress outbound WhatsApp (default: true) |
 | `bot_repo_path` | System/identity repo path |
 | `work_repo_path` | Active work repo path |
+| `runtime_reconcile_*` | Startup reconciliation counters for pending deliveries/open tasks |
+| `group_heartbeat_*` | Last heartbeat timestamps + sequence continuity |
 
 ---
 

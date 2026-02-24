@@ -242,6 +242,25 @@ func TestCountOpenGroupTasks(t *testing.T) {
 	}
 }
 
+func TestRecordKnowledgeIdempotency(t *testing.T) {
+	svc := newTestTimeline(t)
+	inserted, err := svc.RecordKnowledgeIdempotency("idem-1", "claw-a", "inst-a", "proposal", "group.g.knowledge.proposals", "trace-1")
+	if err != nil {
+		t.Fatalf("record knowledge idempotency (first): %v", err)
+	}
+	if !inserted {
+		t.Fatal("expected first insert to be accepted")
+	}
+
+	inserted, err = svc.RecordKnowledgeIdempotency("idem-1", "claw-a", "inst-a", "proposal", "group.g.knowledge.proposals", "trace-1")
+	if err != nil {
+		t.Fatalf("record knowledge idempotency (duplicate): %v", err)
+	}
+	if inserted {
+		t.Fatal("expected duplicate insert to be ignored")
+	}
+}
+
 func TestListTasks(t *testing.T) {
 	svc := newTestTimeline(t)
 

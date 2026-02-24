@@ -212,6 +212,9 @@ func runGatewayMain(cmd *cobra.Command, args []string) {
 		}
 		kafkaCtx, kafkaCancel := context.WithCancel(parentCtx)
 		extTopics := group.ExtendedTopics(grpCfg.GroupName)
+		knowledgeTopics := collectKnowledgeTopics(cfg)
+		allTopics := extTopics.AllTopics()
+		allTopics = append(allTopics, knowledgeTopics...)
 		consumerGroup := grpCfg.ConsumerGroup
 		if consumerGroup == "" {
 			consumerGroup = grpCfg.AgentID
@@ -230,13 +233,17 @@ func runGatewayMain(cmd *cobra.Command, args []string) {
 		kafkaConsumer := group.NewKafkaConsumerWithDialer(
 			grpCfg.KafkaBrokers,
 			consumerGroup,
-			extTopics.AllTopics(),
+			allTopics,
 			dialer,
 		)
 		grpState.SetConsumer(kafkaConsumer)
 		router := group.NewGroupRouter(mgr, msgBus, kafkaConsumer)
 		if orchHandler != nil {
 			router.SetOrchestratorHandler(orchHandler)
+		}
+		if cfg.Knowledge.Enabled && len(knowledgeTopics) > 0 {
+			router.SetKnowledgeHandler(group.NewKnowledgeHandler(timeSvc, cfg.Node.ClawID), knowledgeTopics)
+			fmt.Printf("🧠 Knowledge router enabled (%d topic(s))\n", len(knowledgeTopics))
 		}
 		go func() {
 			if err := router.Run(kafkaCtx); err != nil {
@@ -3658,4 +3665,31 @@ func inferTopicCategory(name string) string {
 	default:
 		return "control"
 	}
+}
+
+func collectKnowledgeTopics(cfg *config.Config) []string {
+	if cfg == nil || !cfg.Knowledge.Enabled {
+		return nil
+	}
+	topics := []string{
+		strings.TrimSpace(cfg.Knowledge.Topics.Capabilities),
+		strings.TrimSpace(cfg.Knowledge.Topics.Presence),
+		strings.TrimSpace(cfg.Knowledge.Topics.Proposals),
+		strings.TrimSpace(cfg.Knowledge.Topics.Votes),
+		strings.TrimSpace(cfg.Knowledge.Topics.Decisions),
+		strings.TrimSpace(cfg.Knowledge.Topics.Facts),
+	}
+	seen := map[string]struct{}{}
+	out := make([]string, 0, len(topics))
+	for _, t := range topics {
+		if t == "" {
+			continue
+		}
+		if _, ok := seen[t]; ok {
+			continue
+		}
+		seen[t] = struct{}{}
+		out = append(out, t)
+	}
+	return out
 }
