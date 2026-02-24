@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/KafClaw/KafClaw/internal/config"
 	"github.com/KafClaw/KafClaw/internal/timeline"
@@ -250,6 +251,9 @@ func runConfigure(cmd *cobra.Command, args []string) error {
 			if err != nil {
 				return fmt.Errorf("wipe memory for embedding switch: %w", err)
 			}
+			if err := logEmbeddingSwitchAudit(beforeFingerprint, afterFingerprint, wipedCount); err != nil {
+				return fmt.Errorf("write embedding switch audit event: %w", err)
+			}
 		}
 	}
 
@@ -384,6 +388,32 @@ func openTimelineDB() (*sql.DB, func(), error) {
 		return nil, nil, err
 	}
 	return svc.DB(), func() { _ = svc.Close() }, nil
+}
+
+func logEmbeddingSwitchAudit(beforeFingerprint, afterFingerprint string, wipedCount int64) error {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return err
+	}
+	path := filepath.Join(home, ".kafclaw", "timeline.db")
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		return err
+	}
+	svc, err := timeline.NewTimelineService(path)
+	if err != nil {
+		return err
+	}
+	defer svc.Close()
+	return svc.AddEvent(&timeline.TimelineEvent{
+		EventID:        fmt.Sprintf("MEMORY_EMBED_SWITCH_%d", time.Now().UnixNano()),
+		Timestamp:      time.Now(),
+		SenderID:       "system",
+		SenderName:     "KafClaw",
+		EventType:      "SYSTEM",
+		ContentText:    fmt.Sprintf("memory embedding switched (%s -> %s), wiped_chunks=%d", beforeFingerprint, afterFingerprint, wipedCount),
+		Classification: "MEMORY_EMBEDDING_SWITCH",
+		Authorized:     true,
+	})
 }
 
 func parseCapabilitySelection(raw string, allowed map[string]struct{}) ([]string, error) {

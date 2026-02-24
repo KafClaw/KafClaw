@@ -35,6 +35,13 @@ Most-used keys stored in `timeline.db`:
 | `selected_repo_path` | Active repository selected in dashboard |
 | `group_name` | Current collaboration group name |
 | `group_active` | Group participation flag |
+| `group_heartbeat_last_attempt_at` | Last heartbeat attempt timestamp (RFC3339 UTC) |
+| `group_heartbeat_last_success_at` | Last successful heartbeat timestamp (RFC3339 UTC) |
+| `group_heartbeat_seq` | Monotonic local heartbeat sequence counter |
+| `runtime_reconcile_last_at` | Last startup reconciliation timestamp |
+| `runtime_reconcile_pending_deliveries` | Pending completed task deliveries discovered at startup |
+| `runtime_reconcile_open_tasks` | Open task count (`pending`/`processing`) discovered at startup |
+| `runtime_reconcile_open_group_tasks` | Open group task count (`pending`/`accepted`) discovered at startup |
 | `kafscale_lfs_proxy_url` | LFS proxy URL for shared artifacts |
 
 ## Useful CLI Commands

@@ -68,6 +68,10 @@ func runGatewayMain(cmd *cobra.Command, args []string) {
 		fmt.Printf("Config error: %v\n", err)
 		os.Exit(1)
 	}
+	if err := validateEmbeddingHardGate(cfg); err != nil {
+		fmt.Printf("Memory embedding gate failed: %v\n", err)
+		os.Exit(1)
+	}
 	// 2. Setup Timeline (QMD)
 	home, _ := os.UserHomeDir()
 	timelinePath := fmt.Sprintf("%s/.kafclaw/timeline.db", home)
@@ -91,6 +95,9 @@ func runGatewayMain(cmd *cobra.Command, args []string) {
 	seedSetting("default_work_repo_path", filepath.Join(home, "KafClaw-Workspace"))
 	seedSetting("default_repo_search_path", home)
 	seedSetting("kafscale_lfs_proxy_url", "http://localhost:8080")
+	if err := reconcileDurableRuntimeState(timeSvc); err != nil {
+		fmt.Printf("⚠️ Runtime reconciliation failed: %v\n", err)
+	}
 
 	// Resolve work repo path (settings override config)
 	workRepoPath := cfg.Paths.WorkRepoPath

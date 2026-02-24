@@ -702,6 +702,28 @@ func (s *TimelineService) ListPendingDeliveries(limit int) ([]AgentTask, error) 
 	return scanTasks(rows)
 }
 
+// CountPendingDeliveries returns the number of completed tasks waiting for delivery.
+func (s *TimelineService) CountPendingDeliveries() (int, error) {
+	var count int
+	err := s.db.QueryRow(`SELECT COUNT(*) FROM tasks
+		WHERE status = 'completed' AND delivery_status = 'pending'
+		AND (delivery_next_at IS NULL OR delivery_next_at <= datetime('now'))`).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("count pending deliveries: %w", err)
+	}
+	return count, nil
+}
+
+// CountOpenTasks returns number of active tasks (pending/processing).
+func (s *TimelineService) CountOpenTasks() (int, error) {
+	var count int
+	err := s.db.QueryRow(`SELECT COUNT(*) FROM tasks WHERE status IN ('pending','processing')`).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("count open tasks: %w", err)
+	}
+	return count, nil
+}
+
 // ListTasks returns tasks filtered by optional status and channel.
 func (s *TimelineService) ListTasks(status, channel string, limit, offset int) ([]AgentTask, error) {
 	if limit <= 0 {
@@ -1553,6 +1575,16 @@ func (s *TimelineService) ListGroupTasks(direction, status string, limit, offset
 		out = append(out, t)
 	}
 	return out, rows.Err()
+}
+
+// CountOpenGroupTasks returns number of group tasks still awaiting completion.
+func (s *TimelineService) CountOpenGroupTasks() (int, error) {
+	var count int
+	err := s.db.QueryRow(`SELECT COUNT(*) FROM group_tasks WHERE status IN ('pending','accepted')`).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("count open group tasks: %w", err)
+	}
+	return count, nil
 }
 
 // ListAllGroupTraces returns paginated group traces with optional agent filter.

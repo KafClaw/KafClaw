@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -127,6 +128,7 @@ func (m *Manager) Join(ctx context.Context) error {
 			Channels:      string(chs),
 			Model:         m.identity.Model,
 		})
+		m.persistHeartbeatMetadata(time.Now(), true)
 	}
 
 	m.active = true
@@ -631,6 +633,30 @@ func (m *Manager) sendHeartbeat(ctx context.Context) {
 		},
 	}
 	if err := m.lfs.ProduceEnvelope(ctx, m.topics.Announce, env); err != nil {
+		if m.timeline != nil {
+			_ = m.timeline.SetSetting("group_heartbeat_last_attempt_at", time.Now().UTC().Format(time.RFC3339))
+		}
 		slog.Debug("Heartbeat failed", "error", err)
+		return
 	}
+	m.persistHeartbeatMetadata(time.Now(), true)
+}
+
+func (m *Manager) persistHeartbeatMetadata(ts time.Time, incrementSeq bool) {
+	if m.timeline == nil {
+		return
+	}
+	now := ts.UTC().Format(time.RFC3339)
+	_ = m.timeline.SetSetting("group_heartbeat_last_attempt_at", now)
+	_ = m.timeline.SetSetting("group_heartbeat_last_success_at", now)
+	if !incrementSeq {
+		return
+	}
+	seq := 1
+	if raw, err := m.timeline.GetSetting("group_heartbeat_seq"); err == nil {
+		if n, convErr := strconv.Atoi(strings.TrimSpace(raw)); convErr == nil && n > 0 {
+			seq = n + 1
+		}
+	}
+	_ = m.timeline.SetSetting("group_heartbeat_seq", strconv.Itoa(seq))
 }

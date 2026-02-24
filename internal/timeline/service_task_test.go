@@ -172,6 +172,76 @@ func TestListPendingDeliveries(t *testing.T) {
 	}
 }
 
+func TestCountPendingDeliveriesAndOpenTasks(t *testing.T) {
+	svc := newTestTimeline(t)
+
+	task1, _ := svc.CreateTask(&AgentTask{Channel: "cli", ChatID: "a", ContentIn: "1"})
+	task2, _ := svc.CreateTask(&AgentTask{Channel: "cli", ChatID: "b", ContentIn: "2"})
+	task3, _ := svc.CreateTask(&AgentTask{Channel: "cli", ChatID: "c", ContentIn: "3"})
+
+	_ = svc.UpdateTaskStatus(task1.TaskID, TaskStatusCompleted, "done", "")
+	_ = svc.UpdateTaskStatus(task2.TaskID, TaskStatusProcessing, "", "")
+	_ = svc.UpdateTaskStatus(task3.TaskID, TaskStatusFailed, "", "x")
+
+	pendingDeliveries, err := svc.CountPendingDeliveries()
+	if err != nil {
+		t.Fatalf("count pending deliveries: %v", err)
+	}
+	if pendingDeliveries != 1 {
+		t.Fatalf("expected 1 pending delivery, got %d", pendingDeliveries)
+	}
+
+	openTasks, err := svc.CountOpenTasks()
+	if err != nil {
+		t.Fatalf("count open tasks: %v", err)
+	}
+	if openTasks != 1 {
+		t.Fatalf("expected 1 open task, got %d", openTasks)
+	}
+}
+
+func TestCountOpenGroupTasks(t *testing.T) {
+	svc := newTestTimeline(t)
+	if err := svc.InsertGroupTask(&GroupTaskRecord{
+		TaskID:      "g1",
+		Description: "pending",
+		Direction:   "incoming",
+		RequesterID: "a",
+		Status:      "pending",
+	}); err != nil {
+		t.Fatalf("insert group task 1: %v", err)
+	}
+	if err := svc.InsertGroupTask(&GroupTaskRecord{
+		TaskID:      "g2",
+		Description: "accepted",
+		Direction:   "incoming",
+		RequesterID: "a",
+		Status:      "pending",
+	}); err != nil {
+		t.Fatalf("insert group task 2: %v", err)
+	}
+	if err := svc.AcceptGroupTask("g2", "worker-1"); err != nil {
+		t.Fatalf("accept group task: %v", err)
+	}
+	if err := svc.InsertGroupTask(&GroupTaskRecord{
+		TaskID:      "g3",
+		Description: "completed",
+		Direction:   "incoming",
+		RequesterID: "a",
+		Status:      "completed",
+	}); err != nil {
+		t.Fatalf("insert group task 3: %v", err)
+	}
+
+	openGroupTasks, err := svc.CountOpenGroupTasks()
+	if err != nil {
+		t.Fatalf("count open group tasks: %v", err)
+	}
+	if openGroupTasks != 2 {
+		t.Fatalf("expected 2 open group tasks, got %d", openGroupTasks)
+	}
+}
+
 func TestListTasks(t *testing.T) {
 	svc := newTestTimeline(t)
 

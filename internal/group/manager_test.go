@@ -5,12 +5,18 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"testing"
 
 	"github.com/KafClaw/KafClaw/internal/config"
+	"github.com/KafClaw/KafClaw/internal/timeline"
 )
 
 func newTestManager(serverURL string) *Manager {
+	return newTestManagerWithTimeline(serverURL, nil)
+}
+
+func newTestManagerWithTimeline(serverURL string, timeSvc *timeline.TimelineService) *Manager {
 	cfg := config.GroupConfig{
 		Enabled:        true,
 		GroupName:      "test-group",
@@ -26,7 +32,7 @@ func newTestManager(serverURL string) *Manager {
 		Model:        "gpt-4o",
 		Status:       "active",
 	}
-	return NewManager(cfg, nil, identity)
+	return NewManager(cfg, timeSvc, identity)
 }
 
 func TestManager_JoinLeave(t *testing.T) {
@@ -149,5 +155,47 @@ func TestManager_Status(t *testing.T) {
 	}
 	if !status["lfs_healthy"].(bool) {
 		t.Error("expected lfs healthy (400 is considered healthy)")
+	}
+}
+
+func TestManager_HeartbeatMetadataPersists(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(LFSEnvelope{KfsLFS: 1})
+	}))
+	defer server.Close()
+
+	timeSvc, err := timeline.NewTimelineService(filepath.Join(t.TempDir(), "timeline.db"))
+	if err != nil {
+		t.Fatalf("open timeline: %v", err)
+	}
+	defer timeSvc.Close()
+
+	m := newTestManagerWithTimeline(server.URL, timeSvc)
+	if err := m.Join(context.Background()); err != nil {
+		t.Fatalf("join: %v", err)
+	}
+	m.sendHeartbeat(context.Background())
+
+	lastAttempt, err := timeSvc.GetSetting("group_heartbeat_last_attempt_at")
+	if err != nil {
+		t.Fatalf("get group_heartbeat_last_attempt_at: %v", err)
+	}
+	if lastAttempt == "" {
+		t.Fatal("expected heartbeat last attempt timestamp")
+	}
+	lastSuccess, err := timeSvc.GetSetting("group_heartbeat_last_success_at")
+	if err != nil {
+		t.Fatalf("get group_heartbeat_last_success_at: %v", err)
+	}
+	if lastSuccess == "" {
+		t.Fatal("expected heartbeat last success timestamp")
+	}
+	seq, err := timeSvc.GetSetting("group_heartbeat_seq")
+	if err != nil {
+		t.Fatalf("get group_heartbeat_seq: %v", err)
+	}
+	if seq == "" || seq == "0" {
+		t.Fatalf("expected heartbeat seq > 0, got %q", seq)
 	}
 }

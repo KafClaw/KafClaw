@@ -350,6 +350,13 @@ func TestConfigureEmbeddingSwitchWithConfirmWipesMemory(t *testing.T) {
 	if count != 0 {
 		t.Fatalf("expected memory chunks wiped, got count=%d", count)
 	}
+	var auditCount int
+	if err := tl.DB().QueryRow(`SELECT COUNT(*) FROM timeline WHERE classification = 'MEMORY_EMBEDDING_SWITCH'`).Scan(&auditCount); err != nil {
+		t.Fatalf("count embedding switch audit events: %v", err)
+	}
+	if auditCount != 1 {
+		t.Fatalf("expected one embedding switch audit event, got %d", auditCount)
+	}
 }
 
 func TestConfigureEmbeddingFirstEnableDoesNotWipeTextOnlyRows(t *testing.T) {
