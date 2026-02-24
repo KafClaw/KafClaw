@@ -20,6 +20,7 @@ Operator-focused guide for managing KafClaw from CLI and runtime endpoints.
 | `kafclaw configure` | Guided/non-interactive config updates (subagents, skills, Kafka group security) |
 | `kafclaw skills` | Skills lifecycle (`enable/disable/list/status/enable-skill/disable-skill/verify/install/update/exec/auth/prereq`) |
 | `kafclaw group` | Join/leave/status/members for Kafka collaboration group |
+| `kafclaw knowledge` | Shared knowledge governance (`status`, `propose`, `vote`, `decisions`, `facts`) |
 | `kafclaw kshark` | Kafka connectivity and protocol diagnostics |
 | `kafclaw agent -m` | Single-shot direct CLI interaction with agent loop |
 | `kafclaw pairing` | Approve/deny pending Slack/Teams sender pairings |
@@ -334,6 +335,16 @@ Notes:
 - Shared fact updates are sequentially versioned (`v1`, `v2`, ...); non-sequential updates are treated as conflicts and do not overwrite latest accepted state
 - `group status` also prints resolved topic names and LFS health
 - `group members` reads roster snapshots from timeline DB
+
+Knowledge CLI examples:
+
+```bash
+./kafclaw knowledge status --json
+./kafclaw knowledge propose --proposal-id p1 --group mygroup --statement "Adopt runbook v2"
+./kafclaw knowledge vote --proposal-id p1 --vote yes
+./kafclaw knowledge decisions --status approved --json
+./kafclaw knowledge facts --group mygroup --json
+```
 
 ### Configure Kafka broker connection (examples)
 
