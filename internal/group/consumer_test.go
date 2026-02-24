@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
 	"time"
 
@@ -13,14 +14,23 @@ import (
 )
 
 type fakeKnowledgeHandler struct {
+	mu    sync.Mutex
 	calls int
 	last  string
 }
 
 func (f *fakeKnowledgeHandler) Process(topic string, _ []byte) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	f.calls++
 	f.last = topic
 	return nil
+}
+
+func (f *fakeKnowledgeHandler) Snapshot() (int, string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.calls, f.last
 }
 
 func TestGroupRouter_RouteAnnounce(t *testing.T) {
@@ -254,10 +264,11 @@ func TestGroupRouter_RouteKnowledgeTopic(t *testing.T) {
 	})
 	time.Sleep(50 * time.Millisecond)
 
-	if fh.calls != 1 {
-		t.Fatalf("expected knowledge handler call count 1, got %d", fh.calls)
+	calls, last := fh.Snapshot()
+	if calls != 1 {
+		t.Fatalf("expected knowledge handler call count 1, got %d", calls)
 	}
-	if fh.last != kTopic {
-		t.Fatalf("expected knowledge handler topic %s, got %s", kTopic, fh.last)
+	if last != kTopic {
+		t.Fatalf("expected knowledge handler topic %s, got %s", kTopic, last)
 	}
 }
