@@ -135,6 +135,7 @@ kafclaw task status --trace <trace-id> --json
 - `missing_output`
 - `invalid_rules`
 - runtime or commit error metadata
+- escalation marker (when retry threshold exceeded): `artifact.escalation` with fallback model/tooling hints
 
 4. Apply targeted fix:
 - contract issue: update `required_input` or `produced_output`

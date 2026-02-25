@@ -130,6 +130,7 @@ Avoid this mode for open-ended and high-ambiguity work.
 - Adds latency and compute cost due to retries and gate checks.
 - Can stall throughput if contracts are underspecified.
 - Requires better task design (`required_input`, `produced_output`, and validation rules must be explicit).
+- On retry-threshold exceed, failed transitions now trigger deterministic escalation hints for fallback model and tooling.
 
 ## Configuration Guidance
 
