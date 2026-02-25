@@ -24,7 +24,7 @@ func FuzzGuardCommand_NoPanicAndTraversalBlocked(f *testing.F) {
 				t.Fatalf("expected traversal-like command to be blocked: %q", command)
 			}
 		}
-		if strings.Contains(lc, "rm -rf /") && err == nil {
+		if destructiveRMRootRegex.MatchString(lc) && err == nil {
 			t.Fatalf("expected destructive rm pattern blocked: %q", command)
 		}
 	})
