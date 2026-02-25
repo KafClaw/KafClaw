@@ -1,6 +1,7 @@
 ---
 parent: Agent Concepts
 title: Runtime Tools and Capabilities
+nav_order: 3
 ---
 
 # Runtime Tools and Capabilities

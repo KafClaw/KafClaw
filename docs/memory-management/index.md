@@ -1,6 +1,6 @@
 ---
 title: Memory Management
-nav_order: 4
+nav_order: 7
 has_children: true
 ---
 
@@ -17,11 +17,15 @@ Private memory, durability, embeddings, and shared knowledge governance in one p
 ## Core Pages
 
 - [Memory Architecture and Notes](/agent-concepts/memory-notes/)
+- [CoT Cascading Protocol](/agent-concepts/CoT/)
 - [Durable Memory Concept (Runbook)](/memory-management/memory-governance-operations/#durable-memory-concept)
-- [Architecture: Timeline and Memory](/architecture-security/architecture-timeline/)
-- [Knowledge Contracts](/reference/knowledge-contracts/)
 - [Memory Governance Operations](/memory-management/memory-governance-operations/)
+
+## Related References
+
+- [Knowledge Contracts](/reference/knowledge-contracts/)
 - [Configuration Keys](/reference/config-keys/)
+- [Architecture: Timeline and Memory](/architecture-security/architecture-timeline/)
 
 ## Operational Endpoints
 

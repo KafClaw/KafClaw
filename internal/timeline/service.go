@@ -4,10 +4,12 @@ import (
 	"crypto/rand"
 	"database/sql"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
 
+	"github.com/KafClaw/KafClaw/internal/cascade"
 	_ "modernc.org/sqlite"
 )
 
@@ -70,6 +72,45 @@ func NewTimelineService(dbPath string) (*TimelineService, error) {
 	_, _ = db.Exec(`CREATE INDEX IF NOT EXISTS idx_tasks_idempotency ON tasks(idempotency_key)`)
 	_, _ = db.Exec(`CREATE INDEX IF NOT EXISTS idx_tasks_trace ON tasks(trace_id)`)
 	_, _ = db.Exec(`CREATE INDEX IF NOT EXISTS idx_tasks_delivery ON tasks(delivery_status, delivery_next_at)`)
+	// Best-effort migration: cascading protocol task/transition tables.
+	_, _ = db.Exec(`CREATE TABLE IF NOT EXISTS cascade_tasks (
+		task_id TEXT NOT NULL,
+		trace_id TEXT NOT NULL,
+		sequence INTEGER NOT NULL,
+		title TEXT DEFAULT '',
+		state TEXT NOT NULL DEFAULT 'pending',
+		required_input TEXT DEFAULT '[]',
+		produced_output TEXT DEFAULT '[]',
+		validation_rules TEXT DEFAULT '[]',
+		input_payload TEXT DEFAULT '{}',
+		output_payload TEXT DEFAULT '{}',
+		remediation TEXT DEFAULT '',
+		retry_count INTEGER NOT NULL DEFAULT 0,
+		max_retries INTEGER NOT NULL DEFAULT 2,
+		timeout_sec INTEGER NOT NULL DEFAULT 120,
+		blocked_by_task_id TEXT DEFAULT '',
+		last_error TEXT DEFAULT '',
+		created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		committed_at DATETIME,
+		released_next_at DATETIME,
+		PRIMARY KEY(trace_id, task_id)
+	)`)
+	_, _ = db.Exec(`CREATE INDEX IF NOT EXISTS idx_cascade_tasks_trace_seq ON cascade_tasks(trace_id, sequence)`)
+	_, _ = db.Exec(`CREATE INDEX IF NOT EXISTS idx_cascade_tasks_state ON cascade_tasks(state)`)
+	_, _ = db.Exec(`CREATE TABLE IF NOT EXISTS cascade_transitions (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		trace_id TEXT NOT NULL,
+		task_id TEXT NOT NULL,
+		from_state TEXT NOT NULL,
+		to_state TEXT NOT NULL,
+		actor TEXT DEFAULT '',
+		reason TEXT DEFAULT '',
+		artifact TEXT DEFAULT '{}',
+		idempotency_key TEXT UNIQUE NOT NULL,
+		created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+	)`)
+	_, _ = db.Exec(`CREATE INDEX IF NOT EXISTS idx_cascade_transitions_trace ON cascade_transitions(trace_id, task_id, created_at)`)
 	// Best-effort migration: add message_type column to tasks table.
 	_, _ = db.Exec(`ALTER TABLE tasks ADD COLUMN message_type TEXT DEFAULT ''`)
 	// Best-effort migration: add token columns to tasks table.
@@ -768,6 +809,321 @@ func (s *TimelineService) UpdateKnowledgeProposalDecision(proposalID, status str
 		return fmt.Errorf("update knowledge proposal decision: %w", err)
 	}
 	return nil
+}
+
+func (s *TimelineService) CreateCascadeTask(rec *CascadeTaskRecord) error {
+	if rec == nil {
+		return fmt.Errorf("cascade task is nil")
+	}
+	rec.TaskID = strings.TrimSpace(rec.TaskID)
+	rec.TraceID = strings.TrimSpace(rec.TraceID)
+	if rec.TaskID == "" || rec.TraceID == "" {
+		return fmt.Errorf("task_id and trace_id are required")
+	}
+	if rec.Sequence <= 0 {
+		return fmt.Errorf("sequence must be > 0")
+	}
+	if strings.TrimSpace(rec.State) == "" {
+		rec.State = "pending"
+	}
+	if strings.TrimSpace(rec.RequiredInput) == "" {
+		rec.RequiredInput = "[]"
+	}
+	if strings.TrimSpace(rec.ProducedOutput) == "" {
+		rec.ProducedOutput = "[]"
+	}
+	if strings.TrimSpace(rec.ValidationRules) == "" {
+		rec.ValidationRules = "[]"
+	}
+	if strings.TrimSpace(rec.InputPayload) == "" {
+		rec.InputPayload = "{}"
+	}
+	if strings.TrimSpace(rec.OutputPayload) == "" {
+		rec.OutputPayload = "{}"
+	}
+	if rec.MaxRetries <= 0 {
+		rec.MaxRetries = 2
+	}
+	if rec.TimeoutSec <= 0 {
+		rec.TimeoutSec = 120
+	}
+	_, err := s.db.Exec(`INSERT INTO cascade_tasks
+		(task_id, trace_id, sequence, title, state, required_input, produced_output, validation_rules,
+		 input_payload, output_payload, remediation, retry_count, max_retries, timeout_sec, blocked_by_task_id, last_error, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`,
+		rec.TaskID, rec.TraceID, rec.Sequence, rec.Title, rec.State, rec.RequiredInput, rec.ProducedOutput, rec.ValidationRules,
+		rec.InputPayload, rec.OutputPayload, rec.Remediation, rec.RetryCount, rec.MaxRetries, rec.TimeoutSec, rec.BlockedByTaskID, rec.LastError,
+	)
+	if err != nil {
+		return fmt.Errorf("create cascade task: %w", err)
+	}
+	return nil
+}
+
+func (s *TimelineService) GetCascadeTask(traceID, taskID string) (*CascadeTaskRecord, error) {
+	row := s.db.QueryRow(`SELECT task_id, trace_id, sequence, COALESCE(title,''), state,
+		COALESCE(required_input,'[]'), COALESCE(produced_output,'[]'), COALESCE(validation_rules,'[]'),
+		COALESCE(input_payload,'{}'), COALESCE(output_payload,'{}'), COALESCE(remediation,''),
+		retry_count, max_retries, timeout_sec, COALESCE(blocked_by_task_id,''), COALESCE(last_error,''),
+		created_at, updated_at, committed_at, released_next_at
+		FROM cascade_tasks WHERE trace_id = ? AND task_id = ?`, strings.TrimSpace(traceID), strings.TrimSpace(taskID))
+	var rec CascadeTaskRecord
+	err := row.Scan(
+		&rec.TaskID, &rec.TraceID, &rec.Sequence, &rec.Title, &rec.State,
+		&rec.RequiredInput, &rec.ProducedOutput, &rec.ValidationRules,
+		&rec.InputPayload, &rec.OutputPayload, &rec.Remediation,
+		&rec.RetryCount, &rec.MaxRetries, &rec.TimeoutSec, &rec.BlockedByTaskID, &rec.LastError,
+		&rec.CreatedAt, &rec.UpdatedAt, &rec.CommittedAt, &rec.ReleasedNextAt,
+	)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("get cascade task: %w", err)
+	}
+	return &rec, nil
+}
+
+func (s *TimelineService) ListCascadeTasks(traceID string) ([]CascadeTaskRecord, error) {
+	rows, err := s.db.Query(`SELECT task_id, trace_id, sequence, COALESCE(title,''), state,
+		COALESCE(required_input,'[]'), COALESCE(produced_output,'[]'), COALESCE(validation_rules,'[]'),
+		COALESCE(input_payload,'{}'), COALESCE(output_payload,'{}'), COALESCE(remediation,''),
+		retry_count, max_retries, timeout_sec, COALESCE(blocked_by_task_id,''), COALESCE(last_error,''),
+		created_at, updated_at, committed_at, released_next_at
+		FROM cascade_tasks WHERE trace_id = ? ORDER BY sequence ASC, task_id ASC`, strings.TrimSpace(traceID))
+	if err != nil {
+		return nil, fmt.Errorf("list cascade tasks: %w", err)
+	}
+	defer rows.Close()
+	out := make([]CascadeTaskRecord, 0, 8)
+	for rows.Next() {
+		var rec CascadeTaskRecord
+		if err := rows.Scan(
+			&rec.TaskID, &rec.TraceID, &rec.Sequence, &rec.Title, &rec.State,
+			&rec.RequiredInput, &rec.ProducedOutput, &rec.ValidationRules,
+			&rec.InputPayload, &rec.OutputPayload, &rec.Remediation,
+			&rec.RetryCount, &rec.MaxRetries, &rec.TimeoutSec, &rec.BlockedByTaskID, &rec.LastError,
+			&rec.CreatedAt, &rec.UpdatedAt, &rec.CommittedAt, &rec.ReleasedNextAt,
+		); err != nil {
+			return nil, err
+		}
+		out = append(out, rec)
+	}
+	return out, rows.Err()
+}
+
+func (s *TimelineService) ListCascadeTransitions(traceID, taskID string, limit int) ([]CascadeTransitionRecord, error) {
+	if limit <= 0 {
+		limit = 100
+	}
+	rows, err := s.db.Query(`SELECT id, trace_id, task_id, from_state, to_state, COALESCE(actor,''), COALESCE(reason,''), COALESCE(artifact,'{}'), idempotency_key, created_at
+		FROM cascade_transitions
+		WHERE trace_id = ? AND (? = '' OR task_id = ?)
+		ORDER BY created_at ASC, id ASC
+		LIMIT ?`, strings.TrimSpace(traceID), strings.TrimSpace(taskID), strings.TrimSpace(taskID), limit)
+	if err != nil {
+		return nil, fmt.Errorf("list cascade transitions: %w", err)
+	}
+	defer rows.Close()
+	out := make([]CascadeTransitionRecord, 0, limit)
+	for rows.Next() {
+		var rec CascadeTransitionRecord
+		if err := rows.Scan(
+			&rec.ID, &rec.TraceID, &rec.TaskID, &rec.FromState, &rec.ToState,
+			&rec.Actor, &rec.Reason, &rec.Artifact, &rec.IdempotencyKey, &rec.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		out = append(out, rec)
+	}
+	return out, rows.Err()
+}
+
+func (s *TimelineService) SetCascadeTaskIO(traceID, taskID, inputPayload, outputPayload, remediation, lastError string) error {
+	_, err := s.db.Exec(`UPDATE cascade_tasks
+		SET input_payload = ?, output_payload = ?, remediation = ?, last_error = ?, updated_at = datetime('now')
+		WHERE trace_id = ? AND task_id = ?`,
+		coalesceJSON(inputPayload, "{}"), coalesceJSON(outputPayload, "{}"), strings.TrimSpace(remediation), strings.TrimSpace(lastError),
+		strings.TrimSpace(traceID), strings.TrimSpace(taskID),
+	)
+	if err != nil {
+		return fmt.Errorf("set cascade task io: %w", err)
+	}
+	return nil
+}
+
+func (s *TimelineService) CanStartCascadeTask(traceID, taskID string) (bool, string, error) {
+	task, err := s.GetCascadeTask(traceID, taskID)
+	if err != nil {
+		return false, "", err
+	}
+	if task == nil {
+		return false, "task_not_found", nil
+	}
+	if task.State != "pending" {
+		return false, "task_not_pending", nil
+	}
+	if task.MaxRetries > 0 && task.RetryCount >= task.MaxRetries {
+		return false, "retry_budget_exhausted", nil
+	}
+	dependency := strings.TrimSpace(task.BlockedByTaskID)
+	if dependency == "" && task.Sequence > 1 {
+		prev := s.db.QueryRow(`SELECT task_id FROM cascade_tasks WHERE trace_id = ? AND sequence = ? LIMIT 1`, task.TraceID, task.Sequence-1)
+		_ = prev.Scan(&dependency)
+	}
+	if strings.TrimSpace(dependency) == "" {
+		return true, "", nil
+	}
+	var depState string
+	err = s.db.QueryRow(`SELECT state FROM cascade_tasks WHERE trace_id = ? AND task_id = ?`, task.TraceID, dependency).Scan(&depState)
+	if err == sql.ErrNoRows {
+		return false, "predecessor_not_found", nil
+	}
+	if err != nil {
+		return false, "", fmt.Errorf("can start cascade task predecessor lookup: %w", err)
+	}
+	if depState != "committed" && depState != "released_next" {
+		return false, "predecessor_not_committed", nil
+	}
+	return true, "", nil
+}
+
+// AdvanceCascadeTask performs a guarded state transition and writes an idempotent transition audit row.
+// Returns inserted=false on duplicate idempotency key.
+func (s *TimelineService) AdvanceCascadeTask(traceID, taskID, fromState, toState, actor, reason, artifact, idempotencyKey string) (bool, error) {
+	traceID = strings.TrimSpace(traceID)
+	taskID = strings.TrimSpace(taskID)
+	fromState = strings.TrimSpace(fromState)
+	toState = strings.TrimSpace(toState)
+	idempotencyKey = strings.TrimSpace(idempotencyKey)
+	if traceID == "" || taskID == "" || fromState == "" || toState == "" || idempotencyKey == "" {
+		return false, fmt.Errorf("trace_id, task_id, from_state, to_state, and idempotency_key are required")
+	}
+	tx, err := s.db.Begin()
+	if err != nil {
+		return false, fmt.Errorf("begin cascade transition tx: %w", err)
+	}
+	defer tx.Rollback()
+
+	var existing int
+	err = tx.QueryRow(`SELECT 1 FROM cascade_transitions WHERE idempotency_key = ? LIMIT 1`, idempotencyKey).Scan(&existing)
+	if err == nil {
+		return false, nil
+	}
+	if err != sql.ErrNoRows {
+		return false, fmt.Errorf("check cascade transition idempotency: %w", err)
+	}
+
+	var retryCount, maxRetries int
+	err = tx.QueryRow(`SELECT retry_count, max_retries
+		FROM cascade_tasks WHERE trace_id = ? AND task_id = ? AND state = ?`,
+		traceID, taskID, fromState).Scan(&retryCount, &maxRetries)
+	if err == sql.ErrNoRows {
+		return false, fmt.Errorf("cascade transition rejected: expected state %s", fromState)
+	}
+	if err != nil {
+		return false, fmt.Errorf("load cascade task for transition: %w", err)
+	}
+
+	nextRetryCount := retryCount
+	if (toState == "pending" && fromState == "self_test") || toState == "failed" {
+		nextRetryCount++
+	}
+	escalationRemediation := ""
+	if toState == "failed" {
+		policy := cascade.DefaultEscalationPolicy(maxRetries)
+		decision := cascade.EvaluateEscalation(nextRetryCount, policy)
+		if decision.Escalate {
+			escalationRemediation = decision.Reason
+			artifact = mergeCascadeArtifact(artifact, map[string]any{
+				"escalation": map[string]any{
+					"triggered":       true,
+					"action":          decision.Action,
+					"fallbackModel":   decision.FallbackModel,
+					"fallbackTooling": decision.FallbackTooling,
+					"retryCount":      nextRetryCount,
+					"retryThreshold":  policy.RetryThreshold,
+				},
+			})
+			baseReason := strings.TrimSpace(reason)
+			if baseReason == "" {
+				reason = decision.Reason
+			} else {
+				reason = baseReason + "; " + decision.Reason
+			}
+		}
+	}
+
+	_, err = tx.Exec(`INSERT INTO cascade_transitions
+		(trace_id, task_id, from_state, to_state, actor, reason, artifact, idempotency_key, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
+		traceID, taskID, fromState, toState, strings.TrimSpace(actor), strings.TrimSpace(reason), coalesceJSON(artifact, "{}"), idempotencyKey,
+	)
+	if err != nil {
+		if strings.Contains(strings.ToLower(err.Error()), "unique") {
+			return false, nil
+		}
+		return false, fmt.Errorf("insert cascade transition: %w", err)
+	}
+
+	lastErr := ""
+	if toState == "failed" {
+		lastErr = strings.TrimSpace(reason)
+	}
+	res, err := tx.Exec(`UPDATE cascade_tasks
+		SET state = ?,
+		    updated_at = datetime('now'),
+		    retry_count = CASE
+		    	WHEN ? = 'pending' AND state = 'self_test' THEN retry_count + 1
+		    	WHEN ? = 'failed' THEN retry_count + 1
+		    	ELSE retry_count
+		    END,
+		    committed_at = CASE WHEN ? = 'committed' THEN datetime('now') ELSE committed_at END,
+		    released_next_at = CASE WHEN ? = 'released_next' THEN datetime('now') ELSE released_next_at END,
+		    remediation = CASE WHEN ? != '' THEN ? ELSE remediation END,
+		    last_error = CASE WHEN ? = 'failed' THEN ? ELSE last_error END
+		WHERE trace_id = ? AND task_id = ? AND state = ?`,
+		toState, toState, toState, toState, toState, escalationRemediation, escalationRemediation, toState, lastErr, traceID, taskID, fromState,
+	)
+	if err != nil {
+		return false, fmt.Errorf("update cascade task state: %w", err)
+	}
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return false, fmt.Errorf("cascade transition rows affected: %w", err)
+	}
+	if rows == 0 {
+		return false, fmt.Errorf("cascade transition rejected: expected state %s", fromState)
+	}
+	if err := tx.Commit(); err != nil {
+		return false, fmt.Errorf("commit cascade transition tx: %w", err)
+	}
+	return true, nil
+}
+
+func coalesceJSON(v string, fallback string) string {
+	if strings.TrimSpace(v) == "" {
+		return fallback
+	}
+	return v
+}
+
+func mergeCascadeArtifact(base string, extras map[string]any) string {
+	merged := map[string]any{}
+	if strings.TrimSpace(base) != "" {
+		_ = json.Unmarshal([]byte(base), &merged)
+	}
+	if merged == nil {
+		merged = map[string]any{}
+	}
+	for k, v := range extras {
+		merged[k] = v
+	}
+	buf, err := json.Marshal(merged)
+	if err != nil {
+		return coalesceJSON(base, "{}")
+	}
+	return string(buf)
 }
 
 // IsSilentMode checks if silent mode is enabled. Defaults to true (safe default).

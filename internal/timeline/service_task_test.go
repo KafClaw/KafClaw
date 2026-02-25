@@ -1,6 +1,7 @@
 package timeline
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -579,5 +580,158 @@ func TestGetTokenUsageSummary(t *testing.T) {
 	}
 	if totalCost < 0.03 {
 		t.Errorf("expected total cost >= 0.03, got %f", totalCost)
+	}
+}
+
+func TestCascadeTaskLifecycleAndTransitionIdempotency(t *testing.T) {
+	svc := newTestTimeline(t)
+
+	if err := svc.CreateCascadeTask(&CascadeTaskRecord{
+		TaskID:          "task-1",
+		TraceID:         "trace-c1",
+		Sequence:        1,
+		Title:           "Collect evidence",
+		RequiredInput:   `["incident_id"]`,
+		ProducedOutput:  `["evidence_bundle"]`,
+		ValidationRules: `["non_empty:evidence_bundle"]`,
+		MaxRetries:      2,
+		TimeoutSec:      120,
+	}); err != nil {
+		t.Fatalf("create cascade task 1: %v", err)
+	}
+	if err := svc.CreateCascadeTask(&CascadeTaskRecord{
+		TaskID:   "task-2",
+		TraceID:  "trace-c1",
+		Sequence: 2,
+		Title:    "Draft summary",
+	}); err != nil {
+		t.Fatalf("create cascade task 2: %v", err)
+	}
+
+	ok, reason, err := svc.CanStartCascadeTask("trace-c1", "task-2")
+	if err != nil {
+		t.Fatalf("can start before commit: %v", err)
+	}
+	if ok || reason != "predecessor_not_committed" {
+		t.Fatalf("expected predecessor gate, got ok=%v reason=%q", ok, reason)
+	}
+
+	inserted, err := svc.AdvanceCascadeTask("trace-c1", "task-1", "pending", "running", "manager", "start", `{}`, "idem-1")
+	if err != nil || !inserted {
+		t.Fatalf("advance pending->running failed: inserted=%v err=%v", inserted, err)
+	}
+	inserted, err = svc.AdvanceCascadeTask("trace-c1", "task-1", "running", "self_test", "task-1", "self test done", `{"pass":true}`, "idem-2")
+	if err != nil || !inserted {
+		t.Fatalf("advance running->self_test failed: inserted=%v err=%v", inserted, err)
+	}
+	inserted, err = svc.AdvanceCascadeTask("trace-c1", "task-1", "self_test", "validated", "manager", "validation pass", `{"checked":true}`, "idem-3")
+	if err != nil || !inserted {
+		t.Fatalf("advance self_test->validated failed: inserted=%v err=%v", inserted, err)
+	}
+	inserted, err = svc.AdvanceCascadeTask("trace-c1", "task-1", "validated", "committed", "manager", "commit output", `{"output":"ok"}`, "idem-4")
+	if err != nil || !inserted {
+		t.Fatalf("advance validated->committed failed: inserted=%v err=%v", inserted, err)
+	}
+
+	inserted, err = svc.AdvanceCascadeTask("trace-c1", "task-1", "validated", "committed", "manager", "dup", `{}`, "idem-4")
+	if err != nil {
+		t.Fatalf("duplicate idempotency should not error: %v", err)
+	}
+	if inserted {
+		t.Fatal("expected duplicate idempotency to report inserted=false")
+	}
+
+	task1, err := svc.GetCascadeTask("trace-c1", "task-1")
+	if err != nil {
+		t.Fatalf("get cascade task 1: %v", err)
+	}
+	if task1 == nil || task1.State != "committed" || task1.CommittedAt == nil {
+		t.Fatalf("unexpected task1 state after commit: %+v", task1)
+	}
+
+	ok, reason, err = svc.CanStartCascadeTask("trace-c1", "task-2")
+	if err != nil {
+		t.Fatalf("can start after commit: %v", err)
+	}
+	if !ok || reason != "" {
+		t.Fatalf("expected task-2 release after task-1 commit, got ok=%v reason=%q", ok, reason)
+	}
+
+	transitions, err := svc.ListCascadeTransitions("trace-c1", "task-1", 50)
+	if err != nil {
+		t.Fatalf("list transitions: %v", err)
+	}
+	if len(transitions) != 4 {
+		t.Fatalf("expected 4 unique transitions, got %d", len(transitions))
+	}
+}
+
+func TestCascadeTaskRetryRemediationAndListing(t *testing.T) {
+	svc := newTestTimeline(t)
+	if err := svc.CreateCascadeTask(&CascadeTaskRecord{
+		TaskID:      "task-retry",
+		TraceID:     "trace-c2",
+		Sequence:    1,
+		MaxRetries:  2,
+		TimeoutSec:  60,
+		Title:       "Extract data",
+		LastError:   "",
+		Remediation: "",
+	}); err != nil {
+		t.Fatalf("create cascade task: %v", err)
+	}
+	if err := svc.SetCascadeTaskIO("trace-c2", "task-retry", `{"input":"x"}`, `{"output":""}`, "missing_output=report", "validation failed"); err != nil {
+		t.Fatalf("set io: %v", err)
+	}
+
+	if _, err := svc.AdvanceCascadeTask("trace-c2", "task-retry", "pending", "running", "manager", "start", `{}`, "c2-1"); err != nil {
+		t.Fatalf("advance pending->running: %v", err)
+	}
+	if _, err := svc.AdvanceCascadeTask("trace-c2", "task-retry", "running", "self_test", "task", "self test", `{}`, "c2-2"); err != nil {
+		t.Fatalf("advance running->self_test: %v", err)
+	}
+	if _, err := svc.AdvanceCascadeTask("trace-c2", "task-retry", "self_test", "pending", "manager", "retry", `{"missing":"report"}`, "c2-3"); err != nil {
+		t.Fatalf("advance self_test->pending: %v", err)
+	}
+	task, err := svc.GetCascadeTask("trace-c2", "task-retry")
+	if err != nil {
+		t.Fatalf("get cascade task: %v", err)
+	}
+	if task == nil || task.RetryCount != 1 {
+		t.Fatalf("expected retry count 1, got %+v", task)
+	}
+
+	if _, err := svc.AdvanceCascadeTask("trace-c2", "task-retry", "pending", "failed", "manager", "retry budget exhausted", `{}`, "c2-4"); err != nil {
+		t.Fatalf("advance pending->failed: %v", err)
+	}
+	task, err = svc.GetCascadeTask("trace-c2", "task-retry")
+	if err != nil {
+		t.Fatalf("get failed task: %v", err)
+	}
+	if task.State != "failed" || task.RetryCount != 2 || task.LastError == "" {
+		t.Fatalf("unexpected failed task state: %+v", task)
+	}
+	if !strings.Contains(task.Remediation, "escalation_triggered=") {
+		t.Fatalf("expected escalation remediation marker, got %+v", task)
+	}
+
+	transitions, err := svc.ListCascadeTransitions("trace-c2", "task-retry", 20)
+	if err != nil {
+		t.Fatalf("list transitions: %v", err)
+	}
+	if len(transitions) == 0 {
+		t.Fatal("expected transitions to exist")
+	}
+	last := transitions[len(transitions)-1]
+	if last.ToState != "failed" || !strings.Contains(last.Artifact, `"escalation"`) {
+		t.Fatalf("expected escalation artifact on failed transition, got %+v", last)
+	}
+
+	all, err := svc.ListCascadeTasks("trace-c2")
+	if err != nil {
+		t.Fatalf("list cascade tasks: %v", err)
+	}
+	if len(all) != 1 || all[0].TaskID != "task-retry" {
+		t.Fatalf("unexpected list response: %+v", all)
 	}
 }

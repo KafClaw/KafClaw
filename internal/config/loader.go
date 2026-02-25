@@ -556,7 +556,7 @@ func cleanEmptyAgents(cfg *Config) {
 	if cfg == nil || cfg.Agents == nil {
 		return
 	}
-	if isZeroSubagentsToolConfig(cfg.Agents.Defaults.Subagents) {
+	if isZeroSubagentsToolConfig(cfg.Agents.Defaults.Subagents) && len(cfg.Agents.List) == 0 {
 		cfg.Agents = nil
 	}
 }

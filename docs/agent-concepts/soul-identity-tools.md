@@ -1,6 +1,7 @@
 ---
 parent: Agent Concepts
 title: Soul and Identity Files
+nav_order: 2
 ---
 
 # Soul and Identity Files

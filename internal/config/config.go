@@ -392,6 +392,11 @@ type AgentSubagentSpec struct {
 	Model string `json:"model"`
 }
 
+// AgentCascadeSpec configures cascading protocol behavior for an agent.
+type AgentCascadeSpec struct {
+	Enabled bool `json:"enabled"`
+}
+
 // AgentListEntry describes a configured agent identity.
 type AgentListEntry struct {
 	ID        string             `json:"id"`
@@ -399,6 +404,7 @@ type AgentListEntry struct {
 	Default   bool               `json:"default,omitempty"`
 	Model     *AgentModelSpec    `json:"model,omitempty"`
 	Subagents *AgentSubagentSpec `json:"subagents,omitempty"`
+	Cascade   *AgentCascadeSpec  `json:"cascade,omitempty"`
 }
 
 // ---------------------------------------------------------------------------

@@ -1,7 +1,7 @@
 ---
 parent: Memory Management
 title: Memory Architecture and Notes
-nav_order: 2
+nav_order: 1
 ---
 
 # Memory Architecture and Notes
@@ -179,6 +179,10 @@ Private memory lanes, restart durability, model-switch behavior, and distributed
 <div class="km-callout">
   Model switch rule: if a previously used embedding model changes, memory vectors are wiped before reindex. Adding the first embedding model later does not wipe existing text records.
 </div>
+
+## Cascading Protocol (Gated Subtasks)
+
+Full protocol details, state machine infographic, and operational guidance are documented in [CoT Cascading Protocol](/agent-concepts/CoT/).
 
 ## Kafka Knowledge Pool: How It Works
 

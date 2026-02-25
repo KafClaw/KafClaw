@@ -327,6 +327,44 @@ type KnowledgeVoteRecord struct {
 	UpdatedAt  time.Time `json:"updated_at"`
 }
 
+// CascadeTaskRecord represents a persisted step in a gated cascading workflow.
+type CascadeTaskRecord struct {
+	TaskID          string     `json:"task_id"`
+	TraceID         string     `json:"trace_id"`
+	Sequence        int        `json:"sequence"`
+	Title           string     `json:"title"`
+	State           string     `json:"state"`            // pending|running|self_test|validated|committed|released_next|failed
+	RequiredInput   string     `json:"required_input"`   // JSON array
+	ProducedOutput  string     `json:"produced_output"`  // JSON array
+	ValidationRules string     `json:"validation_rules"` // JSON array
+	InputPayload    string     `json:"input_payload"`    // JSON object
+	OutputPayload   string     `json:"output_payload"`   // JSON object
+	Remediation     string     `json:"remediation"`      // deterministic remediation hint
+	RetryCount      int        `json:"retry_count"`
+	MaxRetries      int        `json:"max_retries"`
+	TimeoutSec      int        `json:"timeout_sec"`
+	BlockedByTaskID string     `json:"blocked_by_task_id,omitempty"`
+	LastError       string     `json:"last_error"`
+	CreatedAt       time.Time  `json:"created_at"`
+	UpdatedAt       time.Time  `json:"updated_at"`
+	CommittedAt     *time.Time `json:"committed_at,omitempty"`
+	ReleasedNextAt  *time.Time `json:"released_next_at,omitempty"`
+}
+
+// CascadeTransitionRecord is a durable audit transition for cascade state changes.
+type CascadeTransitionRecord struct {
+	ID             int64     `json:"id"`
+	TraceID        string    `json:"trace_id"`
+	TaskID         string    `json:"task_id"`
+	FromState      string    `json:"from_state"`
+	ToState        string    `json:"to_state"`
+	Actor          string    `json:"actor"`
+	Reason         string    `json:"reason"`
+	Artifact       string    `json:"artifact"` // JSON payload (self-test/validator artifact)
+	IdempotencyKey string    `json:"idempotency_key"`
+	CreatedAt      time.Time `json:"created_at"`
+}
+
 // TopicStat holds per-topic aggregated statistics.
 type TopicStat struct {
 	TopicName      string  `json:"topic_name"`
@@ -477,6 +515,46 @@ CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
 CREATE INDEX IF NOT EXISTS idx_tasks_idempotency ON tasks(idempotency_key);
 CREATE INDEX IF NOT EXISTS idx_tasks_trace ON tasks(trace_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_delivery ON tasks(delivery_status, delivery_next_at);
+
+CREATE TABLE IF NOT EXISTS cascade_tasks (
+	task_id TEXT NOT NULL,
+	trace_id TEXT NOT NULL,
+	sequence INTEGER NOT NULL,
+	title TEXT DEFAULT '',
+	state TEXT NOT NULL DEFAULT 'pending',
+	required_input TEXT DEFAULT '[]',
+	produced_output TEXT DEFAULT '[]',
+	validation_rules TEXT DEFAULT '[]',
+	input_payload TEXT DEFAULT '{}',
+	output_payload TEXT DEFAULT '{}',
+	remediation TEXT DEFAULT '',
+	retry_count INTEGER NOT NULL DEFAULT 0,
+	max_retries INTEGER NOT NULL DEFAULT 2,
+	timeout_sec INTEGER NOT NULL DEFAULT 120,
+	blocked_by_task_id TEXT DEFAULT '',
+	last_error TEXT DEFAULT '',
+	created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	committed_at DATETIME,
+	released_next_at DATETIME,
+	PRIMARY KEY(trace_id, task_id)
+);
+CREATE INDEX IF NOT EXISTS idx_cascade_tasks_trace_seq ON cascade_tasks(trace_id, sequence);
+CREATE INDEX IF NOT EXISTS idx_cascade_tasks_state ON cascade_tasks(state);
+
+CREATE TABLE IF NOT EXISTS cascade_transitions (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	trace_id TEXT NOT NULL,
+	task_id TEXT NOT NULL,
+	from_state TEXT NOT NULL,
+	to_state TEXT NOT NULL,
+	actor TEXT DEFAULT '',
+	reason TEXT DEFAULT '',
+	artifact TEXT DEFAULT '{}',
+	idempotency_key TEXT UNIQUE NOT NULL,
+	created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_cascade_transitions_trace ON cascade_transitions(trace_id, task_id, created_at);
 
 CREATE TABLE IF NOT EXISTS policy_decisions (
 	id INTEGER PRIMARY KEY AUTOINCREMENT,

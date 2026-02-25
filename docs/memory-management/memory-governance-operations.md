@@ -1,7 +1,7 @@
 ---
 title: Memory Governance Operations
 parent: Memory Management
-nav_order: 5
+nav_order: 3
 ---
 
 # Memory Governance Operations
@@ -114,3 +114,36 @@ Governance behavior:
 - Quorum policy is controlled by `knowledge.voting.*`.
 - Shared facts apply sequential version policy (`accepted|stale|conflict`).
 - Apply paths are feature-gated by `knowledge.governanceEnabled`.
+
+## Cascade Failure Triage Snippet
+
+Use this quick flow when a cascading task is stuck or failed.
+
+1. Pull the full state machine for the trace:
+
+```bash
+kafclaw task status --trace <trace-id> --json
+```
+
+2. Check transition order for the failing task:
+- expected happy path: `pending -> running -> self_test -> validated -> committed -> released_next`
+- expected retry path: `self_test -> pending` when retries remain
+- terminal paths: `failed` on runtime, validation budget, or commit errors
+
+3. Identify deterministic failure reason in JSON:
+- `missing_input`
+- `missing_output`
+- `invalid_rules`
+- runtime or commit error metadata
+- escalation marker (when retry threshold exceeded): `artifact.escalation` with fallback model/tooling hints
+
+4. Apply targeted fix:
+- contract issue: update `required_input` or `produced_output`
+- validation issue: tighten or correct `validation_rules`
+- runtime issue: fix tool or execution precondition
+
+5. Re-run task and verify transition recovery:
+
+```bash
+kafclaw task status --trace <trace-id> --json
+```

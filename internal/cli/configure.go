@@ -39,6 +39,8 @@ var configureMemoryEmbeddingProvider string
 var configureMemoryEmbeddingModel string
 var configureMemoryEmbeddingDimension int
 var configureConfirmMemoryWipe bool
+var configureAgentID string
+var configureAgentCascadeEnabled bool
 var configureJSON bool
 
 var configureCmd = &cobra.Command{
@@ -71,10 +73,13 @@ func init() {
 	configureCmd.Flags().StringVar(&configureMemoryEmbeddingModel, "memory-embedding-model", "", "Set memory.embedding.model")
 	configureCmd.Flags().IntVar(&configureMemoryEmbeddingDimension, "memory-embedding-dimension", 0, "Set memory.embedding.dimension")
 	configureCmd.Flags().BoolVar(&configureConfirmMemoryWipe, "confirm-memory-wipe", false, "Confirm destructive memory wipe when switching an already-used embedding")
+	configureCmd.Flags().StringVar(&configureAgentID, "agent-id", "", "Agent ID for per-agent settings (defaults to group.agentId, node.clawId, or main)")
+	configureCmd.Flags().BoolVar(&configureAgentCascadeEnabled, "agent-cascade-enabled", false, "Enable or disable cascading protocol for target agent (requires --agent-cascade-enabled-set)")
 	configureCmd.Flags().BoolVar(&configureNonInteractive, "non-interactive", false, "Apply flags only and skip prompts")
 	configureCmd.Flags().BoolVar(&configureJSON, "json", false, "Output machine-readable JSON summary")
 	configureCmd.Flags().Bool("skills-enabled-set", false, "Apply --skills-enabled value")
 	configureCmd.Flags().Bool("memory-embedding-enabled-set", false, "Apply --memory-embedding-enabled value")
+	configureCmd.Flags().Bool("agent-cascade-enabled-set", false, "Apply --agent-cascade-enabled value for target agent")
 	rootCmd.AddCommand(configureCmd)
 }
 
@@ -108,6 +113,42 @@ func runConfigure(cmd *cobra.Command, args []string) error {
 		line = strings.TrimSpace(line)
 		if line != "" {
 			updatedAllowAgents = parseCSVList(line)
+		}
+	}
+
+	targetAgentID := resolveConfigureTargetAgentID(cfg, strings.TrimSpace(configureAgentID))
+	agentCascade, hasAgentCascade := getAgentCascadeEnabled(cfg, targetAgentID)
+	if cmd.Flags().Changed("agent-cascade-enabled-set") {
+		setAgentCascadeEnabled(cfg, targetAgentID, configureAgentCascadeEnabled)
+		hasAgentCascade = true
+		agentCascade = configureAgentCascadeEnabled
+		if configureAgentCascadeEnabled && !configureJSON {
+			printCascadeDeterministicWarning(cmd, targetAgentID)
+		}
+	} else if !configureNonInteractive {
+		reader := bufio.NewReader(cmd.InOrStdin())
+		current := "disabled"
+		if hasAgentCascade && agentCascade {
+			current = "enabled"
+		}
+		fmt.Fprintf(cmd.OutOrStdout(), "\nAgent cascade config target: %s\n", targetAgentID)
+		fmt.Fprintf(cmd.OutOrStdout(), "Current cascading protocol state: %s\n", current)
+		printCascadeDeterministicWarning(cmd, targetAgentID)
+		fmt.Fprint(cmd.OutOrStdout(), "Set cascading protocol for this agent? [e]nable/[d]isable/[k]eep (default keep): ")
+		line, readErr := reader.ReadString('\n')
+		if readErr != nil {
+			return fmt.Errorf("read input: %w", readErr)
+		}
+		switch strings.ToLower(strings.TrimSpace(line)) {
+		case "e", "enable", "enabled", "y", "yes":
+			setAgentCascadeEnabled(cfg, targetAgentID, true)
+			hasAgentCascade = true
+			agentCascade = true
+		case "d", "disable", "disabled", "n", "no":
+			setAgentCascadeEnabled(cfg, targetAgentID, false)
+			hasAgentCascade = true
+			agentCascade = false
+		default:
 		}
 	}
 
@@ -296,6 +337,10 @@ func runConfigure(cmd *cobra.Command, args []string) error {
 					"dimension": cfg.Memory.Embedding.Dimension,
 				},
 				"memoryWipedChunks": wipedCount,
+				"agent": map[string]any{
+					"id":             targetAgentID,
+					"cascadeEnabled": agentCascade && hasAgentCascade,
+				},
 			},
 		}
 		b, _ := json.MarshalIndent(summary, "", "  ")
@@ -325,10 +370,65 @@ func runConfigure(cmd *cobra.Command, args []string) error {
 		cfg.Memory.Embedding.Model,
 		cfg.Memory.Embedding.Dimension,
 	)
+	fmt.Fprintf(cmd.OutOrStdout(), "Updated agents.list[%s].cascade.enabled: %v\n", targetAgentID, agentCascade && hasAgentCascade)
 	if wipedCount > 0 {
 		fmt.Fprintf(cmd.OutOrStdout(), "Wiped memory_chunks due to embedding switch: %d\n", wipedCount)
 	}
 	return nil
+}
+
+func resolveConfigureTargetAgentID(cfg *config.Config, flagValue string) string {
+	if strings.TrimSpace(flagValue) != "" {
+		return strings.TrimSpace(flagValue)
+	}
+	if cfg != nil && strings.TrimSpace(cfg.Group.AgentID) != "" {
+		return strings.TrimSpace(cfg.Group.AgentID)
+	}
+	if cfg != nil && strings.TrimSpace(cfg.Node.ClawID) != "" {
+		return strings.TrimSpace(cfg.Node.ClawID)
+	}
+	return "main"
+}
+
+func getAgentCascadeEnabled(cfg *config.Config, agentID string) (bool, bool) {
+	if cfg == nil || cfg.Agents == nil {
+		return false, false
+	}
+	for _, entry := range cfg.Agents.List {
+		if strings.TrimSpace(entry.ID) != strings.TrimSpace(agentID) {
+			continue
+		}
+		if entry.Cascade == nil {
+			return false, false
+		}
+		return entry.Cascade.Enabled, true
+	}
+	return false, false
+}
+
+func setAgentCascadeEnabled(cfg *config.Config, agentID string, enabled bool) {
+	if cfg.Agents == nil {
+		cfg.Agents = &config.AgentsConfig{}
+	}
+	trimmedID := strings.TrimSpace(agentID)
+	for i := range cfg.Agents.List {
+		if strings.TrimSpace(cfg.Agents.List[i].ID) != trimmedID {
+			continue
+		}
+		cfg.Agents.List[i].Cascade = &config.AgentCascadeSpec{Enabled: enabled}
+		return
+	}
+	cfg.Agents.List = append(cfg.Agents.List, config.AgentListEntry{
+		ID:      trimmedID,
+		Cascade: &config.AgentCascadeSpec{Enabled: enabled},
+	})
+}
+
+func printCascadeDeterministicWarning(cmd *cobra.Command, agentID string) {
+	fmt.Fprintf(cmd.OutOrStdout(),
+		"Warning: agent %q cascading protocol is recommended only for deterministic tasks (ops/runbook/config/code-mod).\n", agentID)
+	fmt.Fprintln(cmd.OutOrStdout(),
+		"For ambiguous or creative tasks, this can increase latency and reduce reliability.")
 }
 
 func validateEmbeddingHardGate(cfg *config.Config) error {

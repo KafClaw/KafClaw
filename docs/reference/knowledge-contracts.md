@@ -1,7 +1,7 @@
 ---
 title: Knowledge Contracts
-parent: Memory Management
-nav_order: 4
+parent: Reference
+nav_order: 7
 ---
 
 # Knowledge Contracts

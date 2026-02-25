@@ -34,12 +34,18 @@ KafClaw is a Go-based agent runtime with three practical deployment modes:
 - [WhatsApp Onboarding](./integrations/whatsapp-onboarding/)
 - [WhatsApp Setup](./integrations/whatsapp-setup/)
 
+## Agent Concepts
+
+- [Agent Concepts](./agent-concepts/)
+- [How Agents Work](./agent-concepts/how-agents-work/)
+- [Soul and Identity Files](./agent-concepts/soul-identity-tools/)
+- [Runtime Tools and Capabilities](./agent-concepts/runtime-tools/)
+
 ## Memory Management
 
 - [Memory Management](./memory-management/)
 - [Memory Architecture and Notes](./agent-concepts/memory-notes/)
-- [Timeline and Memory Architecture](./architecture-security/architecture-timeline/)
-- [Knowledge Contracts](./reference/knowledge-contracts/)
+- [CoT Cascading Protocol](./agent-concepts/CoT/)
 - [Memory Governance Operations](./memory-management/memory-governance-operations/)
 
 ## Communication and Channels
@@ -76,3 +82,4 @@ KafClaw is a Go-based agent runtime with three practical deployment modes:
 - [CLI Reference](./reference/cli-reference/)
 - [API Endpoints](./reference/api-endpoints/)
 - [Configuration Keys](./reference/config-keys/)
+- [Knowledge Contracts](./reference/knowledge-contracts/)
