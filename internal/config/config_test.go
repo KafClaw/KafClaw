@@ -300,6 +300,40 @@ func TestLoadToolsSubagentsPrecedenceOverAgentsDefaults(t *testing.T) {
 	}
 }
 
+func TestLoadKeepsAgentsListWhenDefaultsEmpty(t *testing.T) {
+	tmpDir := t.TempDir()
+	configDir := filepath.Join(tmpDir, ".kafclaw")
+	os.MkdirAll(configDir, 0o755)
+	configFile := filepath.Join(configDir, "config.json")
+
+	configJSON := `{
+		"agents": {
+			"list": [
+				{
+					"id": "ops",
+					"cascade": { "enabled": true }
+				}
+			]
+		}
+	}`
+	os.WriteFile(configFile, []byte(configJSON), 0o600)
+
+	origHome := os.Getenv("HOME")
+	os.Setenv("HOME", tmpDir)
+	defer os.Setenv("HOME", origHome)
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
+	if cfg.Agents == nil || len(cfg.Agents.List) != 1 {
+		t.Fatalf("expected agents.list preserved, got %+v", cfg.Agents)
+	}
+	if cfg.Agents.List[0].ID != "ops" || cfg.Agents.List[0].Cascade == nil || !cfg.Agents.List[0].Cascade.Enabled {
+		t.Fatalf("expected agent cascade config preserved, got %+v", cfg.Agents.List[0])
+	}
+}
+
 func TestLoadMemoryKnowledgeNormalizationAndTopics(t *testing.T) {
 	tmpDir := t.TempDir()
 	configDir := filepath.Join(tmpDir, ".kafclaw")

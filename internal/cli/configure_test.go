@@ -418,3 +418,218 @@ func TestConfigureEmbeddingFirstEnableDoesNotWipeTextOnlyRows(t *testing.T) {
 		t.Fatalf("expected memory rows preserved when enabling first embedding, got count=%d", count)
 	}
 }
+
+func TestConfigureAgentCascadeFlag(t *testing.T) {
+	origKafkaSecurityProtocol := configureKafkaSecurityProtocol
+	origKafkaSASLMechanism := configureKafkaSASLMechanism
+	origKafkaSASLUsername := configureKafkaSASLUsername
+	origKafkaSASLPassword := configureKafkaSASLPassword
+	origAgentID := configureAgentID
+	origAgentCascadeEnabled := configureAgentCascadeEnabled
+	origJSON := configureJSON
+	origKafkaBrokers := configureKafkaBrokers
+	origKafkaTLSCAFile := configureKafkaTLSCAFile
+	origKafkaTLSCertFile := configureKafkaTLSCertFile
+	origKafkaTLSKeyFile := configureKafkaTLSKeyFile
+	origSkillsNodeManager := configureSkillsNodeManager
+	origSkillsScope := configureSkillsScope
+	origGoogleWorkspaceRead := configureGoogleWorkspaceRead
+	origM365Read := configureM365Read
+	origSubagentsAllow := configureSubagentsAllowAgents
+	origSubagentsShare := configureSubagentsMemoryShareMode
+	origMemoryProvider := configureMemoryEmbeddingProvider
+	origMemoryModel := configureMemoryEmbeddingModel
+	origEnableSkills := configureEnableSkills
+	origDisableSkills := configureDisableSkills
+	defer func() {
+		configureKafkaSecurityProtocol = origKafkaSecurityProtocol
+		configureKafkaSASLMechanism = origKafkaSASLMechanism
+		configureKafkaSASLUsername = origKafkaSASLUsername
+		configureKafkaSASLPassword = origKafkaSASLPassword
+		configureAgentID = origAgentID
+		configureAgentCascadeEnabled = origAgentCascadeEnabled
+		configureJSON = origJSON
+		configureKafkaBrokers = origKafkaBrokers
+		configureKafkaTLSCAFile = origKafkaTLSCAFile
+		configureKafkaTLSCertFile = origKafkaTLSCertFile
+		configureKafkaTLSKeyFile = origKafkaTLSKeyFile
+		configureSkillsNodeManager = origSkillsNodeManager
+		configureSkillsScope = origSkillsScope
+		configureGoogleWorkspaceRead = origGoogleWorkspaceRead
+		configureM365Read = origM365Read
+		configureSubagentsAllowAgents = origSubagentsAllow
+		configureSubagentsMemoryShareMode = origSubagentsShare
+		configureMemoryEmbeddingProvider = origMemoryProvider
+		configureMemoryEmbeddingModel = origMemoryModel
+		configureEnableSkills = origEnableSkills
+		configureDisableSkills = origDisableSkills
+	}()
+	configureKafkaSecurityProtocol = ""
+	configureKafkaSASLMechanism = ""
+	configureKafkaSASLUsername = ""
+	configureKafkaSASLPassword = ""
+	configureAgentID = ""
+	configureAgentCascadeEnabled = false
+	configureJSON = false
+	configureKafkaBrokers = ""
+	configureKafkaTLSCAFile = ""
+	configureKafkaTLSCertFile = ""
+	configureKafkaTLSKeyFile = ""
+	configureSkillsNodeManager = ""
+	configureSkillsScope = ""
+	configureGoogleWorkspaceRead = ""
+	configureM365Read = ""
+	configureSubagentsAllowAgents = ""
+	configureSubagentsMemoryShareMode = ""
+	configureMemoryEmbeddingProvider = ""
+	configureMemoryEmbeddingModel = ""
+	configureEnableSkills = nil
+	configureDisableSkills = nil
+
+	tmpDir := t.TempDir()
+	cfgDir := filepath.Join(tmpDir, ".kafclaw")
+	if err := os.MkdirAll(cfgDir, 0o755); err != nil {
+		t.Fatalf("mkdir config dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(cfgDir, "config.json"), []byte(`{"group":{"agentId":"ops-agent"}}`), 0o600); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	origHome := os.Getenv("HOME")
+	defer os.Setenv("HOME", origHome)
+	_ = os.Setenv("HOME", tmpDir)
+
+	out, err := runRootCommand(t,
+		"configure",
+		"--non-interactive",
+		"--agent-cascade-enabled-set",
+		"--agent-cascade-enabled=true",
+	)
+	if err != nil {
+		t.Fatalf("configure agent cascade failed: %v", err)
+	}
+	if !strings.Contains(out, "deterministic tasks") {
+		t.Fatalf("expected deterministic warning in output, got %q", out)
+	}
+
+	data, err := os.ReadFile(filepath.Join(cfgDir, "config.json"))
+	if err != nil {
+		t.Fatalf("read config: %v", err)
+	}
+	var cfg map[string]any
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		t.Fatalf("unmarshal config: %v", err)
+	}
+	agents, ok := cfg["agents"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected agents block in config")
+	}
+	list, ok := agents["list"].([]any)
+	if !ok || len(list) != 1 {
+		t.Fatalf("expected one agents.list entry, got %#v", agents["list"])
+	}
+	entry, _ := list[0].(map[string]any)
+	if id, _ := entry["id"].(string); id != "ops-agent" {
+		t.Fatalf("expected agent id ops-agent, got %#v", entry["id"])
+	}
+	cascade, _ := entry["cascade"].(map[string]any)
+	if enabled, _ := cascade["enabled"].(bool); !enabled {
+		t.Fatalf("expected cascade.enabled true, got %#v", cascade["enabled"])
+	}
+}
+
+func TestConfigureAgentCascadeJSONSummary(t *testing.T) {
+	origKafkaSecurityProtocol := configureKafkaSecurityProtocol
+	origKafkaSASLMechanism := configureKafkaSASLMechanism
+	origKafkaSASLUsername := configureKafkaSASLUsername
+	origKafkaSASLPassword := configureKafkaSASLPassword
+	origAgentID := configureAgentID
+	origAgentCascadeEnabled := configureAgentCascadeEnabled
+	origJSON := configureJSON
+	origKafkaBrokers := configureKafkaBrokers
+	origKafkaTLSCAFile := configureKafkaTLSCAFile
+	origKafkaTLSCertFile := configureKafkaTLSCertFile
+	origKafkaTLSKeyFile := configureKafkaTLSKeyFile
+	origSkillsNodeManager := configureSkillsNodeManager
+	origSkillsScope := configureSkillsScope
+	origGoogleWorkspaceRead := configureGoogleWorkspaceRead
+	origM365Read := configureM365Read
+	origSubagentsAllow := configureSubagentsAllowAgents
+	origSubagentsShare := configureSubagentsMemoryShareMode
+	origMemoryProvider := configureMemoryEmbeddingProvider
+	origMemoryModel := configureMemoryEmbeddingModel
+	origEnableSkills := configureEnableSkills
+	origDisableSkills := configureDisableSkills
+	defer func() {
+		configureKafkaSecurityProtocol = origKafkaSecurityProtocol
+		configureKafkaSASLMechanism = origKafkaSASLMechanism
+		configureKafkaSASLUsername = origKafkaSASLUsername
+		configureKafkaSASLPassword = origKafkaSASLPassword
+		configureAgentID = origAgentID
+		configureAgentCascadeEnabled = origAgentCascadeEnabled
+		configureJSON = origJSON
+		configureKafkaBrokers = origKafkaBrokers
+		configureKafkaTLSCAFile = origKafkaTLSCAFile
+		configureKafkaTLSCertFile = origKafkaTLSCertFile
+		configureKafkaTLSKeyFile = origKafkaTLSKeyFile
+		configureSkillsNodeManager = origSkillsNodeManager
+		configureSkillsScope = origSkillsScope
+		configureGoogleWorkspaceRead = origGoogleWorkspaceRead
+		configureM365Read = origM365Read
+		configureSubagentsAllowAgents = origSubagentsAllow
+		configureSubagentsMemoryShareMode = origSubagentsShare
+		configureMemoryEmbeddingProvider = origMemoryProvider
+		configureMemoryEmbeddingModel = origMemoryModel
+		configureEnableSkills = origEnableSkills
+		configureDisableSkills = origDisableSkills
+	}()
+	configureKafkaSecurityProtocol = ""
+	configureKafkaSASLMechanism = ""
+	configureKafkaSASLUsername = ""
+	configureKafkaSASLPassword = ""
+	configureAgentID = ""
+	configureAgentCascadeEnabled = false
+	configureJSON = false
+	configureKafkaBrokers = ""
+	configureKafkaTLSCAFile = ""
+	configureKafkaTLSCertFile = ""
+	configureKafkaTLSKeyFile = ""
+	configureSkillsNodeManager = ""
+	configureSkillsScope = ""
+	configureGoogleWorkspaceRead = ""
+	configureM365Read = ""
+	configureSubagentsAllowAgents = ""
+	configureSubagentsMemoryShareMode = ""
+	configureMemoryEmbeddingProvider = ""
+	configureMemoryEmbeddingModel = ""
+	configureEnableSkills = nil
+	configureDisableSkills = nil
+
+	tmpDir := t.TempDir()
+	cfgDir := filepath.Join(tmpDir, ".kafclaw")
+	if err := os.MkdirAll(cfgDir, 0o755); err != nil {
+		t.Fatalf("mkdir config dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(cfgDir, "config.json"), []byte(`{"group":{"agentId":"ops-agent"}}`), 0o600); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	origHome := os.Getenv("HOME")
+	defer os.Setenv("HOME", origHome)
+	_ = os.Setenv("HOME", tmpDir)
+
+	out, err := runRootCommand(t,
+		"configure",
+		"--non-interactive",
+		"--json",
+		"--agent-id=qa-agent",
+		"--agent-cascade-enabled-set",
+		"--agent-cascade-enabled=false",
+	)
+	if err != nil {
+		t.Fatalf("configure agent cascade json failed: %v", err)
+	}
+	if !strings.Contains(out, `"id": "qa-agent"`) || !strings.Contains(out, `"cascadeEnabled": false`) {
+		t.Fatalf("expected agent cascade json summary, got %q", out)
+	}
+}

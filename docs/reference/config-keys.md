@@ -240,6 +240,11 @@ Each provider entry accepts `apiKey` and `apiBase`. See [LLM Providers](/referen
 | `agents.list[].model.primary` | string | Primary model for this agent |
 | `agents.list[].model.fallbacks` | []string | Fallback models tried on transient errors |
 | `agents.list[].subagents.model` | string | Model for subagents spawned by this agent |
+| `agents.list[].cascade.enabled` | bool | Enable cascading protocol gates for this agent (recommended only for deterministic tasks) |
+
+Cascade usage warning:
+- Enable for deterministic workflows (ops/runbook/config/code-mod).
+- Keep disabled for ambiguous/creative tasks to reduce latency and retry-loop risk.
 
 ## Subagent Memory Share Mode
 
