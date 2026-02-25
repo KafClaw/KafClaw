@@ -4,10 +4,12 @@ import (
 	"crypto/rand"
 	"database/sql"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
 
+	"github.com/KafClaw/KafClaw/internal/cascade"
 	_ "modernc.org/sqlite"
 )
 
@@ -1003,6 +1005,55 @@ func (s *TimelineService) AdvanceCascadeTask(traceID, taskID, fromState, toState
 	}
 	defer tx.Rollback()
 
+	var existing int
+	err = tx.QueryRow(`SELECT 1 FROM cascade_transitions WHERE idempotency_key = ? LIMIT 1`, idempotencyKey).Scan(&existing)
+	if err == nil {
+		return false, nil
+	}
+	if err != sql.ErrNoRows {
+		return false, fmt.Errorf("check cascade transition idempotency: %w", err)
+	}
+
+	var retryCount, maxRetries int
+	err = tx.QueryRow(`SELECT retry_count, max_retries
+		FROM cascade_tasks WHERE trace_id = ? AND task_id = ? AND state = ?`,
+		traceID, taskID, fromState).Scan(&retryCount, &maxRetries)
+	if err == sql.ErrNoRows {
+		return false, fmt.Errorf("cascade transition rejected: expected state %s", fromState)
+	}
+	if err != nil {
+		return false, fmt.Errorf("load cascade task for transition: %w", err)
+	}
+
+	nextRetryCount := retryCount
+	if (toState == "pending" && fromState == "self_test") || toState == "failed" {
+		nextRetryCount++
+	}
+	escalationRemediation := ""
+	if toState == "failed" {
+		policy := cascade.DefaultEscalationPolicy(maxRetries)
+		decision := cascade.EvaluateEscalation(nextRetryCount, policy)
+		if decision.Escalate {
+			escalationRemediation = decision.Reason
+			artifact = mergeCascadeArtifact(artifact, map[string]any{
+				"escalation": map[string]any{
+					"triggered":       true,
+					"action":          decision.Action,
+					"fallbackModel":   decision.FallbackModel,
+					"fallbackTooling": decision.FallbackTooling,
+					"retryCount":      nextRetryCount,
+					"retryThreshold":  policy.RetryThreshold,
+				},
+			})
+			baseReason := strings.TrimSpace(reason)
+			if baseReason == "" {
+				reason = decision.Reason
+			} else {
+				reason = baseReason + "; " + decision.Reason
+			}
+		}
+	}
+
 	_, err = tx.Exec(`INSERT INTO cascade_transitions
 		(trace_id, task_id, from_state, to_state, actor, reason, artifact, idempotency_key, created_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
@@ -1029,9 +1080,10 @@ func (s *TimelineService) AdvanceCascadeTask(traceID, taskID, fromState, toState
 		    END,
 		    committed_at = CASE WHEN ? = 'committed' THEN datetime('now') ELSE committed_at END,
 		    released_next_at = CASE WHEN ? = 'released_next' THEN datetime('now') ELSE released_next_at END,
+		    remediation = CASE WHEN ? != '' THEN ? ELSE remediation END,
 		    last_error = CASE WHEN ? = 'failed' THEN ? ELSE last_error END
 		WHERE trace_id = ? AND task_id = ? AND state = ?`,
-		toState, toState, toState, toState, toState, toState, lastErr, traceID, taskID, fromState,
+		toState, toState, toState, toState, toState, escalationRemediation, escalationRemediation, toState, lastErr, traceID, taskID, fromState,
 	)
 	if err != nil {
 		return false, fmt.Errorf("update cascade task state: %w", err)
@@ -1054,6 +1106,24 @@ func coalesceJSON(v string, fallback string) string {
 		return fallback
 	}
 	return v
+}
+
+func mergeCascadeArtifact(base string, extras map[string]any) string {
+	merged := map[string]any{}
+	if strings.TrimSpace(base) != "" {
+		_ = json.Unmarshal([]byte(base), &merged)
+	}
+	if merged == nil {
+		merged = map[string]any{}
+	}
+	for k, v := range extras {
+		merged[k] = v
+	}
+	buf, err := json.Marshal(merged)
+	if err != nil {
+		return coalesceJSON(base, "{}")
+	}
+	return string(buf)
 }
 
 // IsSilentMode checks if silent mode is enabled. Defaults to true (safe default).

@@ -43,6 +43,29 @@ type ValidationResult struct {
 	RemediationMsg string
 }
 
+const (
+	EscalationActionNone                 = "none"
+	EscalationActionFallbackModel        = "fallback_model"
+	EscalationActionFallbackTooling      = "fallback_tooling"
+	EscalationActionFallbackModelTooling = "fallback_model_tooling"
+)
+
+// EscalationPolicy defines fallback strategy after retry pressure.
+type EscalationPolicy struct {
+	RetryThreshold  int
+	FallbackModel   string
+	FallbackTooling string
+}
+
+// EscalationDecision is the deterministic escalation output.
+type EscalationDecision struct {
+	Escalate        bool
+	Action          string
+	FallbackModel   string
+	FallbackTooling string
+	Reason          string
+}
+
 func ValidateContract(c TaskContract) error {
 	if strings.TrimSpace(c.TaskID) == "" {
 		return fmt.Errorf("task_id is required")
@@ -125,6 +148,59 @@ func NextStateAfterValidation(task TaskSnapshot, validation ValidationResult) st
 		return StateFailed
 	}
 	return StatePending
+}
+
+// DefaultEscalationPolicy uses a conservative threshold near retry exhaustion.
+func DefaultEscalationPolicy(maxRetries int) EscalationPolicy {
+	threshold := 1
+	if maxRetries > 1 {
+		threshold = maxRetries - 1
+	}
+	return EscalationPolicy{
+		RetryThreshold:  threshold,
+		FallbackModel:   "deterministic-fallback-model",
+		FallbackTooling: "safe-fallback-toolchain",
+	}
+}
+
+// EvaluateEscalation decides if fallback model/tooling should activate.
+func EvaluateEscalation(nextRetryCount int, policy EscalationPolicy) EscalationDecision {
+	threshold := policy.RetryThreshold
+	if threshold <= 0 {
+		threshold = 1
+	}
+	if nextRetryCount <= threshold {
+		return EscalationDecision{Escalate: false, Action: EscalationActionNone}
+	}
+	decision := EscalationDecision{
+		Escalate:        true,
+		FallbackModel:   strings.TrimSpace(policy.FallbackModel),
+		FallbackTooling: strings.TrimSpace(policy.FallbackTooling),
+	}
+	switch {
+	case decision.FallbackModel != "" && decision.FallbackTooling != "":
+		decision.Action = EscalationActionFallbackModelTooling
+	case decision.FallbackModel != "":
+		decision.Action = EscalationActionFallbackModel
+	case decision.FallbackTooling != "":
+		decision.Action = EscalationActionFallbackTooling
+	default:
+		decision.Action = EscalationActionNone
+		decision.Escalate = false
+		return decision
+	}
+	reasonParts := []string{
+		fmt.Sprintf("escalation_triggered=retries_exceeded_threshold(%d>%d)", nextRetryCount, threshold),
+		"action=" + decision.Action,
+	}
+	if decision.FallbackModel != "" {
+		reasonParts = append(reasonParts, "fallback_model="+decision.FallbackModel)
+	}
+	if decision.FallbackTooling != "" {
+		reasonParts = append(reasonParts, "fallback_tooling="+decision.FallbackTooling)
+	}
+	decision.Reason = strings.Join(reasonParts, "; ")
+	return decision
 }
 
 func applyRule(rule string, output map[string]string) bool {

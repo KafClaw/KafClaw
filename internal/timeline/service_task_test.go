@@ -1,6 +1,7 @@
 package timeline
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -709,6 +710,21 @@ func TestCascadeTaskRetryRemediationAndListing(t *testing.T) {
 	}
 	if task.State != "failed" || task.RetryCount != 2 || task.LastError == "" {
 		t.Fatalf("unexpected failed task state: %+v", task)
+	}
+	if !strings.Contains(task.Remediation, "escalation_triggered=") {
+		t.Fatalf("expected escalation remediation marker, got %+v", task)
+	}
+
+	transitions, err := svc.ListCascadeTransitions("trace-c2", "task-retry", 20)
+	if err != nil {
+		t.Fatalf("list transitions: %v", err)
+	}
+	if len(transitions) == 0 {
+		t.Fatal("expected transitions to exist")
+	}
+	last := transitions[len(transitions)-1]
+	if last.ToState != "failed" || !strings.Contains(last.Artifact, `"escalation"`) {
+		t.Fatalf("expected escalation artifact on failed transition, got %+v", last)
 	}
 
 	all, err := svc.ListCascadeTasks("trace-c2")

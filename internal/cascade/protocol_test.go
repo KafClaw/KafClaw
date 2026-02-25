@@ -149,3 +149,35 @@ func TestNextStateAfterValidation(t *testing.T) {
 		t.Fatalf("expected failed when retry budget reached, got %s", got)
 	}
 }
+
+func TestEvaluateEscalation(t *testing.T) {
+	policy := EscalationPolicy{
+		RetryThreshold:  1,
+		FallbackModel:   "m1",
+		FallbackTooling: "t1",
+	}
+	no := EvaluateEscalation(1, policy)
+	if no.Escalate || no.Action != EscalationActionNone {
+		t.Fatalf("expected no escalation at threshold, got %+v", no)
+	}
+	yes := EvaluateEscalation(2, policy)
+	if !yes.Escalate {
+		t.Fatalf("expected escalation above threshold, got %+v", yes)
+	}
+	if yes.Action != EscalationActionFallbackModelTooling {
+		t.Fatalf("unexpected escalation action: %+v", yes)
+	}
+	if yes.Reason == "" {
+		t.Fatalf("expected escalation reason, got %+v", yes)
+	}
+}
+
+func TestDefaultEscalationPolicy(t *testing.T) {
+	p := DefaultEscalationPolicy(2)
+	if p.RetryThreshold != 1 {
+		t.Fatalf("expected threshold 1 for maxRetries=2, got %+v", p)
+	}
+	if p.FallbackModel == "" || p.FallbackTooling == "" {
+		t.Fatalf("expected fallback defaults, got %+v", p)
+	}
+}
