@@ -31,11 +31,17 @@ jobs:
   prepare:
     runs-on: ubuntu-latest
     outputs:
+      should_release: ${{ steps.meta.outputs.should_release }}
       channel: ${{ steps.meta.outputs.channel }}
       version_tag: ${{ steps.meta.outputs.version_tag }}
       prerelease: ${{ steps.meta.outputs.prerelease }}
       release_name: ${{ steps.meta.outputs.release_name }}
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - name: Determine release metadata
         id: meta
         shell: bash
@@ -47,6 +53,7 @@ jobs:
           input_channel="${{ github.event.inputs.channel || '' }}"
           input_tag="${{ github.event.inputs.version_tag || '' }}"
 
+          should_release="true"
           channel="edge"
           prerelease="true"
           version_tag=""
@@ -77,11 +84,20 @@ jobs:
               version_tag="edge-$(date -u +%Y%m%d)-${GITHUB_SHA:0:7}"
             fi
           else
+            latest_edge_tag="$(git for-each-ref --sort=-creatordate --format='%(refname:strip=2)' refs/tags/edge-* | head -n1)"
+            if [[ -n "$latest_edge_tag" ]]; then
+              latest_edge_sha="$(git rev-list -n 1 "$latest_edge_tag")"
+              if [[ "$latest_edge_sha" == "$GITHUB_SHA" ]]; then
+                should_release="false"
+              fi
+            fi
+
             channel="edge"
             prerelease="true"
             version_tag="edge-$(date -u +%Y%m%d)-${GITHUB_SHA:0:7}"
           fi
 
+          echo "should_release=$should_release" >> "$GITHUB_OUTPUT"
           echo "channel=$channel" >> "$GITHUB_OUTPUT"
           echo "version_tag=$version_tag" >> "$GITHUB_OUTPUT"
           echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
@@ -93,6 +109,7 @@ jobs:
   # -------------------------------------------------------------------
   build-go:
     needs: prepare
+    if: needs.prepare.outputs.should_release == 'true'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -248,6 +265,7 @@ jobs:
   # -------------------------------------------------------------------
   smoke-native:
     needs: [prepare, build-go]
+    if: needs.prepare.outputs.should_release == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -288,6 +306,7 @@ jobs:
   # -------------------------------------------------------------------
   build-electron:
     needs: prepare
+    if: needs.prepare.outputs.should_release == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -350,6 +369,7 @@ jobs:
   # -------------------------------------------------------------------
   release:
     needs: [prepare, build-go, smoke-native, build-electron]
+    if: needs.prepare.outputs.should_release == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -403,13 +423,31 @@ jobs:
           subject-path: release_files/*
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ needs.prepare.outputs.version_tag }}
-          name: ${{ needs.prepare.outputs.release_name }}
-          prerelease: ${{ needs.prepare.outputs.prerelease == 'true' }}
-          draft: false
-          generate_release_notes: true
-          files: release_files/*
+        shell: bash
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          args=(
+            release create
+            "${{ needs.prepare.outputs.version_tag }}"
+            --repo "${GITHUB_REPOSITORY}"
+            --target "${GITHUB_SHA}"
+            --title "${{ needs.prepare.outputs.release_name }}"
+            --generate-notes
+          )
+
+          if [[ "${{ needs.prepare.outputs.prerelease }}" == "true" ]]; then
+            args+=(--prerelease)
+          fi
+
+          shopt -s nullglob
+          files=(release_files/*)
+          if [[ ${#files[@]} -eq 0 ]]; then
+            echo "No release files found"
+            exit 1
+          fi
+          args+=("${files[@]}")
+
+          gh "${args[@]}"

@@ -62,6 +62,13 @@ if [[ -f "$ELECTRON_PKG" ]]; then
   echo "Electron version synced to $NEXT"
 fi
 
+ELECTRON_LOCK="${ROOT_DIR}/electron/package-lock.json"
+if [[ -f "$ELECTRON_LOCK" ]]; then
+  sedi -E "0,/\"version\": \"[0-9]+\.[0-9]+\.[0-9]+\"/s//\"version\": \"$NEXT\"/" "$ELECTRON_LOCK"
+  sedi -E "0,/\"version\": \"[0-9]+\.[0-9]+\.[0-9]+\"/s//\"version\": \"$NEXT\"/" "$ELECTRON_LOCK"
+  echo "Electron lockfile version synced to $NEXT"
+fi
+
 git -C "$GIT_ROOT" add -A
 git commit -m "Release v$NEXT"
 git tag "v$NEXT"

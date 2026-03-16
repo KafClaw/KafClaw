@@ -10,7 +10,7 @@ title: Release Process
 KafClaw uses semantic versioning (`MAJOR.MINOR.PATCH`). The version is defined in `internal/cli/root.go` and can be overridden at build time:
 
 ```bash
-go build -ldflags "-X github.com/kamir/kafclaw/internal/cli.version=2.6.0" ./cmd/kafclaw
+go build -ldflags "-X github.com/KafClaw/KafClaw/internal/cli.version=0.1.0" ./cmd/kafclaw
 ```
 
 ## Make Targets
@@ -33,8 +33,9 @@ Release commits are created from the repository root (all staged changes include
 
 ## GitHub Actions
 
-- Workflow: `.github/workflows/release-go.yml`
-- Trigger: tag push `v*` or manual `workflow_dispatch`
+- Workflow: `.github/workflows/release.yml`
+- Trigger: tag push `v*`, scheduled edge releases, or manual `workflow_dispatch`
+- Scheduled edge releases are skipped when `main` has not moved since the most recent `edge-*` tag
 - Build matrix: `ubuntu-latest`, `macos-latest`, `windows-latest`
 - Artifacts attached to GitHub Release via `softprops/action-gh-release@v2`
 
