@@ -1,0 +1,102 @@
+image:
+  # PSA-restricted compliant image (USER 1000:1000 + HOME=/var/lib/kafclaw).
+  # Local-only / NAS-pinned (PLAN-06 E-03 / iter-7 E-10). Iter-8 flips to
+  # ghcr.io. The 2026.05-rc3 tag is the first kafclaw image that runs as
+  # non-root by default; earlier rc1/rc2 tags ran as root and must not be
+  # paired with this chart version.
+  repository: 192.168.0.131:5100/scalytics/kafclaw
+  tag: "2026.05-rc3"
+  pullPolicy: IfNotPresent
+
+replicaCount: 1
+
+service:
+  type: ClusterIP
+  apiPort: 18790
+  dashboardPort: 18791
+
+# Optional: plug into Kafka / KafGraph / OpenRouter.
+config:
+  kafkaBrokers: "kafscale-broker:9092"
+  kafgraphBoltUrl: "bolt://kafgraph:7687"
+  gatewayHost: "0.0.0.0"
+  groupEnabled: false    # needs Kafka brokers reachable; disabled by default
+  orchestratorEnabled: false
+
+secrets:
+  # Expected keys in existingSecret: agent-auth-token, openrouter-api-key, github-token
+  existingSecret: ""     # if empty, creates a dev Secret from the values below
+  agentAuthToken: "changeme-dev-token-only"
+  openrouterApiKey: ""
+  githubToken: ""
+
+persistence:
+  enabled: true
+  storageClass: ""
+  size: 1Gi
+
+# PSA-restricted defaults. The kafclaw image runs as UID 1000:1000 with
+# HOME=/var/lib/kafclaw (matches the PVC mount path below). fsGroup
+# chowns the volume to gid 1000 so the binary can write state.
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]
+
+resources:
+  # modernc.org/sqlite (pure-Go) allocates its page cache from the Go
+  # heap; under a tight cgroup memory limit it fails timeline.db schema
+  # apply with "out of memory (1)" (BUG-0010). 768Mi gives the
+  # allocator headroom; /tmp is disk-backed (see deployment.yaml) so
+  # it no longer competes with the heap for the memory budget.
+  limits: { cpu: 1000m, memory: 768Mi }
+  requests: { cpu: 200m, memory: 256Mi }
+
+probes:
+  # KafClaw's HTTP gateway serves /api/v1/status on the dashboard port
+  # (18791), not /health on the API port (18790). Probing /health:18790
+  # used to send the kubelet into a kill-loop because the API-port mux
+  # returns 404 for /health; only the dashboard-port mux registers a
+  # /api/v1/status handler. See KafClaw/internal/cli/gateway.go:701
+  # (handler) and gateway.go:3515 (DashboardPort default).
+  liveness:
+    httpGet: { path: /api/v1/status, port: 18791 }
+    initialDelaySeconds: 30
+    periodSeconds: 20
+  readiness:
+    httpGet: { path: /api/v1/status, port: 18791 }
+    initialDelaySeconds: 10
+    periodSeconds: 10
+
+serviceAccount:
+  create: true
+  name: ""
+
+# Prometheus metrics + ServiceMonitor (PLAN-06 iter-7 E-12 / G-007).
+#
+# IMPORTANT: kafclaw 2026.05-rc3 does NOT yet serve a /metrics endpoint;
+# the binary needs a promhttp.Handler() registered at /metrics on a
+# stable port. Tracked as BUG-0011 in scalytics-all-in-one-meta/BUGS/.
+#
+# The template ships gated by `metrics.enabled` (default false) so the
+# chart layer is audit-clean today; flip to true once the binary lands
+# /metrics. Both port + path values stay placeholders until then.
+metrics:
+  enabled: false
+  path: "/metrics"
+  port: 9090
+  serviceMonitor:
+    labels: {}
+    interval: 30s
+    scrapeTimeout: 10s
+
+labels:
+  app.kubernetes.io/part-of: ops-foundation

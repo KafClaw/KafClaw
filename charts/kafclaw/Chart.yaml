@@ -1,0 +1,14 @@
+apiVersion: v2
+appVersion: 1.0.0
+description: 'KafClaw — AI agent runtime + gateway + dashboard. Kafka-backed group
+  collaboration, multi-channel (WhatsApp, CLI, Web), LLM-agnostic. '
+keywords:
+- ai-agents
+- kafka
+- kafclaw
+- scalytics
+maintainers:
+- name: Scalytics Platform Team
+name: kafclaw
+type: application
+version: 0.1.7
