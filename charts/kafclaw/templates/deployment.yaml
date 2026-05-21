@@ -1,0 +1,162 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "kafclaw.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "kafclaw.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "kafclaw.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "kafclaw.labels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "kafclaw.serviceAccountName" . }}
+      enableServiceLinks: false
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: kafclaw
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- with .Values.containerSecurityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          args: ["gateway"]
+          ports:
+            - { name: api, containerPort: 18790 }
+            - { name: dashboard, containerPort: 18791 }
+          env:
+            # Point the workspace + work-repo dirs at the writable PVC.
+            # Default entrypoint creates /opt/workspace, which fails under
+            # readOnlyRootFilesystem (iter-7 E-10). Override both env vars
+            # to keep the writes inside HOME=/var/lib/kafclaw (PVC-backed).
+            - name: MIKROBOT_AGENTS_WORKSPACE
+              value: "/var/lib/kafclaw/workspace"
+            - name: MIKROBOT_AGENTS_WORK_REPO_PATH
+              value: "/var/lib/kafclaw/work-repo"
+            - name: KAFCLAW_GATEWAY_HOST
+              value: {{ .Values.config.gatewayHost | quote }}
+            - name: KAFCLAW_GROUP_ENABLED
+              value: {{ .Values.config.groupEnabled | quote }}
+            - name: KAFCLAW_ORCHESTRATOR_ENABLED
+              value: {{ .Values.config.orchestratorEnabled | quote }}
+            - name: KAFCLAW_GROUP_KAFKA_BROKERS
+              value: {{ .Values.config.kafkaBrokers | quote }}
+            - name: KAFCLAW_KAFGRAPH_BOLT_URL
+              value: {{ .Values.config.kafgraphBoltUrl | quote }}
+            - name: MIKROBOT_GATEWAY_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "kafclaw.secretName" . }}
+                  key: agent-auth-token
+            - name: OPENROUTER_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "kafclaw.secretName" . }}
+                  key: openrouter-api-key
+                  optional: true
+            - name: KAFCLAW_GITHUB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "kafclaw.secretName" . }}
+                  key: github-token
+                  optional: true
+          livenessProbe:
+            {{- toYaml .Values.probes.liveness | nindent 12 }}
+          readinessProbe:
+            {{- toYaml .Values.probes.readiness | nindent 12 }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            # kafclaw 2026.05-rc3 sets HOME=/var/lib/kafclaw and runs
+            # as UID 1000. Earlier rc1/rc2 images expected /root/.kafclaw
+            # because they ran as root; never mix rc1/rc2 images with
+            # this chart version (PSA-restricted incompatible).
+            - name: data
+              mountPath: /var/lib/kafclaw
+            # /tmp must be writable for the Go runtime + any temp file
+            # the gateway opens, readOnlyRootFilesystem otherwise blocks.
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: data
+          {{- if .Values.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ include "kafclaw.fullname" . }}-data
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+        - name: tmp
+          # Disk-backed (NOT medium: Memory) so /tmp does not count
+          # against the container's memory limit. modernc.org/sqlite's
+          # allocator competes with a memory-backed tmpfs for the same
+          # cgroup budget and fails schema apply under pressure
+          # (BUG-0010).
+          emptyDir:
+            sizeLimit: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "kafclaw.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "kafclaw.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - { name: api, port: {{ .Values.service.apiPort }}, targetPort: 18790 }
+    - { name: dashboard, port: {{ .Values.service.dashboardPort }}, targetPort: 18791 }
+  selector:
+    {{- include "kafclaw.selectorLabels" . | nindent 4 }}
+---
+{{- if .Values.serviceAccount.create }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "kafclaw.serviceAccountName" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "kafclaw.labels" . | nindent 4 }}
+{{- end }}
+---
+{{- if .Values.persistence.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "kafclaw.fullname" . }}-data
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "kafclaw.labels" . | nindent 4 }}
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: {{ .Values.persistence.size | quote }}
+  {{- with .Values.persistence.storageClass }}
+  storageClassName: {{ . | quote }}
+  {{- end }}
+{{- end }}
+---
+{{- if not .Values.secrets.existingSecret }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "kafclaw.secretName" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "kafclaw.labels" . | nindent 4 }}
+type: Opaque
+stringData:
+  agent-auth-token: {{ .Values.secrets.agentAuthToken | quote }}
+  openrouter-api-key: {{ .Values.secrets.openrouterApiKey | quote }}
+  github-token: {{ .Values.secrets.githubToken | quote }}
+{{- end }}

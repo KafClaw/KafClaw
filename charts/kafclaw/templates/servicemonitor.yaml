@@ -1,0 +1,33 @@
+{{- /*
+  servicemonitor.yaml — Prometheus Operator ServiceMonitor for kafclaw.
+
+  Gated by `.Values.metrics.enabled` (default false). Requires the
+  monitoring.coreos.com/v1 CRD to be installed in-cluster.
+
+  STATUS 2026-05-20: kafclaw binary does not yet serve /metrics
+  (BUG-0011, scalytics-all-in-one-meta/BUGS/). Enabling this template
+  before the binary is instrumented produces scrape errors in
+  Prometheus. PLAN-06 iter-7 E-12 ships the template + gating; the
+  promhttp.Handler() registration is a follow-up.
+*/}}
+{{- if .Values.metrics.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "kafclaw.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "kafclaw.labels" . | nindent 4 }}
+    {{- with .Values.metrics.serviceMonitor.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "kafclaw.selectorLabels" . | nindent 6 }}
+  endpoints:
+    - port: dashboard
+      path: {{ .Values.metrics.path | quote }}
+      interval: {{ .Values.metrics.serviceMonitor.interval | quote }}
+      scrapeTimeout: {{ .Values.metrics.serviceMonitor.scrapeTimeout | quote }}
+{{- end }}
