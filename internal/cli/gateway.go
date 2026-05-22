@@ -21,6 +21,8 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+
 	"github.com/KafClaw/KafClaw/internal/agent"
 	"github.com/KafClaw/KafClaw/internal/bus"
 	"github.com/KafClaw/KafClaw/internal/channels"
@@ -696,6 +698,10 @@ func runGatewayMain(cmd *cobra.Command, args []string) {
 	// Start Dashboard Server
 	go func() {
 		mux := http.NewServeMux()
+
+		// BUG-0011: Prometheus scrape endpoint on the dashboard port. Go
+		// runtime + process metrics only; unauthenticated like /api/v1/status.
+		mux.Handle("/metrics", promhttp.Handler())
 
 		// API: Status (unauthenticated health check)
 		mux.HandleFunc("/api/v1/status", func(w http.ResponseWriter, r *http.Request) {
