@@ -3,9 +3,10 @@ image:
   # Local-only / NAS-pinned (PLAN-06 E-03 / iter-7 E-10). Iter-8 flips to
   # ghcr.io. The 2026.05-rc3 tag is the first kafclaw image that runs as
   # non-root by default; earlier rc1/rc2 tags ran as root and must not be
-  # paired with this chart version.
+  # paired with this chart version. rc4 adds the /metrics endpoint on the
+  # dashboard port (BUG-0011).
   repository: 192.168.0.131:5100/scalytics/kafclaw
-  tag: "2026.05-rc3"
+  tag: "2026.05-rc4"
   pullPolicy: IfNotPresent
 
 replicaCount: 1
@@ -82,15 +83,11 @@ serviceAccount:
 
 # Prometheus metrics + ServiceMonitor (PLAN-06 iter-7 E-12 / G-007).
 #
-# IMPORTANT: kafclaw 2026.05-rc3 does NOT yet serve a /metrics endpoint;
-# the binary needs a promhttp.Handler() registered at /metrics on a
-# stable port. Tracked as BUG-0011 in scalytics-all-in-one-meta/BUGS/.
-#
-# The template ships gated by `metrics.enabled` (default false) so the
-# chart layer is audit-clean today; flip to true once the binary lands
-# /metrics. Both port + path values stay placeholders until then.
+# BUG-0011: kafclaw 2026.05-rc4 serves /metrics (promhttp.Handler) on the
+# dashboard port (18791). The ServiceMonitor scrapes the named `dashboard`
+# port at this path, so the `port` value below is informational only.
 metrics:
-  enabled: false
+  enabled: true
   path: "/metrics"
   port: 9090
   serviceMonitor:
