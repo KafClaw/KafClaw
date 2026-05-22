@@ -3527,8 +3527,9 @@ func runGatewayMain(cmd *cobra.Command, args []string) {
 		if cfg.Gateway.AuthToken != "" {
 			authToken := cfg.Gateway.AuthToken
 			handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				// Skip auth for status endpoint (health check) and CORS preflight
-				if r.URL.Path == "/api/v1/status" || r.Method == "OPTIONS" {
+				// Skip auth for status endpoint (health check), the Prometheus
+				// scrape endpoint (BUG-0011), and CORS preflight.
+				if r.URL.Path == "/api/v1/status" || r.URL.Path == "/metrics" || r.Method == "OPTIONS" {
 					mux.ServeHTTP(w, r)
 					return
 				}
