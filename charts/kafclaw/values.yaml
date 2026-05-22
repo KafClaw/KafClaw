@@ -3,10 +3,11 @@ image:
   # Local-only / NAS-pinned (PLAN-06 E-03 / iter-7 E-10). Iter-8 flips to
   # ghcr.io. The 2026.05-rc3 tag is the first kafclaw image that runs as
   # non-root by default; earlier rc1/rc2 tags ran as root and must not be
-  # paired with this chart version. rc4 adds the /metrics endpoint on the
-  # dashboard port (BUG-0011).
+  # paired with this chart version. rc5 adds the /metrics endpoint on the
+  # dashboard port and whitelists it through the dashboard auth gate
+  # (BUG-0011).
   repository: 192.168.0.131:5100/scalytics/kafclaw
-  tag: "2026.05-rc4"
+  tag: "2026.05-rc5"
   pullPolicy: IfNotPresent
 
 replicaCount: 1
