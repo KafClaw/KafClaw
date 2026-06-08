@@ -242,6 +242,13 @@ func (l *Loop) registerDefaultTools() {
 	l.registry.Register(tools.NewAgentsListTool(l.listSubagentAgentsForTool))
 	l.registry.Register(tools.NewGoogleWorkspaceReadTool())
 	l.registry.Register(tools.NewM365ReadTool())
+
+	// er1-brain leg C(b): live knowledge-graph query tool (no embedder needed).
+	if l.cfg != nil && l.cfg.KafGraph.URL != "" {
+		if gt := tools.NewQueryGraphTool(l.cfg.KafGraph.URL); gt != nil {
+			l.registry.Register(gt)
+		}
+	}
 }
 
 // Run starts the agent loop, processing messages from the bus.

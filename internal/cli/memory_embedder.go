@@ -29,13 +29,13 @@ func resolveMemoryEmbedder(cfg *config.Config, main provider.LLMProvider) (provi
 
 	switch providerID {
 	case "openai":
-		return provider.NewOpenAIProvider(cfg.Providers.OpenAI.APIKey, cfg.Providers.OpenAI.APIBase, ""), "openai"
+		return withDefaultEmbeddingModel(provider.NewOpenAIProvider(cfg.Providers.OpenAI.APIKey, cfg.Providers.OpenAI.APIBase, ""), embCfg.Model), "openai"
 	case "local-hf", "auto":
 		if emb, ok := main.(provider.Embedder); ok {
 			return withDefaultEmbeddingModel(emb, embCfg.Model), "main-provider"
 		}
 		if strings.TrimSpace(cfg.Providers.OpenAI.APIKey) != "" {
-			return provider.NewOpenAIProvider(cfg.Providers.OpenAI.APIKey, cfg.Providers.OpenAI.APIBase, ""), "openai-fallback"
+			return withDefaultEmbeddingModel(provider.NewOpenAIProvider(cfg.Providers.OpenAI.APIKey, cfg.Providers.OpenAI.APIBase, ""), embCfg.Model), "openai-fallback"
 		}
 		return nil, "no embedder available"
 	default:
