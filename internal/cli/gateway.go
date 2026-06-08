@@ -159,7 +159,11 @@ func runGatewayMain(cmd *cobra.Command, args []string) {
 	// 4c. Setup Memory System (uses dedicated embedding resolver, independent from chat provider)
 	var memorySvc *memory.MemoryService
 	if embedder, source := resolveMemoryEmbedder(cfg, prov); embedder != nil {
-		vecStore := memory.NewSQLiteVecStore(timeSvc.DB(), 1536)
+		vecDim := cfg.Memory.Embedding.Dimension
+		if vecDim <= 0 {
+			vecDim = 1536 // default for OpenAI text-embedding-3-small
+		}
+		vecStore := memory.NewSQLiteVecStore(timeSvc.DB(), vecDim)
 		memorySvc = memory.NewMemoryService(vecStore, embedder)
 		fmt.Println("🧠 Memory system initialized:", source)
 	} else {
@@ -393,6 +397,19 @@ func runGatewayMain(cmd *cobra.Command, args []string) {
 		}
 	}
 
+	// 5a-iv-b. Setup KafGraph client (knowledge-graph sync, er1-brain leg C(a))
+	var kafgraphClient *memory.KafGraphClient
+	if cfg.KafGraph.URL != "" && memorySvc != nil {
+		kafgraphClient = memory.NewKafGraphClient(memory.KafGraphConfig{
+			URL:          cfg.KafGraph.URL,
+			Label:        cfg.KafGraph.Label,
+			SyncInterval: cfg.KafGraph.SyncInterval,
+		}, memorySvc)
+		if kafgraphClient != nil {
+			fmt.Println("🔗 KafGraph client initialized")
+		}
+	}
+
 	// 5a-v. Auto-scaffold workspace if soul files are missing (for headless/Docker agents)
 	if cfg.Paths.Workspace != "" {
 		hasSoulFiles := true
@@ -477,6 +494,11 @@ func runGatewayMain(cmd *cobra.Command, args []string) {
 	// Start ER1 Sync Loop
 	if er1Client != nil {
 		go er1Client.SyncLoop(ctx)
+	}
+
+	// Start KafGraph Sync Loop (er1-brain leg C(a))
+	if kafgraphClient != nil {
+		go kafgraphClient.SyncLoop(ctx)
 	}
 
 	// Start Memory Lifecycle Manager (daily pruning)

@@ -21,6 +21,7 @@ type Config struct {
 	Orchestrator          OrchestratorConfig          `json:"orchestrator"`
 	Scheduler             SchedulerConfig             `json:"scheduler"`
 	ER1                   ER1IntegrationConfig        `json:"er1"`
+	KafGraph              KafGraphIntegrationConfig   `json:"kafgraph"`
 	Observer              ObserverMemoryConfig        `json:"observer"`
 	ContentClassification ContentClassificationConfig `json:"contentClassification"`
 	PromptGuard           PromptGuardConfig           `json:"promptGuard"`
@@ -492,6 +493,14 @@ type ER1IntegrationConfig struct {
 	SyncInterval time.Duration `json:"syncInterval" envconfig:"ER1_SYNC_INTERVAL"`
 }
 
+// KafGraphIntegrationConfig configures the KafGraph knowledge-graph sync
+// (er1-brain leg C(a): graph nodes -> vector store -> RAG).
+type KafGraphIntegrationConfig struct {
+	URL          string        `json:"url" envconfig:"KAFGRAPH_URL"`
+	Label        string        `json:"label" envconfig:"KAFGRAPH_LABEL"`
+	SyncInterval time.Duration `json:"syncInterval" envconfig:"KAFGRAPH_SYNC_INTERVAL"`
+}
+
 // ---------------------------------------------------------------------------
 // Observer – observational memory (LLM compression)
 // ---------------------------------------------------------------------------
@@ -703,6 +712,10 @@ func DefaultConfig() *Config {
 			MaxConcDefault: 5,
 		},
 		ER1: ER1IntegrationConfig{
+			SyncInterval: 5 * time.Minute,
+		},
+		KafGraph: KafGraphIntegrationConfig{
+			Label:        "MemoryItem",
 			SyncInterval: 5 * time.Minute,
 		},
 		Observer: ObserverMemoryConfig{
