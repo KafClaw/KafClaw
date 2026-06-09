@@ -84,6 +84,15 @@ func runGatewayMain(cmd *cobra.Command, args []string) {
 		os.Exit(1)
 	}
 
+	// BUG-0025: a fresh instance has no web users, so the Web UI Chat "WEB USER"
+	// dropdown is empty and Send is dead (posts web_user_id:0 -> HTTP 400). Seed a
+	// default web user so web-chat works out of the box; operators rename/add via UI.
+	if users, lerr := timeSvc.ListWebUsers(); lerr == nil && len(users) == 0 {
+		if _, cerr := timeSvc.CreateWebUser("web"); cerr == nil {
+			fmt.Println("🌱 seeded default web user 'web' , Web UI Chat ready")
+		}
+	}
+
 	// Seed default settings if missing
 	seedSetting := func(key, value string) {
 		if strings.TrimSpace(key) == "" || strings.TrimSpace(value) == "" {
