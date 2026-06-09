@@ -6,5 +6,5 @@ import "embed"
 //
 // Keep this broad enough so web page updates are automatically packaged in binaries.
 //
-//go:embed *.html templates
+//go:embed *.html templates vendor
 var Files embed.FS

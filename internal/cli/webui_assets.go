@@ -8,6 +8,14 @@ import (
 	webassets "github.com/KafClaw/KafClaw/web"
 )
 
+// vendorAssetHandler serves the embedded frontend vendor assets (Tailwind, Vue,
+// d3, dagre-d3, JetBrains Mono fonts) under /vendor/. The embed FS is rooted at
+// web/, so the requested path /vendor/<x> resolves to the embedded vendor/<x>.
+// Serving these locally keeps the dashboard offline-capable with no CDN calls.
+func vendorAssetHandler() http.Handler {
+	return http.FileServer(http.FS(webassets.Files))
+}
+
 func serveDashboardAsset(w http.ResponseWriter, name string) {
 	body, err := webassets.Files.ReadFile(name)
 	if err != nil {

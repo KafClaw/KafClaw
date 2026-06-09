@@ -351,10 +351,22 @@ func runGatewayMain(cmd *cobra.Command, args []string) {
 	}
 
 	// 4e. Setup Orchestrator (conditional)
+	// The orchestrator coordinates tasks over the group bus, so it can only be
+	// constructed once a group manager exists (orchestrator.New dereferences the
+	// manager). When KAFCLAW_ORCHESTRATOR_ENABLED is set but no manager was built
+	// (e.g. no group name), we do NOT silently no-op: status still reports the env
+	// (orchestrator_enabled), and we warn loudly with the missing precondition so
+	// the operator isn't left guessing why orchestrator_active is false (BUG-0016).
 	var orch *orchestrator.Orchestrator
-	if cfg.Orchestrator.Enabled && grpState.Manager() != nil {
-		orch = orchestrator.New(cfg.Orchestrator, grpState.Manager(), timeSvc)
-		fmt.Println("🎯 Orchestrator enabled:", cfg.Orchestrator.Role)
+	if cfg.Orchestrator.Enabled {
+		if grpState.Manager() != nil {
+			orch = orchestrator.New(cfg.Orchestrator, grpState.Manager(), timeSvc)
+			fmt.Println("🎯 Orchestrator enabled:", cfg.Orchestrator.Role)
+		} else {
+			fmt.Println("⚠️ Orchestrator is enabled (KAFCLAW_ORCHESTRATOR_ENABLED=true) but NOT active: it needs a group manager to coordinate.")
+			fmt.Println("⚠️ Build the group first: set KAFCLAW_GROUP_ENABLED=true and KAFCLAW_GROUP_NAME=<name>. The orchestrator then coordinates over that group.")
+			fmt.Println("⚠️ /api/v1/status will report orchestrator_enabled=true (env honoured) and orchestrator_active=false until the group manager exists.")
+		}
 	}
 
 	gatewayStartTime := time.Now()
@@ -747,18 +759,19 @@ func runGatewayMain(cmd *cobra.Command, args []string) {
 
 			mode := getMode()
 
-			orchEnabled := false
-			if orch != nil {
-				orchEnabled = true
-			}
-
+			// orchestrator_enabled reflects the configured intent (env/config),
+			// consistent with group_enabled. orchestrator_active reflects whether
+			// the orchestrator was actually constructed (needs a group manager).
+			// Reporting only construction state hid the honoured env and made the
+			// operator chase an already-applied config change (BUG-0016).
 			json.NewEncoder(w).Encode(map[string]any{
 				"version":              version,
 				"mode":                 mode,
 				"agent_id":             agentID,
 				"uptime_seconds":       int(time.Since(gatewayStartTime).Seconds()),
 				"group_enabled":        cfg.Group.Enabled,
-				"orchestrator_enabled": orchEnabled,
+				"orchestrator_enabled": cfg.Orchestrator.Enabled,
+				"orchestrator_active":  orch != nil,
 			})
 		})
 
@@ -929,7 +942,12 @@ func runGatewayMain(cmd *cobra.Command, args []string) {
 			w.Header().Set("Access-Control-Allow-Origin", "*")
 			w.Header().Set("Content-Type", "application/json")
 			if orch == nil {
-				json.NewEncoder(w).Encode(map[string]any{"enabled": false})
+				// Enabled (env/config) may be true while the orchestrator is not
+				// active because no group manager was built yet (BUG-0016).
+				json.NewEncoder(w).Encode(map[string]any{
+					"enabled": cfg.Orchestrator.Enabled,
+					"active":  false,
+				})
 				return
 			}
 			json.NewEncoder(w).Encode(orch.Status())
@@ -978,7 +996,11 @@ func runGatewayMain(cmd *cobra.Command, args []string) {
 				return
 			}
 			if orch == nil {
-				http.Error(w, "orchestrator not enabled", http.StatusBadRequest)
+				if cfg.Orchestrator.Enabled {
+					http.Error(w, "orchestrator enabled but not active: no group manager (set KAFCLAW_GROUP_ENABLED=true and KAFCLAW_GROUP_NAME)", http.StatusServiceUnavailable)
+				} else {
+					http.Error(w, "orchestrator not enabled", http.StatusBadRequest)
+				}
 				return
 			}
 			var body struct {
@@ -3522,6 +3544,12 @@ func runGatewayMain(cmd *cobra.Command, args []string) {
 		mediaDir := filepath.Join(cfg.Paths.Workspace, "media")
 		fs := http.FileServer(http.Dir(mediaDir))
 		mux.Handle("/media/", http.StripPrefix("/media/", fs))
+
+		// Static: vendored frontend assets (Tailwind, Vue, d3, dagre-d3, fonts).
+		// Served from the embedded FS so the dashboard renders offline with no
+		// external CDN calls (UI hardening, PLAN-15). The embed FS is rooted at
+		// web/, so /vendor/<x> maps to the embedded vendor/<x>.
+		mux.Handle("/vendor/", vendorAssetHandler())
 
 		// SPA: Timeline
 		mux.HandleFunc("/timeline", func(w http.ResponseWriter, r *http.Request) {
