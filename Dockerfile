@@ -2,7 +2,7 @@
 # (Mac ARM64 host building Linux AMD64 container images).
 
 # ---- Builder ----
-FROM golang:1.24-alpine AS builder
+FROM golang:1.26-alpine AS builder
 
 RUN apk add --no-cache gcc musl-dev
 
@@ -13,7 +13,7 @@ COPY . .
 RUN CGO_ENABLED=1 go build -o /kafclaw ./cmd/kafclaw
 
 # ---- Runtime ----
-FROM alpine:3.20
+FROM alpine:3.21
 
 RUN apk add --no-cache ca-certificates git
 
