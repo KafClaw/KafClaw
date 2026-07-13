@@ -418,7 +418,7 @@ jobs:
           output-file: release_files/sbom.spdx.json
 
       - name: Build provenance attestation
-        uses: actions/attest-build-provenance@v2
+        uses: actions/attest-build-provenance@v4
         with:
           subject-path: release_files/*
 
