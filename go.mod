@@ -15,7 +15,7 @@ require (
 	github.com/zalando/go-keyring v0.2.8
 	go.mau.fi/whatsmeow v0.0.0-20260129212019-7787ab952245
 	google.golang.org/protobuf v1.36.11
-	modernc.org/sqlite v1.55.0
+	modernc.org/sqlite v1.56.0
 )
 
 require (
@@ -32,7 +32,7 @@ require (
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/klauspost/compress v1.19.1 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
-	github.com/mattn/go-isatty v0.0.20 // indirect
+	github.com/mattn/go-isatty v0.0.24 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/ncruces/go-strftime v1.0.0 // indirect
 	github.com/petermattis/goid v0.0.0-20260113132338-7c7de50cc741 // indirect
@@ -54,7 +54,7 @@ require (
 	golang.org/x/net v0.57.0 // indirect
 	golang.org/x/sys v0.47.0 // indirect
 	golang.org/x/text v0.40.0 // indirect
-	modernc.org/libc v1.74.1 // indirect
+	modernc.org/libc v1.74.4 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect
 )
