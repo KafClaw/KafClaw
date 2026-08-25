@@ -2,7 +2,7 @@
 # (Mac ARM64 host building Linux AMD64 container images).
 
 # ---- Builder ----
-FROM golang:1.26-alpine AS builder
+FROM golang:1.27-alpine AS builder
 
 RUN apk add --no-cache gcc musl-dev
 
