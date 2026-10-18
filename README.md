@@ -267,6 +267,6 @@ KShark is a built-in Kafka diagnostic tool for verifying connectivity and inspec
 
 Licensed under the [Apache License, Version 2.0](LICENSE).
 
-Background on the design: [How I built a secure, high-performance AI agent squad](https://www.novatechflow.com/2026/02/how-i-built-secure-high-performance-ai.html) and [Building a model-agnostic multi-agent system](https://www.novatechflow.com/2026/02/building-model-agnostic-multi-agent.html) on novatechflow.com.
+Background on the design: [How I built a secure, high-performance AI agent squad](https://www.novatechflow.com/2026/02/how-i-built-secure-high-performance-ai.html) on novatechflow.com.
 
 This project was inspired by [HKUDS/nanobot](https://github.com/HKUDS/nanobot). While originally a fork, KafClaw has been completely rewritten in Go to support enterprise-grade Kafka backends and multi-agent coordination. Original attribution is preserved in the [NOTICE](NOTICE) file.
