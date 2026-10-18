@@ -89,6 +89,7 @@ func runConfigure(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("load config: %w", err)
 	}
 	beforeFingerprint := memoryEmbeddingFingerprint(cfg)
+	reader := bufio.NewReader(cmd.InOrStdin())
 
 	updatedAllowAgents := cfg.Tools.Subagents.AllowAgents
 	hasFlagUpdate := configureClearSubagentsAllowAgents || strings.TrimSpace(configureSubagentsAllowAgents) != ""
@@ -99,7 +100,6 @@ func runConfigure(cmd *cobra.Command, args []string) error {
 	}
 
 	if !hasFlagUpdate && !configureNonInteractive {
-		reader := bufio.NewReader(cmd.InOrStdin())
 		current := strings.Join(cfg.Tools.Subagents.AllowAgents, ",")
 		if current == "" {
 			current = "(current agent only)"
@@ -126,7 +126,6 @@ func runConfigure(cmd *cobra.Command, args []string) error {
 			printCascadeDeterministicWarning(cmd, targetAgentID)
 		}
 	} else if !configureNonInteractive {
-		reader := bufio.NewReader(cmd.InOrStdin())
 		current := "disabled"
 		if hasAgentCascade && agentCascade {
 			current = "enabled"

@@ -53,19 +53,21 @@ func (c *KafkaConsumer) Start(ctx context.Context) error {
 // Subscribe dynamically adds a new topic to consume from. Safe to call after Start.
 func (c *KafkaConsumer) Subscribe(topic string) error {
 	c.mu.Lock()
-	defer c.mu.Unlock()
 
 	// Check if already subscribed
 	for _, t := range c.topics {
 		if t == topic {
+			c.mu.Unlock()
 			return nil
 		}
 	}
 
 	c.topics = append(c.topics, topic)
-	if c.ctx != nil {
+	ctx := c.ctx
+	c.mu.Unlock()
+	if ctx != nil {
 		brokerList := strings.Split(c.brokers, ",")
-		c.startReader(c.ctx, brokerList, topic)
+		c.startReader(ctx, brokerList, topic)
 	}
 	return nil
 }

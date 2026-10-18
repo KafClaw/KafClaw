@@ -4067,6 +4067,9 @@ func runGit(repo string, args ...string) (string, error) {
 		return "", fmt.Errorf("git subcommand not allowed: %v", args)
 	}
 	for _, a := range args[1:] {
+		if args[0] == "branch" && a == "--format=%(refname:short)" {
+			continue
+		}
 		if !safeGitArg.MatchString(a) {
 			return "", fmt.Errorf("git arg contains unsafe characters: %q", a)
 		}
