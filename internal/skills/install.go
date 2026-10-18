@@ -157,7 +157,7 @@ func InstallSkill(cfg *config.Config, target string, approveWarnings bool) (*Ins
 		return nil, err
 	}
 	dest := filepath.Join(state.Installed, pkg.SkillName)
-	snapshot := filepath.Join(state.Snapshots, pkg.SkillName, time.Now().UTC().Format("20060102T150405Z"))
+	snapshot := filepath.Join(state.Snapshots, pkg.SkillName, time.Now().UTC().Format("20060102T150405.000000000Z"))
 	stage := filepath.Join(state.TmpDir, fmt.Sprintf("install-%s-%d", pkg.SkillName, time.Now().UnixNano()))
 	if err := os.MkdirAll(stage, 0o700); err != nil {
 		return nil, err

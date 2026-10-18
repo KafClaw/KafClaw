@@ -115,7 +115,7 @@ if warnings > 0:
 endef
 export PY_CODEQL_GATE
 
-.PHONY: help check bootstrap build run rerun test vet race fmt fmt-check commit-check test-smoke test-critical test-fuzz code-ql code-ql-summary code-ql-gate test-classification test-subagents-e2e check-bundled-skills install \
+.PHONY: help check bootstrap build run rerun test vet race fmt fmt-check commit-check test-smoke test-critical test-coverage test-fuzz code-ql code-ql-summary code-ql-gate test-classification test-subagents-e2e check-bundled-skills install \
     release release-major release-minor release-patch dist-go \
     docker-build docker-up docker-down docker-logs \
     run-standalone run-full run-headless \
@@ -259,6 +259,10 @@ check-bundled-skills: ## Validate that bundled skills/docs artifacts exist
 
 test-critical: ## Enforce 100% coverage on critical logic
 	bash scripts/check_critical_coverage.sh
+
+test-coverage: ## Enforce at least 85% coverage across all Go packages
+	go test -covermode=atomic -coverpkg=./... -coverprofile=coverage.out ./...
+	bash scripts/check_coverage.sh coverage.out 85
 
 test-fuzz: ## Run fuzz tests for critical guard logic
 	bash scripts/test_fuzz.sh

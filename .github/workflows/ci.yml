@@ -85,8 +85,8 @@ jobs:
       - name: Run race detector
         run: go test -race ./...
 
-      - name: Upload coverage artifact
-        run: go test -coverprofile=coverage.out ./...
+      - name: Enforce overall coverage (85%)
+        run: make test-coverage
 
       - name: Store coverage file
         uses: actions/upload-artifact@v7
