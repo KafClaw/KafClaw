@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -16,11 +17,15 @@ import (
 
 // mockProvider returns a canned response and records calls for inspection.
 type mockProvider struct {
+	mu        sync.Mutex
 	responses []provider.ChatResponse
 	calls     int
 }
 
 func (m *mockProvider) Chat(_ context.Context, req *provider.ChatRequest) (*provider.ChatResponse, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	idx := m.calls
 	m.calls++
 	if idx < len(m.responses) {
@@ -35,6 +40,52 @@ func (m *mockProvider) Speak(_ context.Context, _ *provider.TTSRequest) (*provid
 	return &provider.TTSResponse{}, nil
 }
 func (m *mockProvider) DefaultModel() string { return "mock-model" }
+
+func TestMockProviderConcurrentChat(t *testing.T) {
+	const callers = 64
+	mock := &mockProvider{responses: make([]provider.ChatResponse, callers)}
+	for i := range mock.responses {
+		mock.responses[i].Content = fmt.Sprintf("response-%d", i)
+	}
+
+	start := make(chan struct{})
+	results := make(chan string, callers)
+	var wg sync.WaitGroup
+	for range callers {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-start
+			resp, err := mock.Chat(context.Background(), &provider.ChatRequest{})
+			if err != nil {
+				t.Errorf("Chat error: %v", err)
+				return
+			}
+			results <- resp.Content
+		}()
+	}
+	close(start)
+	wg.Wait()
+	close(results)
+
+	seen := make(map[string]bool, callers)
+	for content := range results {
+		if seen[content] {
+			t.Errorf("response returned more than once: %q", content)
+		}
+		seen[content] = true
+	}
+	if len(seen) != callers {
+		t.Errorf("expected %d distinct responses, got %d", callers, len(seen))
+	}
+	if mock.calls != callers {
+		t.Errorf("expected %d calls, got %d", callers, mock.calls)
+	}
+	resp, err := mock.Chat(context.Background(), &provider.ChatRequest{})
+	if err != nil || resp.Content != "mock response" {
+		t.Fatalf("expected fallback after canned responses, got %v, %v", resp, err)
+	}
+}
 
 // TestInternalExternalClassificationE2E exercises the full pipeline:
 //

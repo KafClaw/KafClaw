@@ -255,18 +255,6 @@ func TestLoopSpawnSubagentFromTool_Success(t *testing.T) {
 	if !gotCompleted {
 		t.Fatal("timed out waiting for subagent completion")
 	}
-	parent := loop.sessions.GetOrCreate("whatsapp:owner@s.whatsapp.net")
-	foundHandoff := false
-	for _, m := range parent.Messages {
-		if strings.Contains(m.Content, "[subagent handoff "+res.RunID+"]") && strings.Contains(m.Content, "Status: completed") {
-			foundHandoff = true
-			break
-		}
-	}
-	if !foundHandoff {
-		t.Fatalf("expected parent session handoff message for run %s", res.RunID)
-	}
-
 	select {
 	case msg := <-outbound:
 		if !strings.Contains(msg.Content, "[subagent "+res.RunID+"]") {
@@ -280,6 +268,20 @@ func TestLoopSpawnSubagentFromTool_Success(t *testing.T) {
 		}
 	case <-time.After(2 * time.Second):
 		t.Fatal("expected subagent completion outbound message")
+	}
+
+	// The outbound announcement follows the handoff write; completed status alone
+	// does not guarantee the parent session has been updated yet.
+	parent := loop.sessions.GetOrCreate("whatsapp:owner@s.whatsapp.net")
+	foundHandoff := false
+	for _, m := range parent.Messages {
+		if strings.Contains(m.Content, "[subagent handoff "+res.RunID+"]") && strings.Contains(m.Content, "Status: completed") {
+			foundHandoff = true
+			break
+		}
+	}
+	if !foundHandoff {
+		t.Fatalf("expected parent session handoff message for run %s", res.RunID)
 	}
 }
 
