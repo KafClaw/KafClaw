@@ -51,6 +51,8 @@ jobs:
     name: Go Checks
     runs-on: ubuntu-latest
     needs: [smoke, fuzz]
+    outputs:
+      coverage: ${{ steps.coverage.outputs.total }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -93,3 +95,56 @@ jobs:
         with:
           name: coverage.out
           path: coverage.out
+
+      - name: Coverage total
+        id: coverage
+        run: |
+          total=$(go tool cover -func=coverage.out | awk '/^total:/ {sub("%", "", $3); print $3}')
+          echo "Total coverage: ${total}%" >> "$GITHUB_STEP_SUMMARY"
+          echo "total=${total}" >> "$GITHUB_OUTPUT"
+
+  coverage-badge:
+    name: Coverage Badge
+    needs: go-ci
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    concurrency:
+      group: coverage-badge
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+
+      - name: Publish coverage.json to the badges branch
+        env:
+          TOTAL: ${{ needs.go-ci.outputs.coverage }}
+        run: |
+          if [ -z "$TOTAL" ]; then
+            echo "No coverage total from the Go Checks job." >&2
+            exit 1
+          fi
+          color=red
+          if awk -v t="$TOTAL" 'BEGIN { exit !(t >= 80) }'; then
+            color=brightgreen
+          elif awk -v t="$TOTAL" 'BEGIN { exit !(t >= 60) }'; then
+            color=yellow
+          fi
+          if git ls-remote --exit-code --heads origin badges >/dev/null; then
+            git fetch -q --depth 1 origin badges
+            git switch -q -c badges FETCH_HEAD
+          else
+            git switch -q --orphan badges
+          fi
+          printf '{"schemaVersion":1,"label":"coverage","message":"%s%%","color":"%s"}\n' "$TOTAL" "$color" > coverage.json
+          git add coverage.json
+          if git diff --cached --quiet; then
+            echo "Coverage badge unchanged at ${TOTAL}%."
+            exit 0
+          fi
+          git -c user.name="github-actions[bot]" \
+            -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -q -m "Coverage badge: ${TOTAL}%"
+          git push origin HEAD:badges
