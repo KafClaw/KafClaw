@@ -1,5 +1,6 @@
-// Package kafclaw is the root module package for repository analysis tools.
+// Package kafclaw is an agent runtime that connects AI agents through Apache
+// Kafka topics.
 //
-// The runtime entrypoint is under cmd/kafclaw and most implementation code
-// lives under internal/.
+// The kafclaw command lives in cmd/kafclaw and the implementation is under
+// internal/.
 package kafclaw
