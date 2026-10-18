@@ -3,6 +3,7 @@
 [![Release](https://github.com/KafClaw/KafClaw/actions/workflows/release.yml/badge.svg?branch=main)](https://github.com/KafClaw/KafClaw/actions/workflows/release.yml)
 [![Pages](https://github.com/KafClaw/KafClaw/actions/workflows/pages.yml/badge.svg?branch=main)](https://github.com/KafClaw/KafClaw/actions/workflows/pages.yml)
 [![CodeQL](https://github.com/KafClaw/KafClaw/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/KafClaw/KafClaw/actions/workflows/codeql.yml)
+[![Coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/KafClaw/KafClaw/badges/coverage.json)](https://github.com/KafClaw/KafClaw/actions/workflows/ci.yml)
 
 [![License](https://img.shields.io/github/license/KafClaw/KafClaw)](LICENSE)
 
