@@ -15,8 +15,6 @@ KafClaw is part of a broader infrastructure stack:
 
 - **KafScale**: Kafka-compatible + S3-compatible platform for event transport and large artifact flows.  
   [kafscale.io](https://kafscale.io) • [github.com/kafscale](https://github.com/kafscale)
-- **GitClaw**: agent-first self-hosted Git platform for repository workflows and automation.  
-  [github.com/KafClaw/GitClaw](https://github.com/KafClaw/GitClaw)
 - **Scalytics Copilot**: open-source operations stack for private AI inference with open models.  
   [github.com/scalytics/ScalyticsCopilot](https://github.com/scalytics/ScalyticsCopilot)
 - **KafClaw**: agent runtime and coordination layer (local, Kafka-connected, and remote gateway modes).
