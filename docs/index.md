@@ -18,9 +18,15 @@ KafClaw is a Go-based agent runtime with three practical deployment modes:
 ## Ecosystem
 
 - **KafScale** ([github.com/kafscale](https://github.com/kafscale), [kafscale.io](https://kafscale.io)): Kafka-compatible and S3-compatible data plane used for durable event transport and large artifact flows in agent systems.
-- **GitClaw** (in this KafClaw repository): agentic, self-hosted GitHub replacement focused on autonomous repository workflows and automation.
+- **GitClaw** ([github.com/KafClaw/GitClaw](https://github.com/KafClaw/GitClaw)): agentic, self-hosted GitHub replacement focused on autonomous repository workflows and automation.
 - **Scalytics Copilot** ([github.com/scalytics/ScalyticsCopilot](https://github.com/scalytics/ScalyticsCopilot)): Apache 2.0-licensed open-source operations stack for private AI inference with open models, providing OpenAI-compatible APIs, hardware monitoring, and management for GenAI workloads.
 - **KafClaw**: runtime and coordination layer for local, Kafka-connected, and remote/headless agents.
+- **KafGraph** ([github.com/scalytics/KafGraph](https://github.com/scalytics/KafGraph)): shared knowledge graph for agents. It runs as a KafScale processor and reads the KafClaw group topics.
+- **kafSIEM** ([github.com/scalytics/kafSIEM](https://github.com/scalytics/kafSIEM)): entity graph over Kafka agent traffic and OSINT feeds. KafClaw agents are one of its inputs.
+- **kshark-core** ([github.com/scalytics/kshark-core](https://github.com/scalytics/kshark-core)): Kafka connectivity diagnostics, and an example of how agents can use our tools to debug Kafka clusters.
+- **infinimesh** ([infinimesh.org](https://infinimesh.org/)): self-hosted IoT device platform. Its Kafka addon streams device data to Kafka or KafScale.
+
+All projects are listed at [scalytics.io/open-source](https://www.scalytics.io/open-source). For governed AI agents on Kafka with commercial support, see [Lascaris](https://www.scalytics.io/lascaris).
 
 ## Start Here
 
