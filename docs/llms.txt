@@ -18,7 +18,6 @@ KafClaw runs in four modes: standalone (no Kafka), group, full (group plus orche
 ## Code
 
 - [KafClaw/KafClaw](https://github.com/KafClaw/KafClaw): Source, releases and issues
-- [KafClaw/GitClaw](https://github.com/KafClaw/GitClaw): Gitea fork with agent enrollment, MIT
 
 ## Related projects
 
