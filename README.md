@@ -4,7 +4,6 @@
 [![Pages](https://github.com/KafClaw/KafClaw/actions/workflows/pages.yml/badge.svg?branch=main)](https://github.com/KafClaw/KafClaw/actions/workflows/pages.yml)
 [![CodeQL](https://github.com/KafClaw/KafClaw/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/KafClaw/KafClaw/actions/workflows/codeql.yml)
 
-[![Go Report Card](https://goreportcard.com/badge/github.com/KafClaw/KafClaw)](https://goreportcard.com/report/github.com/KafClaw/KafClaw)
 [![License](https://img.shields.io/github/license/KafClaw/KafClaw)](LICENSE)
 
 KafClaw is backed by [Scalytics](https://www.scalytics.io). We do not create, operate, or endorse any crypto tokens. If you see token-based fundraising using the KafClaw name, it is not affiliated with this project.
@@ -15,10 +14,24 @@ KafClaw is part of a broader infrastructure stack:
 
 - **KafScale**: Kafka-compatible + S3-compatible platform for event transport and large artifact flows.  
   [kafscale.io](https://kafscale.io) • [github.com/kafscale](https://github.com/kafscale)
-- **GitClaw**: agent-first self-hosted Git platform for repository workflows and automation.
+- **GitClaw**: agent-first self-hosted Git platform for repository workflows and automation.  
+  [github.com/KafClaw/GitClaw](https://github.com/KafClaw/GitClaw)
 - **Scalytics Copilot**: open-source operations stack for private AI inference with open models.  
   [github.com/scalytics/ScalyticsCopilot](https://github.com/scalytics/ScalyticsCopilot)
 - **KafClaw**: agent runtime and coordination layer (local, Kafka-connected, and remote gateway modes).
+
+Related projects from the same team:
+
+- **KafGraph**: shared knowledge graph for agents. It runs as a KafScale processor and reads the KafClaw group topics.  
+  [github.com/scalytics/KafGraph](https://github.com/scalytics/KafGraph)
+- **kafSIEM**: entity graph over Kafka agent traffic and OSINT feeds. KafClaw agents are one of its inputs.  
+  [github.com/scalytics/kafSIEM](https://github.com/scalytics/kafSIEM)
+- **kshark-core**: Kafka connectivity diagnostics, and an example of how agents can use our tools to debug Kafka clusters.  
+  [github.com/scalytics/kshark-core](https://github.com/scalytics/kshark-core)
+- **infinimesh**: self-hosted IoT device platform. Its Kafka addon streams device data to Kafka or KafScale.  
+  [infinimesh.org](https://infinimesh.org/)
+
+All projects: [scalytics.io/open-source](https://www.scalytics.io/open-source). For governed AI agents on Kafka with commercial support, see [Lascaris](https://www.scalytics.io/lascaris).
 
 **Enterprise-grade multi-agent collaboration over Apache Kafka.**
 
@@ -164,7 +177,7 @@ make run-headless      # Server mode (requires KAFCLAW_GATEWAY_AUTH_TOKEN)
 ## Quick Start
 
 ```bash
-# Prerequisites: Go 1.24+, Apache Kafka (for group modes)
+# Prerequisites: Go 1.26+ (see go.mod), Apache Kafka (for group modes)
 
 cd KafClaw
 
@@ -253,5 +266,7 @@ KShark is a built-in Kafka diagnostic tool for verifying connectivity and inspec
 ## License
 
 Licensed under the [Apache License, Version 2.0](LICENSE).
+
+Background on the design: [How I built a secure, high-performance AI agent squad](https://www.novatechflow.com/2026/02/how-i-built-secure-high-performance-ai.html) and [Building a model-agnostic multi-agent system](https://www.novatechflow.com/2026/02/building-model-agnostic-multi-agent.html) on novatechflow.com.
 
 This project was inspired by [HKUDS/nanobot](https://github.com/HKUDS/nanobot). While originally a fork, KafClaw has been completely rewritten in Go to support enterprise-grade Kafka backends and multi-agent coordination. Original attribution is preserved in the [NOTICE](NOTICE) file.

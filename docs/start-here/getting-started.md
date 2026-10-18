@@ -64,7 +64,7 @@ Desktop app distribution:
 
 ## 2. Prerequisites (Source Build Path)
 
-- Go `1.24+`
+- Go `1.26+` (see `go.mod`)
 - Git
 - Optional for group mode: Kafka reachable from your machine
 - Optional for desktop: Electron dependencies

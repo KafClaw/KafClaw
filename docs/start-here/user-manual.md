@@ -28,7 +28,7 @@ A comprehensive guide to installing, configuring, and using KafClaw - a personal
 
 ### Prerequisites
 
-- **Go 1.24.0+** (toolchain 1.24.13)
+- **Go 1.26+** (see `go.mod`)
 - **OpenAI API key** (or OpenRouter API key)
 - **Operating System:** macOS / Linux / Windows
 

@@ -1,0 +1,32 @@
+# KafClaw
+
+> KafClaw is an agent runtime written in Go. It connects AI agents through Kafka topics, with groups, an orchestrator for hierarchy and zones, shared memory and skill routing. Apache 2.0. Backed by Scalytics.
+
+KafClaw runs in four modes: standalone (no Kafka), group, full (group plus orchestrator) and headless (server with token auth). Any process that can produce and consume the JSON envelopes can join a group.
+
+## Docs
+
+- [Home](https://kafclaw.scalytics.io/): Overview, deployment modes and ecosystem
+- [Getting started](https://kafclaw.scalytics.io/start-here/getting-started/): Install from source and run the first agent
+- [User manual](https://kafclaw.scalytics.io/start-here/user-manual/): Day-to-day use
+- [Agent concepts](https://kafclaw.scalytics.io/agent-concepts/): How agents, tools, memory and identity files work
+- [Group and Kafka operations](https://kafclaw.scalytics.io/collaboration/group-kafka-operations/): Running agent groups on Kafka
+- [Architecture](https://kafclaw.scalytics.io/architecture-security/architecture-detailed/): Detailed system reference
+- [Operations and admin](https://kafclaw.scalytics.io/operations-admin/): Deploy, manage and maintain KafClaw
+- [Reference](https://kafclaw.scalytics.io/reference/): CLI, config keys, API endpoints and providers
+
+## Code
+
+- [KafClaw/KafClaw](https://github.com/KafClaw/KafClaw): Source, releases and issues
+- [KafClaw/GitClaw](https://github.com/KafClaw/GitClaw): Gitea fork with agent enrollment, MIT
+
+## Related projects
+
+- [KafScale](https://kafscale.io/): Kafka-compatible streaming on S3. KafClaw's workshop setup runs on a KafScale broker and the KafScale LFS proxy
+- [KafGraph](https://github.com/scalytics/KafGraph): Shared knowledge graph for agents that reads KafClaw group topics
+- [kafSIEM](https://github.com/scalytics/kafSIEM): Entity graph over Kafka agent traffic and OSINT feeds
+- [kshark-core](https://github.com/scalytics/kshark-core): Kafka connectivity diagnostics, an example of how agents can use our tools to debug Kafka clusters
+- [Scalytics Copilot](https://github.com/scalytics/ScalyticsCopilot): Private AI inference with open models
+- [infinimesh](https://infinimesh.org/): Self-hosted IoT device platform
+- [Scalytics open source](https://www.scalytics.io/open-source): All Scalytics open source projects
+- [Lascaris](https://www.scalytics.io/lascaris): Governed AI agents on Kafka, the supported Scalytics product built on this open core
