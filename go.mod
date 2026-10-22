@@ -2,6 +2,8 @@ module github.com/KafClaw/KafClaw
 
 go 1.26.0
 
+toolchain go1.26.10
+
 require (
 	github.com/fatih/color v1.19.0
 	github.com/google/uuid v1.6.0
