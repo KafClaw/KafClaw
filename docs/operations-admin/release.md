@@ -34,8 +34,7 @@ Release commits are created from the repository root (all staged changes include
 ## GitHub Actions
 
 - Workflow: `.github/workflows/release.yml`
-- Trigger: tag push `v*`, scheduled edge releases, or manual `workflow_dispatch`
-- Scheduled edge releases are skipped when `main` has not moved since the most recent `edge-*` tag
+- Trigger: tag push `v*` (stable) or `edge-*` (edge), or manual `workflow_dispatch`
 - Build matrix: `ubuntu-latest`, `macos-latest`, `windows-latest`
 - Artifacts attached to GitHub Release via `softprops/action-gh-release@v2`
 

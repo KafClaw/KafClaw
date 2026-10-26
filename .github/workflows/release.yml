@@ -5,8 +5,6 @@ on:
     tags:
       - "v*"
       - "edge-*"
-  schedule:
-    - cron: "0 2 * * *"
   workflow_dispatch:
     inputs:
       channel:
@@ -31,7 +29,6 @@ jobs:
   prepare:
     runs-on: ubuntu-latest
     outputs:
-      should_release: ${{ steps.meta.outputs.should_release }}
       channel: ${{ steps.meta.outputs.channel }}
       version_tag: ${{ steps.meta.outputs.version_tag }}
       prerelease: ${{ steps.meta.outputs.prerelease }}
@@ -53,7 +50,6 @@ jobs:
           input_channel="${{ github.event.inputs.channel || '' }}"
           input_tag="${{ github.event.inputs.version_tag || '' }}"
 
-          should_release="true"
           channel="edge"
           prerelease="true"
           version_tag=""
@@ -67,7 +63,7 @@ jobs:
               channel="edge"
               prerelease="true"
             fi
-          elif [[ "$event" == "workflow_dispatch" ]]; then
+          else
             if [[ "$input_channel" == "stable" ]]; then
               channel="stable"
               prerelease="false"
@@ -83,21 +79,8 @@ jobs:
             else
               version_tag="edge-$(date -u +%Y%m%d)-${GITHUB_SHA:0:7}"
             fi
-          else
-            latest_edge_tag="$(git for-each-ref --sort=-creatordate --format='%(refname:strip=2)' refs/tags/edge-* | head -n1)"
-            if [[ -n "$latest_edge_tag" ]]; then
-              latest_edge_sha="$(git rev-list -n 1 "$latest_edge_tag")"
-              if [[ "$latest_edge_sha" == "$GITHUB_SHA" ]]; then
-                should_release="false"
-              fi
-            fi
-
-            channel="edge"
-            prerelease="true"
-            version_tag="edge-$(date -u +%Y%m%d)-${GITHUB_SHA:0:7}"
           fi
 
-          echo "should_release=$should_release" >> "$GITHUB_OUTPUT"
           echo "channel=$channel" >> "$GITHUB_OUTPUT"
           echo "version_tag=$version_tag" >> "$GITHUB_OUTPUT"
           echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
@@ -109,7 +92,6 @@ jobs:
   # -------------------------------------------------------------------
   build-go:
     needs: prepare
-    if: needs.prepare.outputs.should_release == 'true'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -265,7 +247,6 @@ jobs:
   # -------------------------------------------------------------------
   smoke-native:
     needs: [prepare, build-go]
-    if: needs.prepare.outputs.should_release == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -306,7 +287,6 @@ jobs:
   # -------------------------------------------------------------------
   build-electron:
     needs: prepare
-    if: needs.prepare.outputs.should_release == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -369,7 +349,6 @@ jobs:
   # -------------------------------------------------------------------
   release:
     needs: [prepare, build-go, smoke-native, build-electron]
-    if: needs.prepare.outputs.should_release == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
