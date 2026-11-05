@@ -263,6 +263,10 @@ KShark is a built-in Kafka diagnostic tool for verifying connectivity and inspec
 - Electron desktop: `make electron-dist` packages for current platform
 - See `docs/release.md` for details
 
+## Further reading
+
+- Related: [OpenClaw multi-agent setup with separate workspaces and model fallbacks](https://www.novatechflow.com/2026/02/building-model-agnostic-multi-agent.html)
+
 ## License
 
 Licensed under the [Apache License, Version 2.0](LICENSE).
