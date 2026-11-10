@@ -29,7 +29,7 @@
     "electron": "^45.2.1",
     "electron-builder": "^26.18.0",
     "typescript": "^7.0.2",
-    "vite": "^8.3.5"
+    "vite": "^8.3.6"
   },
   "engines": {
     "node": ">=24.9.0",
