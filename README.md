@@ -265,6 +265,7 @@ KShark is a built-in Kafka diagnostic tool for verifying connectivity and inspec
 
 ## Further reading
 
+- [Coordinate AI agents over Kafka with KafClaw](https://www.novatechflow.com/2026/11/coordinate-ai-agents-over-kafka-with.html)
 - Related: [OpenClaw multi-agent setup with separate workspaces and model fallbacks](https://www.novatechflow.com/2026/02/building-model-agnostic-multi-agent.html)
 
 ## License
